@@ -162,7 +162,7 @@ export default function CustomerDashboard() {
               <ShoppingBag className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Glovo Algeciras</h1>
+              <h1 className="text-xl font-bold text-gray-900">Nubo</h1>
               <p className="text-sm text-gray-600">Hola, {user.name}</p>
             </div>
           </div>
