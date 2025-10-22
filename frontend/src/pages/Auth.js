@@ -79,7 +79,7 @@ export default function Auth() {
           <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
             <Truck className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Glovo Algeciras</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Nubo</h1>
         </div>
 
         <Card className="shadow-2xl border-0">
