@@ -1,0 +1,33 @@
+{
+  "short_name": "Nubo",
+  "name": "Nubo - Entregas en Algeciras",
+  "description": "Pide comida, haz la compra o envía paquetes en Algeciras",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#10b981",
+  "background_color": "#f0fdf4",
+  "orientation": "portrait",
+  "scope": "/",
+  "categories": ["food", "shopping", "delivery"],
+  "screenshots": [
+    {
+      "src": "/screenshot-1.png",
+      "type": "image/png",
+      "sizes": "540x720"
+    }
+  ]
+}
