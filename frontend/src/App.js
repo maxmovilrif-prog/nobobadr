@@ -82,6 +82,7 @@ function App() {
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />
         </Routes>
+        <InstallPWA />
         <Toaster position="top-right" />
       </BrowserRouter>
     </AuthContext.Provider>
