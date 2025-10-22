@@ -1,15 +1,18 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from typing import List, Optional, Dict
 import uuid
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
+import bcrypt
+import jwt
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,54 +22,593 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
+# JWT Configuration
+JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_HOURS = 24
+
+# Stripe Configuration
+STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
+
+# Create the main app
 app = FastAPI()
-
-# Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+security = HTTPBearer()
 
+# =========================
+# MODELS
+# =========================
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    email: EmailStr
+    name: str
+    phone: str
+    role: str  # customer, driver, business
+    password_hash: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Driver specific
+    is_available: bool = False
+    vehicle_type: Optional[str] = None
+    current_location: Optional[Dict[str, float]] = None
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class UserCreate(BaseModel):
+    email: EmailStr
+    name: str
+    phone: str
+    password: str
+    role: str
+    vehicle_type: Optional[str] = None
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    phone: str
+    role: str
+    is_available: bool = False
+    vehicle_type: Optional[str] = None
+
+class Business(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    owner_id: str
+    name: str
+    category: str  # restaurant, supermarket, courier
+    description: str
+    address: str
+    phone: str
+    image_url: str
+    rating: float = 0.0
+    delivery_time: str
+    is_open: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class BusinessCreate(BaseModel):
+    name: str
+    category: str
+    description: str
+    address: str
+    phone: str
+    image_url: str
+    delivery_time: str
+
+class Product(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    business_id: str
+    name: str
+    description: str
+    price: float
+    image_url: str
+    category: str
+    available: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProductCreate(BaseModel):
+    business_id: str
+    name: str
+    description: str
+    price: float
+    image_url: str
+    category: str
+
+class OrderItem(BaseModel):
+    product_id: str
+    product_name: str
+    quantity: int
+    price: float
+
+class Order(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    customer_id: str
+    business_id: str
+    driver_id: Optional[str] = None
+    items: List[OrderItem]
+    total_amount: float
+    delivery_address: str
+    status: str  # pending, accepted, preparing, ready, in_transit, delivered, cancelled
+    payment_status: str = "pending"  # pending, paid, failed
+    payment_session_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class OrderCreate(BaseModel):
+    business_id: str
+    items: List[OrderItem]
+    delivery_address: str
+
+class OrderStatusUpdate(BaseModel):
+    status: str
+
+class Message(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: str
+    sender_id: str
+    sender_role: str
+    message: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MessageCreate(BaseModel):
+    order_id: str
+    message: str
+
+class PaymentTransaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    order_id: str
+    user_id: str
+    amount: float
+    currency: str
+    payment_status: str
+    metadata: Optional[Dict] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# =========================
+# AUTH HELPERS
+# =========================
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def create_token(user_id: str, role: str) -> str:
+    expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+    payload = {
+        'user_id': user_id,
+        'role': role,
+        'exp': expiration
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload['user_id']
+        user = await db.users.find_one({'id': user_id}, {'_id': 0})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# =========================
+# AUTH ENDPOINTS
+# =========================
+
+@api_router.post("/auth/register", response_model=UserResponse)
+async def register(user_data: UserCreate):
+    # Check if user exists
+    existing = await db.users.find_one({'email': user_data.email}, {'_id': 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
+    # Create user
+    user_dict = user_data.model_dump()
+    password = user_dict.pop('password')
+    user_dict['password_hash'] = hash_password(password)
     
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+    user = User(**user_dict)
+    doc = user.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.users.insert_one(doc)
+    
+    return UserResponse(**user.model_dump())
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
+@api_router.post("/auth/login")
+async def login(credentials: UserLogin):
+    user = await db.users.find_one({'email': credentials.email}, {'_id': 0})
+    if not user or not verify_password(credentials.password, user['password_hash']):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
+    token = create_token(user['id'], user['role'])
+    user.pop('password_hash')
     
-    return status_checks
+    return {'token': token, 'user': user}
 
-# Include the router in the main app
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    return UserResponse(**current_user)
+
+# =========================
+# BUSINESS ENDPOINTS
+# =========================
+
+@api_router.post("/businesses", response_model=Business)
+async def create_business(business_data: BusinessCreate, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'business':
+        raise HTTPException(status_code=403, detail="Only business users can create businesses")
+    
+    business_dict = business_data.model_dump()
+    business_dict['owner_id'] = current_user['id']
+    
+    business = Business(**business_dict)
+    doc = business.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.businesses.insert_one(doc)
+    return business
+
+@api_router.get("/businesses", response_model=List[Business])
+async def get_businesses(category: Optional[str] = None):
+    query = {} if not category else {'category': category}
+    businesses = await db.businesses.find(query, {'_id': 0}).to_list(1000)
+    
+    for business in businesses:
+        if isinstance(business.get('created_at'), str):
+            business['created_at'] = datetime.fromisoformat(business['created_at'])
+    
+    return businesses
+
+@api_router.get("/businesses/{business_id}", response_model=Business)
+async def get_business(business_id: str):
+    business = await db.businesses.find_one({'id': business_id}, {'_id': 0})
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    
+    if isinstance(business.get('created_at'), str):
+        business['created_at'] = datetime.fromisoformat(business['created_at'])
+    
+    return business
+
+# =========================
+# PRODUCT ENDPOINTS
+# =========================
+
+@api_router.post("/products", response_model=Product)
+async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'business':
+        raise HTTPException(status_code=403, detail="Only business users can create products")
+    
+    # Verify business ownership
+    business = await db.businesses.find_one({'id': product_data.business_id, 'owner_id': current_user['id']}, {'_id': 0})
+    if not business:
+        raise HTTPException(status_code=403, detail="Not authorized for this business")
+    
+    product = Product(**product_data.model_dump())
+    doc = product.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.products.insert_one(doc)
+    return product
+
+@api_router.get("/products/{business_id}", response_model=List[Product])
+async def get_products(business_id: str):
+    products = await db.products.find({'business_id': business_id}, {'_id': 0}).to_list(1000)
+    
+    for product in products:
+        if isinstance(product.get('created_at'), str):
+            product['created_at'] = datetime.fromisoformat(product['created_at'])
+    
+    return products
+
+# =========================
+# ORDER ENDPOINTS
+# =========================
+
+@api_router.post("/orders", response_model=Order)
+async def create_order(order_data: OrderCreate, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'customer':
+        raise HTTPException(status_code=403, detail="Only customers can create orders")
+    
+    # Calculate total
+    total = sum(item.price * item.quantity for item in order_data.items)
+    
+    order_dict = order_data.model_dump()
+    order_dict['customer_id'] = current_user['id']
+    order_dict['total_amount'] = total
+    order_dict['status'] = 'pending'
+    
+    order = Order(**order_dict)
+    doc = order.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    
+    await db.orders.insert_one(doc)
+    return order
+
+@api_router.get("/orders", response_model=List[Order])
+async def get_orders(current_user: dict = Depends(get_current_user)):
+    query = {}
+    if current_user['role'] == 'customer':
+        query['customer_id'] = current_user['id']
+    elif current_user['role'] == 'driver':
+        query['driver_id'] = current_user['id']
+    elif current_user['role'] == 'business':
+        # Get businesses owned by user
+        businesses = await db.businesses.find({'owner_id': current_user['id']}, {'_id': 0}).to_list(100)
+        business_ids = [b['id'] for b in businesses]
+        query['business_id'] = {'$in': business_ids}
+    
+    orders = await db.orders.find(query, {'_id': 0}).to_list(1000)
+    
+    for order in orders:
+        if isinstance(order.get('created_at'), str):
+            order['created_at'] = datetime.fromisoformat(order['created_at'])
+        if isinstance(order.get('updated_at'), str):
+            order['updated_at'] = datetime.fromisoformat(order['updated_at'])
+    
+    return orders
+
+@api_router.get("/orders/{order_id}", response_model=Order)
+async def get_order(order_id: str, current_user: dict = Depends(get_current_user)):
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    if isinstance(order.get('created_at'), str):
+        order['created_at'] = datetime.fromisoformat(order['created_at'])
+    if isinstance(order.get('updated_at'), str):
+        order['updated_at'] = datetime.fromisoformat(order['updated_at'])
+    
+    return order
+
+@api_router.patch("/orders/{order_id}/status")
+async def update_order_status(order_id: str, status_update: OrderStatusUpdate, current_user: dict = Depends(get_current_user)):
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Update order status
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$set': {'status': status_update.status, 'updated_at': datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {'message': 'Order status updated', 'status': status_update.status}
+
+@api_router.post("/orders/{order_id}/assign-driver")
+async def assign_driver(order_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'driver':
+        raise HTTPException(status_code=403, detail="Only drivers can accept orders")
+    
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    if order.get('driver_id'):
+        raise HTTPException(status_code=400, detail="Order already assigned")
+    
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$set': {'driver_id': current_user['id'], 'status': 'accepted', 'updated_at': datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {'message': 'Order assigned successfully'}
+
+# =========================
+# DRIVER ENDPOINTS
+# =========================
+
+@api_router.get("/drivers/available-orders", response_model=List[Order])
+async def get_available_orders(current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'driver':
+        raise HTTPException(status_code=403, detail="Only drivers can view available orders")
+    
+    orders = await db.orders.find({'driver_id': None, 'status': 'pending', 'payment_status': 'paid'}, {'_id': 0}).to_list(1000)
+    
+    for order in orders:
+        if isinstance(order.get('created_at'), str):
+            order['created_at'] = datetime.fromisoformat(order['created_at'])
+        if isinstance(order.get('updated_at'), str):
+            order['updated_at'] = datetime.fromisoformat(order['updated_at'])
+    
+    return orders
+
+@api_router.patch("/drivers/availability")
+async def update_availability(is_available: bool, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'driver':
+        raise HTTPException(status_code=403, detail="Only drivers can update availability")
+    
+    await db.users.update_one(
+        {'id': current_user['id']},
+        {'$set': {'is_available': is_available}}
+    )
+    
+    return {'message': 'Availability updated', 'is_available': is_available}
+
+# =========================
+# CHAT ENDPOINTS
+# =========================
+
+@api_router.post("/messages", response_model=Message)
+async def send_message(message_data: MessageCreate, current_user: dict = Depends(get_current_user)):
+    message_dict = message_data.model_dump()
+    message_dict['sender_id'] = current_user['id']
+    message_dict['sender_role'] = current_user['role']
+    
+    message = Message(**message_dict)
+    doc = message.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.messages.insert_one(doc)
+    return message
+
+@api_router.get("/messages/{order_id}", response_model=List[Message])
+async def get_messages(order_id: str, current_user: dict = Depends(get_current_user)):
+    messages = await db.messages.find({'order_id': order_id}, {'_id': 0}).sort('created_at', 1).to_list(1000)
+    
+    for message in messages:
+        if isinstance(message.get('created_at'), str):
+            message['created_at'] = datetime.fromisoformat(message['created_at'])
+    
+    return messages
+
+# =========================
+# PAYMENT ENDPOINTS
+# =========================
+
+@api_router.post("/payments/create-checkout")
+async def create_checkout_session(order_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    # Get order
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    if order['customer_id'] != current_user['id']:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Get host URL from request
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    
+    # Initialize Stripe
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    # Get origin from request headers
+    origin = request.headers.get('origin', host_url.rstrip('/'))
+    
+    # Create checkout session
+    success_url = f"{origin}/order-success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/orders"
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=float(order['total_amount']),
+        currency="eur",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            'order_id': order_id,
+            'user_id': current_user['id']
+        }
+    )
+    
+    session = await stripe_checkout.create_checkout_session(checkout_request)
+    
+    # Create payment transaction
+    transaction = PaymentTransaction(
+        session_id=session.session_id,
+        order_id=order_id,
+        user_id=current_user['id'],
+        amount=float(order['total_amount']),
+        currency="eur",
+        payment_status="pending",
+        metadata={'order_id': order_id}
+    )
+    
+    doc = transaction.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    
+    await db.payment_transactions.insert_one(doc)
+    
+    # Update order with session_id
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$set': {'payment_session_id': session.session_id}}
+    )
+    
+    return {'url': session.url, 'session_id': session.session_id}
+
+@api_router.get("/payments/status/{session_id}")
+async def get_payment_status(session_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    # Get transaction
+    transaction = await db.payment_transactions.find_one({'session_id': session_id}, {'_id': 0})
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Check if already processed
+    if transaction['payment_status'] == 'paid':
+        return transaction
+    
+    # Initialize Stripe
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    # Get status from Stripe
+    status = await stripe_checkout.get_checkout_status(session_id)
+    
+    # Update transaction
+    await db.payment_transactions.update_one(
+        {'session_id': session_id},
+        {'$set': {
+            'payment_status': status.payment_status,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Update order if paid
+    if status.payment_status == 'paid':
+        await db.orders.update_one(
+            {'id': transaction['order_id']},
+            {'$set': {'payment_status': 'paid'}}
+        )
+    
+    return {
+        'session_id': session_id,
+        'payment_status': status.payment_status,
+        'status': status.status,
+        'amount': status.amount_total / 100,  # Convert from cents
+        'currency': status.currency
+    }
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature")
+    
+    try:
+        host_url = str(request.base_url)
+        webhook_url = f"{host_url}api/webhook/stripe"
+        stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+        
+        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        # Update transaction based on webhook
+        if webhook_response.payment_status == 'paid':
+            transaction = await db.payment_transactions.find_one({'session_id': webhook_response.session_id}, {'_id': 0})
+            if transaction and transaction['payment_status'] != 'paid':
+                await db.payment_transactions.update_one(
+                    {'session_id': webhook_response.session_id},
+                    {'$set': {'payment_status': 'paid', 'updated_at': datetime.now(timezone.utc).isoformat()}}
+                )
+                
+                await db.orders.update_one(
+                    {'id': transaction['order_id']},
+                    {'$set': {'payment_status': 'paid'}}
+                )
+        
+        return {'status': 'success'}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Include router
 app.include_router(api_router)
 
 app.add_middleware(
@@ -77,11 +619,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
