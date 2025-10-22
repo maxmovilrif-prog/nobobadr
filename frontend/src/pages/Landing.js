@@ -63,7 +63,7 @@ export default function Landing() {
               <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
                 <Truck className="w-6 h-6 text-white" />
               </div>
-              <span className="text-2xl font-bold text-gray-900">Glovo Algeciras</span>
+              <span className="text-2xl font-bold text-gray-900">Nubo</span>
             </div>
             <Button 
               data-testid="nav-login-btn"
