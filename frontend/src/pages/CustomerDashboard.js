@@ -212,7 +212,10 @@ export default function CustomerDashboard() {
                     <img src={business.image_url} alt={business.name} className="w-full h-full object-cover" />
                   </div>
                   <CardContent className="p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{business.name}</h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      {business.category === 'vehicles' && <Car className="w-5 h-5 text-emerald-600" />}
+                      <h3 className="text-lg font-semibold text-gray-900">{business.name}</h3>
+                    </div>
                     <p className="text-sm text-gray-600 mb-2">{business.description}</p>
                     <div className="flex items-center justify-between text-sm">
                       <span className="flex items-center text-gray-600">
