@@ -610,15 +610,152 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# Include routers
-app.include_router(api_router)
+# =========================
+# DROPSHIPPING MODELS & ROUTES
+# =========================
 
-# Import and include dropshipping routes
-try:
-    from dropshipping_routes import router as dropshipping_router
-    app.include_router(dropshipping_router, prefix="/api")
-except Exception as e:
-    print(f"Warning: Could not load dropshipping routes: {e}")
+class DropshippingProduct(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    business_id: str
+    name: str
+    description: str
+    original_price: float
+    selling_price: float
+    commission_percentage: float
+    platform: str  # alibaba, temu, aliexpress
+    product_url: str
+    image_url: str
+    category: str
+    stock_status: str = "available"
+    shipping_time: str = "15-30 días"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class DropshippingProductCreate(BaseModel):
+    name: str
+    description: str
+    original_price: float
+    commission_percentage: float
+    platform: str
+    product_url: str
+    image_url: str
+    category: str
+    shipping_time: str = "15-30 días"
+
+class DropshippingOrderStatusUpdate(BaseModel):
+    status: str
+    tracking_number: Optional[str] = None
+    notes: Optional[str] = None
+
+@api_router.post("/dropshipping/products", response_model=DropshippingProduct)
+async def create_dropshipping_product(product_data: DropshippingProductCreate, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'business':
+        raise HTTPException(status_code=403, detail="Only business users can create products")
+    
+    selling_price = product_data.original_price * (1 + product_data.commission_percentage / 100)
+    
+    product_dict = product_data.model_dump()
+    product_dict['business_id'] = current_user['id']
+    product_dict['selling_price'] = round(selling_price, 2)
+    
+    product = DropshippingProduct(**product_dict)
+    doc = product.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.dropshipping_products.insert_one(doc)
+    return product
+
+@api_router.get("/dropshipping/products", response_model=List[DropshippingProduct])
+async def get_dropshipping_products(
+    platform: Optional[str] = None,
+    category: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None
+):
+    query = {}
+    if platform:
+        query['platform'] = platform
+    if category:
+        query['category'] = category
+    if min_price is not None:
+        query['selling_price'] = {'$gte': min_price}
+    if max_price is not None:
+        query.setdefault('selling_price', {})['$lte'] = max_price
+    
+    products = await db.dropshipping_products.find(query, {'_id': 0}).to_list(1000)
+    
+    for product in products:
+        if isinstance(product.get('created_at'), str):
+            product['created_at'] = datetime.fromisoformat(product['created_at'])
+    
+    return products
+
+@api_router.get("/dropshipping/orders-to-purchase")
+async def get_orders_to_purchase(current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'business':
+        raise HTTPException(status_code=403, detail="Only business users")
+    
+    # Get paid orders with dropshipping products
+    orders = await db.orders.find({
+        'payment_status': 'paid',
+        'status': {'$in': ['pending', 'accepted']}
+    }, {'_id': 0}).to_list(1000)
+    
+    purchase_list = []
+    
+    for order in orders:
+        for item in order['items']:
+            # Check if dropshipping product
+            dropship_prod = await db.dropshipping_products.find_one({'id': item['product_id']}, {'_id': 0})
+            if dropship_prod:
+                commission = dropship_prod['selling_price'] - dropship_prod['original_price']
+                customer = await db.users.find_one({'id': order['customer_id']}, {'_id': 0})
+                
+                purchase_list.append({
+                    'order_id': order['id'],
+                    'product_name': item['product_name'],
+                    'quantity': item['quantity'],
+                    'platform': dropship_prod['platform'],
+                    'product_url': dropship_prod['product_url'],
+                    'original_price': dropship_prod['original_price'],
+                    'total_to_pay': dropship_prod['original_price'] * item['quantity'],
+                    'commission_earned': commission * item['quantity'],
+                    'customer_name': customer['name'],
+                    'customer_email': customer['email'],
+                    'customer_phone': customer['phone'],
+                    'delivery_address': order['delivery_address'],
+                    'order_date': order['created_at']
+                })
+    
+    return purchase_list
+
+@api_router.get("/dropshipping/stats")
+async def get_dropshipping_stats(current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'business':
+        raise HTTPException(status_code=403, detail="Only business users")
+    
+    # Get all paid orders
+    orders = await db.orders.find({'payment_status': 'paid'}, {'_id': 0}).to_list(10000)
+    
+    total_commission = 0
+    orders_count = 0
+    
+    for order in orders:
+        for item in order['items']:
+            dropship_prod = await db.dropshipping_products.find_one({'id': item['product_id']}, {'_id': 0})
+            if dropship_prod:
+                commission = (dropship_prod['selling_price'] - dropship_prod['original_price']) * item['quantity']
+                total_commission += commission
+                orders_count += 1
+    
+    return {
+        'total_orders': orders_count,
+        'total_commission': round(total_commission, 2),
+        'currency': 'EUR'
+    }
+
+# Include router
+app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
