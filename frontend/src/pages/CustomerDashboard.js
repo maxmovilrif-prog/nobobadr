@@ -25,6 +25,14 @@ export default function CustomerDashboard() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [vehicleFilters, setVehicleFilters] = useState({
+    priceRange: [0, 50000],
+    brand: 'all',
+    fuel: 'all',
+    type: 'all',
+    sortBy: 'name'
+  });
+  const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
 
   useEffect(() => {
     fetchBusinesses();
