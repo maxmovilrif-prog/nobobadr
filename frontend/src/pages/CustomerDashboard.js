@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard } from 'lucide-react';
+import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car } from 'lucide-react';
+import VehicleCard from '@/components/VehicleCard';
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
