@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import DeliveryMap from '@/components/DeliveryMap';
 import { toast } from 'sonner';
 import { ArrowLeft, Package, MapPin, Clock, MessageCircle, Send } from 'lucide-react';
 
