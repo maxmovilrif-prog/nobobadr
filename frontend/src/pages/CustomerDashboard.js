@@ -272,6 +272,14 @@ export default function CustomerDashboard() {
               ))}
             </div>
 
+            {/* Vehicle Filters - Only show when vehicles category is selected */}
+            {filter === 'vehicles' && (
+              <VehicleFilters
+                onFilterChange={setVehicleFilters}
+                onSearchChange={setVehicleSearchTerm}
+              />
+            )}
+
             {/* Businesses Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredBusinesses.map(business => (
