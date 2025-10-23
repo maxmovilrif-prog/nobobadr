@@ -314,7 +314,12 @@ export default function CustomerDashboard() {
                 <div className="grid md:grid-cols-3 gap-6">
                   <ScrollArea className="md:col-span-2 h-[500px]">
                     <div className="grid gap-4 pr-4">
-                      {products.map(product => (
+                      {displayedProducts.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Car className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                          <p className="text-gray-600">No se encontraron vehículos con los filtros seleccionados</p>
+                        </div>
+                      ) : displayedProducts.map(product => (
                         selectedBusiness?.category === 'vehicles' ? (
                           <Card key={product.id} data-testid={`product-card-${product.id}`} className="overflow-hidden">
                             <div className="grid md:grid-cols-2 gap-4">
