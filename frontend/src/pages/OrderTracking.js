@@ -143,6 +143,12 @@ export default function OrderTracking() {
               </CardContent>
             </Card>
 
+            {/* Google Maps */}
+            <DeliveryMap 
+              order={order}
+              deliveryAddress={order.delivery_address}
+            />
+
             {/* Status Timeline */}
             <Card data-testid="status-timeline" className="border-0 shadow-lg">
               <CardHeader>
