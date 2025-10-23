@@ -144,6 +144,65 @@ export default function CustomerDashboard() {
     }
   };
 
+  // Filter and search for vehicles
+  const filterVehicleProducts = (prods) => {
+    let filtered = [...prods];
+
+    // Apply search
+    if (vehicleSearchTerm) {
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(vehicleSearchTerm.toLowerCase()) ||
+        p.description.toLowerCase().includes(vehicleSearchTerm.toLowerCase()) ||
+        p.category.toLowerCase().includes(vehicleSearchTerm.toLowerCase())
+      );
+    }
+
+    // Apply price range
+    filtered = filtered.filter(p => 
+      p.price >= vehicleFilters.priceRange[0] && 
+      p.price <= vehicleFilters.priceRange[1]
+    );
+
+    // Apply brand filter
+    if (vehicleFilters.brand !== 'all') {
+      filtered = filtered.filter(p => p.name.includes(vehicleFilters.brand));
+    }
+
+    // Apply fuel type filter
+    if (vehicleFilters.fuel !== 'all') {
+      filtered = filtered.filter(p => p.category === vehicleFilters.fuel);
+    }
+
+    // Apply vehicle type filter
+    if (vehicleFilters.type !== 'all') {
+      filtered = filtered.filter(p => p.category === vehicleFilters.type);
+    }
+
+    // Apply sorting
+    switch (vehicleFilters.sortBy) {
+      case 'price-asc':
+        filtered.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-desc':
+        filtered.sort((a, b) => b.price - a.price);
+        break;
+      case 'name':
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'newest':
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        break;
+      default:
+        break;
+    }
+
+    return filtered;
+  };
+
+  const displayedProducts = filter === 'vehicles' && products.length > 0
+    ? filterVehicleProducts(products)
+    : products;
+
   const filteredBusinesses = filter === 'all' 
     ? businesses 
     : businesses.filter(b => b.category === filter);
