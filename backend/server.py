@@ -610,8 +610,15 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# Include router
+# Include routers
 app.include_router(api_router)
+
+# Import and include dropshipping routes
+try:
+    from dropshipping_routes import router as dropshipping_router
+    app.include_router(dropshipping_router, prefix="/api")
+except Exception as e:
+    print(f"Warning: Could not load dropshipping routes: {e}")
 
 app.add_middleware(
     CORSMiddleware,
