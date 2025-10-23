@@ -239,21 +239,43 @@ export default function CustomerDashboard() {
                   <ScrollArea className="md:col-span-2 h-[500px]">
                     <div className="grid gap-4 pr-4">
                       {products.map(product => (
-                        <Card key={product.id} data-testid={`product-card-${product.id}`}>
-                          <CardContent className="p-4 flex gap-4">
-                            <img src={product.image_url} alt={product.name} className="w-24 h-24 object-cover rounded-lg" />
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-gray-900">{product.name}</h4>
-                              <p className="text-sm text-gray-600 mb-2">{product.description}</p>
-                              <div className="flex items-center justify-between">
-                                <span className="text-lg font-bold text-emerald-600">€{product.price.toFixed(2)}</span>
-                                <Button data-testid={`add-to-cart-${product.id}`} onClick={() => addToCart(product)} size="sm" className="bg-emerald-600">
-                                  <Plus className="w-4 h-4" />
-                                </Button>
-                              </div>
+                        selectedBusiness?.category === 'vehicles' ? (
+                          <Card key={product.id} data-testid={`product-card-${product.id}`} className="overflow-hidden">
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <img src={product.image_url} alt={product.name} className="w-full h-48 object-cover" />
+                              <CardContent className="p-4">
+                                <Badge className="mb-2">{product.category}</Badge>
+                                <h4 className="font-bold text-lg text-gray-900 mb-2">{product.name}</h4>
+                                <p className="text-sm text-gray-600 mb-3">{product.description}</p>
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="text-2xl font-bold text-emerald-600">€{product.price.toLocaleString('es-ES')}</span>
+                                    <p className="text-xs text-gray-500">Desde €{Math.round(product.price / 60)}/mes</p>
+                                  </div>
+                                  <Button data-testid={`add-to-cart-${product.id}`} onClick={() => addToCart(product)} size="sm" className="bg-emerald-600">
+                                    Consultar
+                                  </Button>
+                                </div>
+                              </CardContent>
                             </div>
-                          </CardContent>
-                        </Card>
+                          </Card>
+                        ) : (
+                          <Card key={product.id} data-testid={`product-card-${product.id}`}>
+                            <CardContent className="p-4 flex gap-4">
+                              <img src={product.image_url} alt={product.name} className="w-24 h-24 object-cover rounded-lg" />
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900">{product.name}</h4>
+                                <p className="text-sm text-gray-600 mb-2">{product.description}</p>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-lg font-bold text-emerald-600">€{product.price.toFixed(2)}</span>
+                                  <Button data-testid={`add-to-cart-${product.id}`} onClick={() => addToCart(product)} size="sm" className="bg-emerald-600">
+                                    <Plus className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
                       ))}
                     </div>
                   </ScrollArea>
