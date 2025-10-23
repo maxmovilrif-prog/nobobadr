@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car } from 'lucide-react';
 import VehicleCard from '@/components/VehicleCard';
+import VehicleFilters from '@/components/VehicleFilters';
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
