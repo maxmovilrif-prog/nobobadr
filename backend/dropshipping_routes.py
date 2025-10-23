@@ -3,8 +3,56 @@ from typing import List, Optional
 from datetime import datetime, timezone
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
-from models_dropshipping import DropshippingProduct, DropshippingOrder
 from pydantic import BaseModel
+
+# Import from main server for get_current_user
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+
+try:
+    from models_dropshipping import DropshippingProduct, DropshippingOrder
+except:
+    # Define models inline if import fails
+    from pydantic import Field, ConfigDict
+    import uuid
+    
+    class DropshippingProduct(BaseModel):
+        model_config = ConfigDict(extra="ignore")
+        id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+        business_id: str
+        name: str
+        description: str
+        original_price: float
+        selling_price: float
+        commission_percentage: float
+        platform: str
+        product_url: str
+        image_url: str
+        category: str
+        stock_status: str = "available"
+        shipping_time: str = "15-30 días"
+        created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    class DropshippingOrder(BaseModel):
+        model_config = ConfigDict(extra="ignore")
+        id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+        order_id: str
+        product_id: str
+        product_name: str
+        product_url: str
+        platform: str
+        original_price: float
+        selling_price: float
+        commission_earned: float
+        quantity: int
+        customer_info: dict
+        status: str = "pending_purchase"
+        tracking_number: Optional[str] = None
+        notes: Optional[str] = None
+        purchased_at: Optional[datetime] = None
+        created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+        updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
