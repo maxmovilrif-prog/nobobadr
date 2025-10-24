@@ -84,6 +84,7 @@ function App() {
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />
         </Routes>
         <InstallPWA />
+        <WhatsAppButton phoneNumber="+34729342510" />
         <Toaster position="top-right" />
       </BrowserRouter>
     </AuthContext.Provider>
