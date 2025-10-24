@@ -4,7 +4,7 @@ import { Phone, Mail, MapPin, MessageCircle, Facebook, Instagram, Twitter } from
 export default function Footer() {
   const phoneNumber = '+34 729 34 251';
   const email = 'contacto@nubo.com';
-  const address = 'Algeciras, Cádiz, España';
+  const address = 'España, Europa y Marruecos';
 
   const handleWhatsApp = () => {
     const formattedNumber = phoneNumber.replace(/\s+/g, '');
