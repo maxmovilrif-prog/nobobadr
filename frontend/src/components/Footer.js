@@ -91,7 +91,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-700 mt-8 pt-6 text-center text-sm text-gray-400">
-          <p>© 2025 Nubo Algeciras. Todos los derechos reservados.</p>
+          <p>© 2025 Nubo - España, Europa y Marruecos. Todos los derechos reservados.</p>
           <p className="mt-2">
             <span className="text-emerald-400">📱 WhatsApp:</span> {phoneNumber}
           </p>
