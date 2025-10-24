@@ -257,7 +257,8 @@ export default function CustomerDashboard() {
                 { value: 'restaurant', label: 'Restaurantes', icon: ShoppingBag },
                 { value: 'supermarket', label: 'Supermercados', icon: Package },
                 { value: 'courier', label: 'Paquetería', icon: Package },
-                { value: 'vehicles', label: 'Vehículos', icon: ShoppingCart }
+                { value: 'vehicles', label: 'Vehículos', icon: Car },
+                { value: 'electronics', label: 'Electrónica', icon: ShoppingCart }
               ].map(cat => (
                 <Button
                   key={cat.value}
