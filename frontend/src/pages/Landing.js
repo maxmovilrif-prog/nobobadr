@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Package, Truck, Store, Clock, Shield, MapPin } from 'lucide-react';
+import Footer from '@/components/Footer';
 
 export default function Landing() {
   const navigate = useNavigate();
