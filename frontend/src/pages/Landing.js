@@ -12,7 +12,7 @@ export default function Landing() {
     {
       icon: <Store className="w-8 h-8 text-emerald-600" />,
       title: 'Restaurantes y Tiendas',
-      description: 'Pide de tus negocios locales favoritos en Algeciras'
+      description: 'Pide de tus negocios favoritos en España, Europa y Marruecos'
     },
     {
       icon: <Package className="w-8 h-8 text-emerald-600" />,
