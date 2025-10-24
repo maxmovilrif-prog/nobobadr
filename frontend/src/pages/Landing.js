@@ -85,7 +85,7 @@ export default function Landing() {
                 <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent"> a tu puerta</span>
               </h1>
               <p className="text-lg lg:text-xl text-gray-600 mb-8">
-                Pide comida, haz la compra o envía lo que necesites. En Algeciras, lo tienes todo al alcance de un click.
+                Pide comida, haz la compra o envía lo que necesites. En España, Europa y Marruecos, lo tienes todo al alcance de un click.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
