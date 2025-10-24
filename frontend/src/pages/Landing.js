@@ -155,7 +155,7 @@ export default function Landing() {
       <div className="py-20 px-6 bg-gradient-to-br from-emerald-600 to-teal-700">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">¿Listo para empezar?</h2>
-          <p className="text-xl text-emerald-50 mb-8">Únete a miles de usuarios en Algeciras</p>
+          <p className="text-xl text-emerald-50 mb-8">Únete a miles de usuarios en España, Europa y Marruecos</p>
           <Button 
             data-testid="footer-cta-btn"
             size="lg" 
