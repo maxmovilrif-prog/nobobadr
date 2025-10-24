@@ -133,7 +133,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">¿Por qué elegirnos?</h2>
-            <p className="text-lg text-gray-600">Servicio rápido, seguro y confiable en Algeciras</p>
+            <p className="text-lg text-gray-600">Servicio rápido, seguro y confiable en España, Europa y Marruecos</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, idx) => (
