@@ -166,6 +166,9 @@ export default function Landing() {
           </Button>
         </div>
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }
