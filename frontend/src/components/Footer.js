@@ -24,7 +24,7 @@ export default function Footer() {
           <div>
             <h3 className="text-xl font-bold mb-4 text-emerald-400">Nubo</h3>
             <p className="text-gray-300 text-sm">
-              Tu marketplace en Algeciras. Comida, compras, paquetería, coches y electrónica.
+              Tu marketplace en España, Europa y Marruecos. Comida, compras, paquetería, coches y electrónica.
             </p>
           </div>
 
