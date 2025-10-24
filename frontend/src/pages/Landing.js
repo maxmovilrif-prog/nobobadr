@@ -37,7 +37,7 @@ export default function Landing() {
     {
       icon: <MapPin className="w-8 h-8 text-emerald-600" />,
       title: 'Cobertura Total',
-      description: 'Servicio en toda la zona de Algeciras'
+      description: 'Servicio en España, Europa y Marruecos'
     }
   ];
 
