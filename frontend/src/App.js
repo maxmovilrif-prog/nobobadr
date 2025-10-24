@@ -10,6 +10,7 @@ import BusinessDashboard from '@/pages/BusinessDashboard';
 import OrderTracking from '@/pages/OrderTracking';
 import OrderSuccess from '@/pages/OrderSuccess';
 import InstallPWA from '@/components/InstallPWA';
+import WhatsAppButton from '@/components/WhatsAppButton';
 import { Toaster } from '@/components/ui/sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
