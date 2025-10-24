@@ -258,7 +258,8 @@ export default function CustomerDashboard() {
                 { value: 'supermarket', label: 'Supermercados', icon: Package },
                 { value: 'courier', label: 'Paquetería', icon: Package },
                 { value: 'vehicles', label: 'Vehículos', icon: Car },
-                { value: 'electronics', label: 'Electrónica', icon: ShoppingCart }
+                { value: 'electronics', label: 'Electrónica', icon: ShoppingCart },
+                { value: 'transport', label: 'NuboRide 🚗', icon: MapPin }
               ].map(cat => (
                 <Button
                   key={cat.value}
