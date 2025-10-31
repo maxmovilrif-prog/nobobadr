@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car } from 'lucide-react';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleFilters from '@/components/VehicleFilters';
+import RideBooking from '@/components/RideBooking';
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
