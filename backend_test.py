@@ -466,6 +466,147 @@ class GlovoAlgecirasAPITester:
             token=self.tokens['customer']
         )
 
+    def test_dropshipping_operations(self):
+        """Test dropshipping operations"""
+        print("\n" + "="*50)
+        print("TESTING DROPSHIPPING OPERATIONS")
+        print("="*50)
+        
+        if 'business' not in self.tokens:
+            print("❌ No business token available, skipping dropshipping tests")
+            return
+
+        # Create dropshipping products
+        dropshipping_products = [
+            {
+                "name": "Smartphone Samsung Galaxy A54",
+                "description": "Teléfono inteligente con pantalla de 6.4 pulgadas, 128GB",
+                "original_price": 280.00,
+                "commission_percentage": 20.0,
+                "platform": "alibaba",
+                "product_url": "https://www.alibaba.com/product/samsung-galaxy-a54",
+                "image_url": "https://via.placeholder.com/400x400",
+                "category": "Electronics",
+                "shipping_time": "15-25 días"
+            },
+            {
+                "name": "Auriculares Bluetooth TWS",
+                "description": "Auriculares inalámbricos con cancelación de ruido",
+                "original_price": 45.00,
+                "commission_percentage": 25.0,
+                "platform": "aliexpress",
+                "product_url": "https://www.aliexpress.com/item/bluetooth-earbuds",
+                "image_url": "https://via.placeholder.com/400x400",
+                "category": "Electronics",
+                "shipping_time": "10-20 días"
+            },
+            {
+                "name": "Reloj Inteligente Deportivo",
+                "description": "Smartwatch con monitor de frecuencia cardíaca y GPS",
+                "original_price": 65.00,
+                "commission_percentage": 18.0,
+                "platform": "temu",
+                "product_url": "https://www.temu.com/smartwatch-sports",
+                "image_url": "https://via.placeholder.com/400x400",
+                "category": "Wearables",
+                "shipping_time": "12-22 días"
+            }
+        ]
+
+        created_dropshipping_products = []
+        for product_data in dropshipping_products:
+            success, response = self.run_test(
+                f"Create Dropshipping Product: {product_data['name']}",
+                "POST",
+                "dropshipping/products",
+                200,
+                data=product_data,
+                token=self.tokens['business']
+            )
+            
+            if success and 'id' in response:
+                created_dropshipping_products.append(response)
+
+        if created_dropshipping_products:
+            self.test_data['dropshipping_products'] = created_dropshipping_products
+            
+            # Test get all dropshipping products
+            self.run_test(
+                "Get All Dropshipping Products",
+                "GET",
+                "dropshipping/products",
+                200
+            )
+            
+            # Test get dropshipping products by platform
+            self.run_test(
+                "Get Dropshipping Products by Platform (alibaba)",
+                "GET",
+                "dropshipping/products",
+                200,
+                params={"platform": "alibaba"}
+            )
+            
+            self.run_test(
+                "Get Dropshipping Products by Platform (aliexpress)",
+                "GET",
+                "dropshipping/products",
+                200,
+                params={"platform": "aliexpress"}
+            )
+            
+            self.run_test(
+                "Get Dropshipping Products by Platform (temu)",
+                "GET",
+                "dropshipping/products",
+                200,
+                params={"platform": "temu"}
+            )
+            
+            # Test get dropshipping products by category
+            self.run_test(
+                "Get Dropshipping Products by Category (Electronics)",
+                "GET",
+                "dropshipping/products",
+                200,
+                params={"category": "Electronics"}
+            )
+            
+            # Test get dropshipping products with price filters
+            self.run_test(
+                "Get Dropshipping Products with Min Price",
+                "GET",
+                "dropshipping/products",
+                200,
+                params={"min_price": 50.0}
+            )
+            
+            self.run_test(
+                "Get Dropshipping Products with Max Price",
+                "GET",
+                "dropshipping/products",
+                200,
+                params={"max_price": 100.0}
+            )
+            
+            # Test get orders to purchase
+            self.run_test(
+                "Get Orders to Purchase",
+                "GET",
+                "dropshipping/orders-to-purchase",
+                200,
+                token=self.tokens['business']
+            )
+            
+            # Test get dropshipping stats
+            self.run_test(
+                "Get Dropshipping Stats",
+                "GET",
+                "dropshipping/stats",
+                200,
+                token=self.tokens['business']
+            )
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Glovo Algeciras API Tests")
