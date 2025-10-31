@@ -9,6 +9,7 @@ import DriverDashboard from '@/pages/DriverDashboard';
 import BusinessDashboard from '@/pages/BusinessDashboard';
 import OrderTracking from '@/pages/OrderTracking';
 import OrderSuccess from '@/pages/OrderSuccess';
+import DropshippingPanel from '@/pages/DropshippingPanel';
 import InstallPWA from '@/components/InstallPWA';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { Toaster } from '@/components/ui/sonner';
