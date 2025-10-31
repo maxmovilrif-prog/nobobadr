@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { LogOut, Store, Package, ShoppingBag, Plus, Globe } from 'lucide-react';
 
 export default function BusinessDashboard() {
+  const navigate = useNavigate();
   const { user, token, logout, API } = useContext(AuthContext);
   const [businesses, setBusinesses] = useState([]);
   const [selectedBusiness, setSelectedBusiness] = useState(null);
