@@ -145,6 +145,60 @@ export default function CustomerDashboard() {
     }
   };
 
+  const handleRideBooking = async (bookingData) => {
+    try {
+      setLoading(true);
+      
+      // Create order for NuboRide service
+      const orderData = {
+        business_id: selectedBusiness.id,
+        items: [{
+          product_id: bookingData.service.id,
+          product_name: bookingData.service.name,
+          quantity: 1,
+          price: parseFloat(bookingData.totalPrice)
+        }],
+        delivery_address: `${bookingData.route.startAddress} → ${bookingData.route.endAddress}`,
+        pickup_location: {
+          address: bookingData.route.startAddress,
+          coordinates: { lat: 0, lng: 0 } // Will be set by backend/driver
+        },
+        delivery_location: {
+          address: bookingData.route.endAddress,
+          coordinates: { lat: 0, lng: 0 }
+        },
+        route_info: bookingData.route
+      };
+
+      const response = await axios.post(`${API}/orders`, orderData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Create Stripe payment
+      const paymentResponse = await axios.post(
+        `${API}/create-checkout-session`,
+        {
+          orderId: response.data.id,
+          items: orderData.items
+        },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            Origin: window.location.origin
+          }
+        }
+      );
+
+      // Redirect to Stripe
+      window.location.href = paymentResponse.data.url;
+    } catch (error) {
+      console.error('Error booking ride:', error);
+      toast.error('Error al reservar el viaje');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filter and search for vehicles
   const filterVehicleProducts = (prods) => {
     let filtered = [...prods];
