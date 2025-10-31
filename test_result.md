@@ -101,3 +101,114 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Nubo is a multi-service marketplace application for España, Europa y Marruecos. The app includes:
+  - Food delivery, grocery shopping, package delivery
+  - Courier services (MRW, Correos Express, NACEX, GLS)
+  - Vehicle marketplace with advanced search/filters
+  - Dropshipping from Alibaba, Temu, AliExpress with 15-25% commission
+  - Electronics marketplace
+  - NuboRide (Uber-like transport service)
+  - PWA with offline capabilities
+  - Google Maps integration for real-time tracking and routes
+  
+  Current tasks:
+  1. Update contact email from contacto@nubo.com to exprenobo@hotmail.com
+  2. Verify Google Maps integration for NuboRide and delivery tracking
+  3. Complete dropshipping business dashboard integration
+  4. Test all features end-to-end
+
+backend:
+  - task: "User authentication (JWT)"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "JWT authentication implemented with login, register, and me endpoints"
+  
+  - task: "Dropshipping API endpoints"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Dropshipping endpoints exist: POST /api/dropshipping/products, GET /api/dropshipping/products, GET /api/dropshipping/orders-to-purchase. Need to test functionality."
+  
+  - task: "Google Maps coordinates storage in orders"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Orders support coordinates for pickup and delivery locations"
+
+frontend:
+  - task: "Contact email update"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/Footer.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated email from contacto@nubo.com to exprenobo@hotmail.com in Footer.js"
+  
+  - task: "Google Maps integration components"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/MapComponent.js, /app/frontend/src/components/RouteSelector.js, /app/frontend/src/components/RideBooking.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "MapComponent, RouteSelector, and RideBooking components exist and use REACT_APP_GOOGLE_MAPS_API_KEY. Need to verify integration in CustomerDashboard."
+  
+  - task: "Dropshipping panel integration"
+    implemented: true
+    working: false
+    file: "/app/frontend/src/pages/DropshippingPanel.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "main"
+        comment: "DropshippingPanel.js exists but is not imported or routed in App.js. Needs integration."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Integrate DropshippingPanel into App.js routing"
+    - "Verify Google Maps API key configuration"
+    - "Test backend dropshipping endpoints"
+    - "Test NuboRide booking flow with RouteSelector"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Initial assessment complete. Email updated in Footer.js. Found DropshippingPanel not integrated in routing. Need to add route for /dropshipping-panel and integrate RideBooking in CustomerDashboard for NuboRide service."
