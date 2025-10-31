@@ -636,6 +636,9 @@ class GlovoAlgecirasAPITester:
         # Test chat operations
         self.test_chat_operations()
         
+        # Test dropshipping operations
+        self.test_dropshipping_operations()
+        
         # Print final results
         print("\n" + "="*60)
         print("FINAL TEST RESULTS")
