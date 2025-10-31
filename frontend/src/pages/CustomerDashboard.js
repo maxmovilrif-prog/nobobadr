@@ -362,8 +362,8 @@ export default function CustomerDashboard() {
               ))}
             </div>
 
-            {/* Products Dialog */}
-            <Dialog open={selectedBusiness !== null} onOpenChange={() => setSelectedBusiness(null)}>
+            {/* Products Dialog - For non-transport businesses */}
+            <Dialog open={selectedBusiness !== null && selectedBusiness?.category !== 'transport'} onOpenChange={() => setSelectedBusiness(null)}>
               <DialogContent data-testid="products-dialog" className="max-w-4xl max-h-[90vh]">
                 <DialogHeader>
                   <DialogTitle className="text-2xl">{selectedBusiness?.name}</DialogTitle>
