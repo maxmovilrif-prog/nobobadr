@@ -159,10 +159,21 @@ export default function BusinessDashboard() {
               <p className="text-sm text-gray-600">Hola, {user.name}</p>
             </div>
           </div>
-          <Button data-testid="logout-btn" onClick={logout} variant="outline" size="sm">
-            <LogOut className="w-4 h-4 mr-2" />
-            Salir
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={() => navigate('/dropshipping-panel')}
+              variant="outline" 
+              size="sm"
+              className="mr-2"
+            >
+              <Globe className="w-4 h-4 mr-2" />
+              Dropshipping
+            </Button>
+            <Button data-testid="logout-btn" onClick={logout} variant="outline" size="sm">
+              <LogOut className="w-4 h-4 mr-2" />
+              Salir
+            </Button>
+          </div>
         </div>
       </header>
 
