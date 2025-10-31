@@ -470,6 +470,15 @@ export default function CustomerDashboard() {
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* NuboRide Booking Dialog */}
+            <RideBooking 
+              isOpen={selectedBusiness !== null && selectedBusiness?.category === 'transport'}
+              onClose={() => setSelectedBusiness(null)}
+              services={products}
+              businessName={selectedBusiness?.name || ''}
+              onBookRide={handleRideBooking}
+            />
           </TabsContent>
 
           <TabsContent value="orders">
