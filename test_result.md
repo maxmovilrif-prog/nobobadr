@@ -294,10 +294,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Test dropshipping endpoints and panel functionality"
-    - "Test NuboRide booking flow with RouteSelector"
-    - "Verify Google Maps integration (note: API key is placeholder)"
-    - "Test backend authentication and order creation"
+    - "Frontend testing (delegated to main agent - testing agent does not test frontend)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
