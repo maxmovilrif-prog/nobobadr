@@ -83,6 +83,7 @@ function App() {
           <Route path="/orders" element={user ? <CustomerDashboard /> : <Navigate to="/auth" />} />
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />
+          <Route path="/dropshipping-panel" element={user && user.role === 'business' ? <DropshippingPanel /> : <Navigate to="/auth" />} />
         </Routes>
         <InstallPWA />
         <WhatsAppButton phoneNumber="+34729342510" />
