@@ -22,18 +22,34 @@ export default function Footer() {
   return (
     <footer className="bg-gradient-to-br from-gray-900 to-gray-800 text-white mt-auto">
       <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid md:grid-cols-4 gap-8">
+        <div className="grid md:grid-cols-5 gap-8">
           {/* About */}
-          <div>
-            <h3 className="text-xl font-bold mb-4 text-emerald-400">Nubo</h3>
-            <p className="text-gray-300 text-sm">
-              Tu marketplace en España, Europa y Marruecos. Comida, compras, paquetería, coches y electrónica.
+          <div className="md:col-span-2">
+            <h3 className="text-xl font-bold mb-4 text-emerald-400">{t('footer.about')}</h3>
+            <p className="text-gray-300 text-sm mb-4">
+              {t('footer.about_text')}
             </p>
+            {/* Payment Methods */}
+            <div className="mt-4">
+              <p className="text-xs text-gray-400 mb-2">{t('footer.payment_methods')}</p>
+              <div className="flex gap-3 items-center">
+                <div className="bg-white px-3 py-2 rounded">
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/Visa_Logo.png" alt="Visa" className="h-5" />
+                </div>
+                <div className="bg-white px-3 py-2 rounded">
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-5" />
+                </div>
+                <div className="flex items-center gap-1 bg-gray-700 px-3 py-2 rounded text-xs">
+                  <CreditCard className="w-4 h-4" />
+                  <span>+más</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Contact */}
           <div>
-            <h4 className="font-semibold mb-4 text-emerald-400">Contacto</h4>
+            <h4 className="font-semibold mb-4 text-emerald-400">{t('footer.contact')}</h4>
             <div className="space-y-3">
               <button
                 onClick={handleCall}
