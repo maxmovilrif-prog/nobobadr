@@ -100,19 +100,24 @@ export default function Footer() {
             
             <button
               onClick={handleWhatsApp}
-              className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors font-medium"
+              className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors font-medium mb-4"
             >
               <MessageCircle className="w-5 h-5" />
-              Chatea con nosotros
+              {t('footer.chat')}
             </button>
+
+            {/* Language Selector */}
+            <div className="w-full">
+              <LanguageSelector variant="outline" />
+            </div>
           </div>
         </div>
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-700 mt-8 pt-6 text-center text-sm text-gray-400">
-          <p>© 2025 Nubo - España, Europa y Marruecos. Todos los derechos reservados.</p>
+          <p>© 2025 {t('footer.about')} - {t('landing.coverage')}. {t('footer.rights')}.</p>
           <p className="mt-2">
-            <span className="text-emerald-400">📱 WhatsApp:</span> {phoneNumber}
+            <span className="text-emerald-400">📱 {t('footer.whatsapp')}:</span> {phoneNumber}
           </p>
         </div>
       </div>
