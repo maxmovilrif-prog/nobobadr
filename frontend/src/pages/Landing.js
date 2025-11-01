@@ -45,9 +45,9 @@ export default function Landing() {
   ];
 
   const categories = [
-    { name: 'Restaurantes', emoji: '🍔', color: 'from-orange-400 to-red-500' },
-    { name: 'Supermercados', emoji: '🛒', color: 'from-blue-400 to-cyan-500' },
-    { name: 'Paquetería', emoji: '📦', color: 'from-purple-400 to-pink-500' }
+    { name: t('landing.services.restaurants'), emoji: '🍔', color: 'from-orange-400 to-red-500' },
+    { name: t('landing.services.supermarkets'), emoji: '🛒', color: 'from-blue-400 to-cyan-500' },
+    { name: t('landing.services.courier'), emoji: '📦', color: 'from-purple-400 to-pink-500' }
   ];
 
   return (
