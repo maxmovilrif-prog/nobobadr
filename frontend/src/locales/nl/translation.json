@@ -1,0 +1,172 @@
+{
+  "common": {
+    "login": "Inloggen",
+    "logout": "Uitloggen",
+    "register": "Registreren",
+    "email": "E-mail",
+    "password": "Wachtwoord",
+    "name": "Naam",
+    "phone": "Telefoon",
+    "address": "Adres",
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "delete": "Verwijderen",
+    "edit": "Bewerken",
+    "search": "Zoeken",
+    "filter": "Filteren",
+    "price": "Prijs",
+    "description": "Beschrijving",
+    "category": "Categorie",
+    "total": "Totaal",
+    "confirm": "Bevestigen",
+    "back": "Terug",
+    "next": "Volgende",
+    "loading": "Laden...",
+    "error": "Fout",
+    "success": "Succes"
+  },
+  "landing": {
+    "brand": "Nubo",
+    "hero_title": "Alles wat je nodig hebt,",
+    "hero_subtitle": "bij je deur",
+    "hero_description": "Bestel eten, doe boodschappen of verstuur wat je nodig hebt. In Spanje, Europa en Marokko heb je alles met één klik.",
+    "cta_customer": "Begin nu",
+    "cta_business": "Ik ben een bedrijf",
+    "services": {
+      "restaurants": "Restaurants",
+      "supermarkets": "Supermarkten",
+      "courier": "Koerier"
+    },
+    "coverage": "Spanje, Europa en Marokko"
+  },
+  "auth": {
+    "welcome": "Welkom bij",
+    "login_title": "Inloggen",
+    "register_title": "Account aanmaken",
+    "have_account": "Heb je al een account?",
+    "no_account": "Heb je geen account?",
+    "user_type": "Gebruikerstype",
+    "customer": "Klant",
+    "driver": "Chauffeur",
+    "business": "Bedrijf",
+    "vehicle_type": "Voertuigtype",
+    "vehicle_bike": "Fiets",
+    "vehicle_motorcycle": "Motorfiets",
+    "vehicle_car": "Auto",
+    "vehicle_van": "Bestelwagen"
+  },
+  "dashboard": {
+    "customer": {
+      "title": "Nubo",
+      "welcome": "Hallo",
+      "tabs": {
+        "businesses": "Bedrijven",
+        "orders": "Mijn bestellingen"
+      },
+      "categories": {
+        "all": "Alle",
+        "restaurant": "Restaurants",
+        "supermarket": "Supermarkten",
+        "courier": "Koerier",
+        "vehicles": "Voertuigen",
+        "electronics": "Elektronica",
+        "transport": "NuboRide 🚗"
+      },
+      "cart": "Winkelwagen",
+      "empty_cart": "Lege winkelwagen",
+      "delivery_address": "Afleveradres",
+      "pay_order": "Bestelling betalen",
+      "processing": "Verwerken...",
+      "no_orders": "Je hebt nog geen bestellingen",
+      "order_again": "Opnieuw bestellen"
+    },
+    "business": {
+      "title": "Bedrijfsdashboard",
+      "no_business": "Je hebt geen geregistreerde bedrijven",
+      "create_first": "Maak je eerste bedrijf om te beginnen",
+      "create_business": "Bedrijf aanmaken",
+      "dropshipping": "Dropshipping",
+      "add_product": "Product toevoegen",
+      "my_products": "Mijn producten",
+      "orders": "Bestellingen"
+    },
+    "driver": {
+      "title": "Chauffeursdashboard",
+      "available": "Beschikbaar",
+      "unavailable": "Niet beschikbaar",
+      "available_orders": "Beschikbare bestellingen",
+      "my_deliveries": "Mijn leveringen",
+      "accept_order": "Bestelling accepteren",
+      "complete_delivery": "Levering voltooien"
+    }
+  },
+  "dropshipping": {
+    "title": "Dropshipping paneel",
+    "back_dashboard": "Terug naar dashboard",
+    "stats": {
+      "total_orders": "Totaal bestellingen",
+      "total_commission": "Totale commissie",
+      "active_products": "Actieve producten"
+    },
+    "tabs": {
+      "orders": "Openstaande bestellingen",
+      "products": "Mijn producten"
+    },
+    "orders_to_buy": "Te kopen bestellingen",
+    "pending": "wachtend",
+    "add_product": "Product toevoegen",
+    "platforms": {
+      "alibaba": "Alibaba",
+      "aliexpress": "AliExpress",
+      "temu": "Temu"
+    },
+    "product_url": "Product URL",
+    "original_price": "Oorspronkelijke prijs",
+    "commission": "Commissie",
+    "selling_price": "Verkoopprijs",
+    "shipping_time": "Verzendtijd"
+  },
+  "nuboride": {
+    "title": "NuboRide",
+    "select_service": "Selecteer je service",
+    "select_route": "Voer je route in",
+    "confirm_trip": "Bevestig je reis",
+    "origin": "Vertrek",
+    "destination": "Bestemming",
+    "calculate_route": "Route berekenen",
+    "calculating": "Berekenen...",
+    "distance": "Afstand",
+    "estimated_time": "Geschatte tijd",
+    "estimated_price": "Geschatte prijs",
+    "change_service": "Service wijzigen",
+    "confirm_pay": "Bevestigen en betalen"
+  },
+  "footer": {
+    "about": "Nubo",
+    "about_text": "Jouw marktplaats in Spanje, Europa en Marokko. Eten, boodschappen, koerier, auto's en elektronica.",
+    "contact": "Contact",
+    "links": "Links",
+    "home": "Home",
+    "help": "Hulp",
+    "terms": "Voorwaarden",
+    "follow": "Volg ons",
+    "chat": "Chat met ons",
+    "rights": "Alle rechten voorbehouden",
+    "whatsapp": "WhatsApp",
+    "payment_methods": "Geaccepteerde betaalmethoden"
+  },
+  "order": {
+    "status": {
+      "pending": "Wachtend",
+      "accepted": "Geaccepteerd",
+      "preparing": "Voorbereiden",
+      "in_transit": "Onderweg",
+      "delivered": "Geleverd",
+      "cancelled": "Geannuleerd"
+    },
+    "tracking": "Bestelling volgen",
+    "order_details": "Bestelgegevens",
+    "delivery_address": "Afleveradres",
+    "contact_driver": "Contact chauffeur"
+  }
+}

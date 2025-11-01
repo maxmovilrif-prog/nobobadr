@@ -1,0 +1,172 @@
+{
+  "common": {
+    "login": "تسجيل الدخول",
+    "logout": "تسجيل الخروج",
+    "register": "التسجيل",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "name": "الاسم",
+    "phone": "الهاتف",
+    "address": "العنوان",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "search": "بحث",
+    "filter": "تصفية",
+    "price": "السعر",
+    "description": "الوصف",
+    "category": "الفئة",
+    "total": "المجموع",
+    "confirm": "تأكيد",
+    "back": "رجوع",
+    "next": "التالي",
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "نجح"
+  },
+  "landing": {
+    "brand": "نوبو",
+    "hero_title": "كل ما تحتاجه،",
+    "hero_subtitle": "عند بابك",
+    "hero_description": "اطلب الطعام، تسوق أو أرسل ما تحتاجه. في إسبانيا وأوروبا والمغرب، كل شيء بنقرة واحدة.",
+    "cta_customer": "ابدأ الآن",
+    "cta_business": "أنا صاحب عمل",
+    "services": {
+      "restaurants": "المطاعم",
+      "supermarkets": "السوبر ماركت",
+      "courier": "التوصيل"
+    },
+    "coverage": "إسبانيا وأوروبا والمغرب"
+  },
+  "auth": {
+    "welcome": "مرحباً بك في",
+    "login_title": "تسجيل الدخول",
+    "register_title": "إنشاء حساب",
+    "have_account": "هل لديك حساب بالفعل؟",
+    "no_account": "ليس لديك حساب؟",
+    "user_type": "نوع المستخدم",
+    "customer": "عميل",
+    "driver": "سائق",
+    "business": "عمل تجاري",
+    "vehicle_type": "نوع المركبة",
+    "vehicle_bike": "دراجة",
+    "vehicle_motorcycle": "دراجة نارية",
+    "vehicle_car": "سيارة",
+    "vehicle_van": "شاحنة"
+  },
+  "dashboard": {
+    "customer": {
+      "title": "نوبو",
+      "welcome": "مرحباً",
+      "tabs": {
+        "businesses": "الأعمال",
+        "orders": "طلباتي"
+      },
+      "categories": {
+        "all": "الكل",
+        "restaurant": "المطاعم",
+        "supermarket": "السوبر ماركت",
+        "courier": "التوصيل",
+        "vehicles": "المركبات",
+        "electronics": "الإلكترونيات",
+        "transport": "نوبو رايد 🚗"
+      },
+      "cart": "السلة",
+      "empty_cart": "السلة فارغة",
+      "delivery_address": "عنوان التسليم",
+      "pay_order": "دفع الطلب",
+      "processing": "جاري المعالجة...",
+      "no_orders": "ليس لديك طلبات بعد",
+      "order_again": "اطلب مرة أخرى"
+    },
+    "business": {
+      "title": "لوحة العمل",
+      "no_business": "ليس لديك أعمال مسجلة",
+      "create_first": "أنشئ عملك الأول للبدء",
+      "create_business": "إنشاء عمل",
+      "dropshipping": "الدروب شيبينغ",
+      "add_product": "إضافة منتج",
+      "my_products": "منتجاتي",
+      "orders": "الطلبات"
+    },
+    "driver": {
+      "title": "لوحة السائق",
+      "available": "متاح",
+      "unavailable": "غير متاح",
+      "available_orders": "الطلبات المتاحة",
+      "my_deliveries": "توصيلاتي",
+      "accept_order": "قبول الطلب",
+      "complete_delivery": "إكمال التسليم"
+    }
+  },
+  "dropshipping": {
+    "title": "لوحة الدروب شيبينغ",
+    "back_dashboard": "العودة إلى اللوحة",
+    "stats": {
+      "total_orders": "إجمالي الطلبات",
+      "total_commission": "إجمالي العمولة",
+      "active_products": "المنتجات النشطة"
+    },
+    "tabs": {
+      "orders": "الطلبات المعلقة",
+      "products": "منتجاتي"
+    },
+    "orders_to_buy": "الطلبات للشراء",
+    "pending": "معلق",
+    "add_product": "إضافة منتج",
+    "platforms": {
+      "alibaba": "علي بابا",
+      "aliexpress": "علي إكسبريس",
+      "temu": "تيمو"
+    },
+    "product_url": "رابط المنتج",
+    "original_price": "السعر الأصلي",
+    "commission": "العمولة",
+    "selling_price": "سعر البيع",
+    "shipping_time": "وقت الشحن"
+  },
+  "nuboride": {
+    "title": "نوبو رايد",
+    "select_service": "اختر خدمتك",
+    "select_route": "حدد مسارك",
+    "confirm_trip": "أكد رحلتك",
+    "origin": "نقطة الانطلاق",
+    "destination": "الوجهة",
+    "calculate_route": "حساب المسار",
+    "calculating": "جاري الحساب...",
+    "distance": "المسافة",
+    "estimated_time": "الوقت المقدر",
+    "estimated_price": "السعر المقدر",
+    "change_service": "تغيير الخدمة",
+    "confirm_pay": "تأكيد والدفع"
+  },
+  "footer": {
+    "about": "نوبو",
+    "about_text": "سوقك في إسبانيا وأوروبا والمغرب. طعام، تسوق، توصيل، سيارات وإلكترونيات.",
+    "contact": "اتصل بنا",
+    "links": "الروابط",
+    "home": "الرئيسية",
+    "help": "مساعدة",
+    "terms": "الشروط والأحكام",
+    "follow": "تابعنا",
+    "chat": "دردش معنا",
+    "rights": "جميع الحقوق محفوظة",
+    "whatsapp": "واتساب",
+    "payment_methods": "طرق الدفع المقبولة"
+  },
+  "order": {
+    "status": {
+      "pending": "معلق",
+      "accepted": "مقبول",
+      "preparing": "قيد التحضير",
+      "in_transit": "في الطريق",
+      "delivered": "تم التسليم",
+      "cancelled": "ملغى"
+    },
+    "tracking": "تتبع الطلب",
+    "order_details": "تفاصيل الطلب",
+    "delivery_address": "عنوان التسليم",
+    "contact_driver": "اتصل بالسائق"
+  }
+}

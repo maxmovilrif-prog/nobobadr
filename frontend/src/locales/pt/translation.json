@@ -1,0 +1,172 @@
+{
+  "common": {
+    "login": "Entrar",
+    "logout": "Sair",
+    "register": "Registar",
+    "email": "E-mail",
+    "password": "Palavra-passe",
+    "name": "Nome",
+    "phone": "Telefone",
+    "address": "Endereço",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "search": "Pesquisar",
+    "filter": "Filtrar",
+    "price": "Preço",
+    "description": "Descrição",
+    "category": "Categoria",
+    "total": "Total",
+    "confirm": "Confirmar",
+    "back": "Voltar",
+    "next": "Seguinte",
+    "loading": "A carregar...",
+    "error": "Erro",
+    "success": "Sucesso"
+  },
+  "landing": {
+    "brand": "Nubo",
+    "hero_title": "Tudo o que precisas,",
+    "hero_subtitle": "à tua porta",
+    "hero_description": "Pede comida, faz compras ou envia o que precisas. Em Espanha, Europa e Marrocos, tens tudo com um clique.",
+    "cta_customer": "Começar Agora",
+    "cta_business": "Sou uma Empresa",
+    "services": {
+      "restaurants": "Restaurantes",
+      "supermarkets": "Supermercados",
+      "courier": "Estafeta"
+    },
+    "coverage": "Espanha, Europa e Marrocos"
+  },
+  "auth": {
+    "welcome": "Bem-vindo a",
+    "login_title": "Entrar",
+    "register_title": "Criar Conta",
+    "have_account": "Já tens uma conta?",
+    "no_account": "Não tens uma conta?",
+    "user_type": "Tipo de utilizador",
+    "customer": "Cliente",
+    "driver": "Motorista",
+    "business": "Empresa",
+    "vehicle_type": "Tipo de veículo",
+    "vehicle_bike": "Bicicleta",
+    "vehicle_motorcycle": "Motocicleta",
+    "vehicle_car": "Carro",
+    "vehicle_van": "Carrinha"
+  },
+  "dashboard": {
+    "customer": {
+      "title": "Nubo",
+      "welcome": "Olá",
+      "tabs": {
+        "businesses": "Empresas",
+        "orders": "Minhas Encomendas"
+      },
+      "categories": {
+        "all": "Todos",
+        "restaurant": "Restaurantes",
+        "supermarket": "Supermercados",
+        "courier": "Estafeta",
+        "vehicles": "Veículos",
+        "electronics": "Eletrónica",
+        "transport": "NuboRide 🚗"
+      },
+      "cart": "Carrinho",
+      "empty_cart": "Carrinho vazio",
+      "delivery_address": "Endereço de entrega",
+      "pay_order": "Pagar Encomenda",
+      "processing": "A processar...",
+      "no_orders": "Ainda não tens encomendas",
+      "order_again": "Encomendar novamente"
+    },
+    "business": {
+      "title": "Painel de Empresa",
+      "no_business": "Não tens empresas registadas",
+      "create_first": "Cria a tua primeira empresa para começar",
+      "create_business": "Criar Empresa",
+      "dropshipping": "Dropshipping",
+      "add_product": "Adicionar Produto",
+      "my_products": "Meus Produtos",
+      "orders": "Encomendas"
+    },
+    "driver": {
+      "title": "Painel de Motorista",
+      "available": "Disponível",
+      "unavailable": "Indisponível",
+      "available_orders": "Encomendas Disponíveis",
+      "my_deliveries": "Minhas Entregas",
+      "accept_order": "Aceitar Encomenda",
+      "complete_delivery": "Completar Entrega"
+    }
+  },
+  "dropshipping": {
+    "title": "Painel Dropshipping",
+    "back_dashboard": "Voltar ao Painel",
+    "stats": {
+      "total_orders": "Total de Encomendas",
+      "total_commission": "Comissão Total",
+      "active_products": "Produtos Ativos"
+    },
+    "tabs": {
+      "orders": "Encomendas Pendentes",
+      "products": "Meus Produtos"
+    },
+    "orders_to_buy": "Encomendas para Comprar",
+    "pending": "pendente",
+    "add_product": "Adicionar Produto",
+    "platforms": {
+      "alibaba": "Alibaba",
+      "aliexpress": "AliExpress",
+      "temu": "Temu"
+    },
+    "product_url": "URL do Produto",
+    "original_price": "Preço Original",
+    "commission": "Comissão",
+    "selling_price": "Preço de Venda",
+    "shipping_time": "Tempo de Envio"
+  },
+  "nuboride": {
+    "title": "NuboRide",
+    "select_service": "Seleciona o teu serviço",
+    "select_route": "Indica o teu percurso",
+    "confirm_trip": "Confirma a tua viagem",
+    "origin": "Origem",
+    "destination": "Destino",
+    "calculate_route": "Calcular Percurso",
+    "calculating": "A calcular...",
+    "distance": "Distância",
+    "estimated_time": "Tempo estimado",
+    "estimated_price": "Preço estimado",
+    "change_service": "Mudar serviço",
+    "confirm_pay": "Confirmar e Pagar"
+  },
+  "footer": {
+    "about": "Nubo",
+    "about_text": "O teu marketplace em Espanha, Europa e Marrocos. Comida, compras, estafeta, carros e eletrónica.",
+    "contact": "Contacto",
+    "links": "Links",
+    "home": "Início",
+    "help": "Ajuda",
+    "terms": "Termos e Condições",
+    "follow": "Segue-nos",
+    "chat": "Fala connosco",
+    "rights": "Todos os direitos reservados",
+    "whatsapp": "WhatsApp",
+    "payment_methods": "Métodos de pagamento aceites"
+  },
+  "order": {
+    "status": {
+      "pending": "Pendente",
+      "accepted": "Aceite",
+      "preparing": "A preparar",
+      "in_transit": "Em trânsito",
+      "delivered": "Entregue",
+      "cancelled": "Cancelado"
+    },
+    "tracking": "Rastreio de Encomenda",
+    "order_details": "Detalhes da Encomenda",
+    "delivery_address": "Endereço de Entrega",
+    "contact_driver": "Contactar Motorista"
+  }
+}
