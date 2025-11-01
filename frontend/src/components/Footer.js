@@ -1,10 +1,13 @@
 import React from 'react';
-import { Phone, Mail, MapPin, MessageCircle, Facebook, Instagram, Twitter } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Phone, Mail, MapPin, MessageCircle, Facebook, Instagram, Twitter, CreditCard } from 'lucide-react';
+import LanguageSelector from './LanguageSelector';
 
 export default function Footer() {
+  const { t } = useTranslation();
   const phoneNumber = '+34 729 34 251';
   const email = 'exprenobo@hotmail.com';
-  const address = 'España, Europa y Marruecos';
+  const address = t('landing.coverage');
 
   const handleWhatsApp = () => {
     const formattedNumber = phoneNumber.replace(/\s+/g, '');
