@@ -109,7 +109,7 @@ export default function Landing() {
                   onClick={() => navigate('/auth?role=business')}
                   className="border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-8 py-6 text-lg rounded-2xl"
                 >
-                  Soy un Negocio
+                  {t('landing.cta_business')}
                 </Button>
               </div>
             </div>
