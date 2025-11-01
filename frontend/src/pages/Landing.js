@@ -87,11 +87,11 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="animate-slide-up">
               <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-                Todo lo que necesitas,
-                <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent"> a tu puerta</span>
+                {t('landing.hero_title')}
+                <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent"> {t('landing.hero_subtitle')}</span>
               </h1>
               <p className="text-lg lg:text-xl text-gray-600 mb-8">
-                Pide comida, haz la compra o envía lo que necesites. En España, Europa y Marruecos, lo tienes todo al alcance de un click.
+                {t('landing.hero_description')}
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
@@ -100,7 +100,7 @@ export default function Landing() {
                   onClick={() => navigate('/auth')}
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-8 py-6 text-lg rounded-2xl shadow-lg hover:shadow-xl"
                 >
-                  Empezar Ahora
+                  {t('landing.cta_customer')}
                 </Button>
                 <Button 
                   data-testid="partner-cta-btn"
