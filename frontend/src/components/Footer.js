@@ -74,18 +74,18 @@ export default function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-semibold mb-4 text-emerald-400">Enlaces</h4>
+            <h4 className="font-semibold mb-4 text-emerald-400">{t('footer.links')}</h4>
             <ul className="space-y-2 text-sm text-gray-300">
-              <li><a href="/" className="hover:text-emerald-400 transition-colors">Inicio</a></li>
-              <li><a href="/auth" className="hover:text-emerald-400 transition-colors">Iniciar Sesión</a></li>
-              <li><a href="#" className="hover:text-emerald-400 transition-colors">Ayuda</a></li>
-              <li><a href="#" className="hover:text-emerald-400 transition-colors">Términos y Condiciones</a></li>
+              <li><a href="/" className="hover:text-emerald-400 transition-colors">{t('footer.home')}</a></li>
+              <li><a href="/auth" className="hover:text-emerald-400 transition-colors">{t('common.login')}</a></li>
+              <li><a href="#" className="hover:text-emerald-400 transition-colors">{t('footer.help')}</a></li>
+              <li><a href="#" className="hover:text-emerald-400 transition-colors">{t('footer.terms')}</a></li>
             </ul>
           </div>
 
-          {/* Social & WhatsApp */}
+          {/* Social & Language */}
           <div>
-            <h4 className="font-semibold mb-4 text-emerald-400">Síguenos</h4>
+            <h4 className="font-semibold mb-4 text-emerald-400">{t('footer.follow')}</h4>
             <div className="flex gap-3 mb-4">
               <a href="#" className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-emerald-500 transition-colors">
                 <Facebook className="w-5 h-5" />
