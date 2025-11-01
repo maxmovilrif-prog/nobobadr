@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Package, Truck, Store, Clock, Shield, MapPin } from 'lucide-react';
 import Footer from '@/components/Footer';
+import LanguageSelector from '@/components/LanguageSelector';
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const features = [
     {
