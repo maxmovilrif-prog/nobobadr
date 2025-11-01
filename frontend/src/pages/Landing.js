@@ -67,15 +67,18 @@ export default function Landing() {
               <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
                 <Truck className="w-6 h-6 text-white" />
               </div>
-              <span className="text-2xl font-bold text-gray-900">Nubo</span>
+              <span className="text-2xl font-bold text-gray-900">{t('landing.brand')}</span>
             </div>
-            <Button 
-              data-testid="nav-login-btn"
-              onClick={() => navigate('/auth')}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6"
-            >
-              Iniciar Sesión
-            </Button>
+            <div className="flex items-center gap-3">
+              <LanguageSelector variant="outline" />
+              <Button 
+                data-testid="nav-login-btn"
+                onClick={() => navigate('/auth')}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6"
+              >
+                {t('common.login')}
+              </Button>
+            </div>
           </div>
         </nav>
 
