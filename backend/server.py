@@ -754,7 +754,66 @@ async def get_dropshipping_stats(current_user: dict = Depends(get_current_user))
         'currency': 'EUR'
     }
 
-# Include router
+# =========================
+# AFFILIATE LINKS MODELS & ROUTES
+# =========================
+
+class AffiliateLinks(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    flights_url: Optional[str] = None
+    flights_provider: Optional[str] = "Skyscanner"
+    ferries_url: Optional[str] = None
+    ferries_provider: Optional[str] = "Direct Ferries"
+    hotels_url: Optional[str] = None
+    hotels_provider: Optional[str] = "Booking.com"
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class AffiliateLinksUpdate(BaseModel):
+    flights_url: Optional[str] = None
+    flights_provider: Optional[str] = None
+    ferries_url: Optional[str] = None
+    ferries_provider: Optional[str] = None
+    hotels_url: Optional[str] = None
+    hotels_provider: Optional[str] = None
+
+@api_router.get("/affiliate-links", response_model=AffiliateLinks)
+async def get_affiliate_links():
+    """Get current affiliate links configuration"""
+    links = await db.affiliate_links.find_one({}, {'_id': 0})
+    if not links:
+        # Return default empty links
+        default_links = AffiliateLinks()
+        return default_links
+    return AffiliateLinks(**links)
+
+@api_router.put("/affiliate-links")
+async def update_affiliate_links(links_data: AffiliateLinksUpdate, current_user: dict = Depends(get_current_user)):
+    """Update affiliate links (admin/business only)"""
+    if current_user['role'] not in ['business', 'admin']:
+        raise HTTPException(status_code=403, detail="Only business/admin can update affiliate links")
+    
+    # Get existing or create new
+    existing = await db.affiliate_links.find_one({})
+    
+    update_data = {k: v for k, v in links_data.dict().items() if v is not None}
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    if existing:
+        await db.affiliate_links.update_one(
+            {'id': existing['id']},
+            {'$set': update_data}
+        )
+    else:
+        new_links = AffiliateLinks(**update_data)
+        await db.affiliate_links.insert_one(new_links.dict())
+    
+    return {"message": "Affiliate links updated successfully"}
+
+# =========================
+# APP CONFIGURATION
+# =========================
+
 app.include_router(api_router)
 
 app.add_middleware(
