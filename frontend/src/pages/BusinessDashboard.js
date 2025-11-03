@@ -161,6 +161,15 @@ export default function BusinessDashboard() {
           </div>
           <div className="flex items-center gap-3">
             <Button 
+              onClick={() => navigate('/affiliate-settings')}
+              variant="outline" 
+              size="sm"
+              className="mr-2"
+            >
+              <Plane className="w-4 h-4 mr-2" />
+              Viajes
+            </Button>
+            <Button 
               onClick={() => navigate('/dropshipping-panel')}
               variant="outline" 
               size="sm"
