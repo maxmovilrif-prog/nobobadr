@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { LogOut, Store, Package, ShoppingBag, Plus, Globe } from 'lucide-react';
+import { LogOut, Store, Package, ShoppingBag, Plus, Globe, Plane } from 'lucide-react';
 
 export default function BusinessDashboard() {
   const navigate = useNavigate();
