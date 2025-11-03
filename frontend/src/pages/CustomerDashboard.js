@@ -298,6 +298,31 @@ export default function CustomerDashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Travel Banner */}
+        <Card className="mb-8 bg-gradient-to-r from-blue-500 via-teal-500 to-emerald-500 text-white border-0 overflow-hidden relative">
+          <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+          <CardContent className="p-6 relative z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-2">✈️ 🚢 🏨 ¿Planeas un viaje?</h3>
+                <p className="text-white/90 mb-4">
+                  Encuentra los mejores vuelos, ferries y hoteles en Europa y Marruecos
+                </p>
+                <Button
+                  onClick={() => navigate('/travel')}
+                  className="bg-white text-emerald-600 hover:bg-gray-100"
+                >
+                  Ver Ofertas de Viaje
+                  <MapPin className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+              <div className="hidden md:block text-6xl opacity-20">
+                🌍
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs defaultValue="businesses" className="w-full">
           <TabsList className="mb-8">
             <TabsTrigger data-testid="businesses-tab" value="businesses">Negocios</TabsTrigger>
