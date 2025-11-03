@@ -10,6 +10,8 @@ import BusinessDashboard from '@/pages/BusinessDashboard';
 import OrderTracking from '@/pages/OrderTracking';
 import OrderSuccess from '@/pages/OrderSuccess';
 import DropshippingPanel from '@/pages/DropshippingPanel';
+import TravelBooking from '@/pages/TravelBooking';
+import AffiliateSettings from '@/pages/AffiliateSettings';
 import InstallPWA from '@/components/InstallPWA';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { Toaster } from '@/components/ui/sonner';
