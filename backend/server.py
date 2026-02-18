@@ -701,15 +701,36 @@ async def get_orders_to_purchase(current_user: dict = Depends(get_current_user))
         'status': {'$in': ['pending', 'accepted']}
     }, {'_id': 0}).to_list(1000)
     
-    purchase_list = []
+    if not orders:
+        return []
     
+    # Batch fetch: Get all unique product IDs and customer IDs
+    product_ids = set()
+    customer_ids = set()
     for order in orders:
+        customer_ids.add(order['customer_id'])
         for item in order['items']:
-            # Check if dropshipping product
-            dropship_prod = await db.dropshipping_products.find_one({'id': item['product_id']}, {'_id': 0})
+            product_ids.add(item['product_id'])
+    
+    # Fetch all products and customers in batch
+    dropship_products = await db.dropshipping_products.find(
+        {'id': {'$in': list(product_ids)}}, {'_id': 0}
+    ).to_list(None)
+    products_map = {prod['id']: prod for prod in dropship_products}
+    
+    customers = await db.users.find(
+        {'id': {'$in': list(customer_ids)}}, {'_id': 0}
+    ).to_list(None)
+    customers_map = {cust['id']: cust for cust in customers}
+    
+    # Build purchase list with cached data
+    purchase_list = []
+    for order in orders:
+        customer = customers_map.get(order['customer_id'])
+        for item in order['items']:
+            dropship_prod = products_map.get(item['product_id'])
             if dropship_prod:
                 commission = dropship_prod['selling_price'] - dropship_prod['original_price']
-                customer = await db.users.find_one({'id': order['customer_id']}, {'_id': 0})
                 
                 purchase_list.append({
                     'order_id': order['id'],
@@ -720,9 +741,9 @@ async def get_orders_to_purchase(current_user: dict = Depends(get_current_user))
                     'original_price': dropship_prod['original_price'],
                     'total_to_pay': dropship_prod['original_price'] * item['quantity'],
                     'commission_earned': commission * item['quantity'],
-                    'customer_name': customer['name'],
-                    'customer_email': customer['email'],
-                    'customer_phone': customer['phone'],
+                    'customer_name': customer['name'] if customer else 'Unknown',
+                    'customer_email': customer['email'] if customer else '',
+                    'customer_phone': customer['phone'] if customer else '',
                     'delivery_address': order['delivery_address'],
                     'order_date': order['created_at']
                 })
