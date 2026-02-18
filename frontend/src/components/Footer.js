@@ -5,7 +5,7 @@ import LanguageSelector from './LanguageSelector';
 
 export default function Footer() {
   const { t } = useTranslation();
-  const phoneNumber = '+34 729 34 251';
+  const phoneNumber = '+34 654 24 38 48';
   const email = 'exprenobo@hotmail.com';
   const address = t('landing.coverage');
 
