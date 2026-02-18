@@ -758,12 +758,32 @@ async def get_dropshipping_stats(current_user: dict = Depends(get_current_user))
     # Get all paid orders
     orders = await db.orders.find({'payment_status': 'paid'}, {'_id': 0}).to_list(10000)
     
+    if not orders:
+        return {
+            'total_orders': 0,
+            'total_commission': 0.0,
+            'currency': 'EUR'
+        }
+    
+    # Batch fetch: Get all unique product IDs
+    product_ids = set()
+    for order in orders:
+        for item in order['items']:
+            product_ids.add(item['product_id'])
+    
+    # Fetch all dropshipping products in batch
+    dropship_products = await db.dropshipping_products.find(
+        {'id': {'$in': list(product_ids)}}, {'_id': 0}
+    ).to_list(None)
+    products_map = {prod['id']: prod for prod in dropship_products}
+    
+    # Calculate stats with cached data
     total_commission = 0
     orders_count = 0
     
     for order in orders:
         for item in order['items']:
-            dropship_prod = await db.dropshipping_products.find_one({'id': item['product_id']}, {'_id': 0})
+            dropship_prod = products_map.get(item['product_id'])
             if dropship_prod:
                 commission = (dropship_prod['selling_price'] - dropship_prod['original_price']) * item['quantity']
                 total_commission += commission
