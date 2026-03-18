@@ -78,8 +78,8 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-gray-300">
               <li><a href="/" className="hover:text-emerald-400 transition-colors">{t('footer.home')}</a></li>
               <li><a href="/auth" className="hover:text-emerald-400 transition-colors">{t('common.login')}</a></li>
-              <li><a href="#" className="hover:text-emerald-400 transition-colors">{t('footer.help')}</a></li>
-              <li><a href="#" className="hover:text-emerald-400 transition-colors">{t('footer.terms')}</a></li>
+              <li><a href="/privacy" className="hover:text-emerald-400 transition-colors">Privacidad</a></li>
+              <li><a href="/terms" className="hover:text-emerald-400 transition-colors">{t('footer.terms')}</a></li>
             </ul>
           </div>
 
