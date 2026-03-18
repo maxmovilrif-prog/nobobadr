@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '@/App';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import DeliveryMap from '@/components/DeliveryMap';
 import { toast } from 'sonner';
-import { ArrowLeft, Package, MapPin, Clock, MessageCircle, Send } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Clock, MessageCircle, Send, Navigation } from 'lucide-react';
 
 export default function OrderTracking() {
   const { orderId } = useParams();
@@ -19,16 +19,61 @@ export default function OrderTracking() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [driverLocation, setDriverLocation] = useState(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const ws = useRef(null);
 
   useEffect(() => {
     fetchOrder();
     fetchMessages();
-    const interval = setInterval(() => {
-      fetchOrder();
-      fetchMessages();
-    }, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
+    connectWebSocket();
+    
+    return () => {
+      if (ws.current) {
+        ws.current.close();
+      }
+    };
   }, [orderId]);
+
+  const connectWebSocket = () => {
+    // Get WebSocket URL from backend URL
+    const wsUrl = API.replace('http', 'ws').replace('https', 'wss');
+    ws.current = new WebSocket(`${wsUrl}/ws/tracking/${orderId}`);
+
+    ws.current.onopen = () => {
+      console.log('🐝 WebSocket conectado - Tracking en tiempo real activo');
+      setWsConnected(true);
+      toast.success('Tracking en tiempo real conectado 🐝');
+    };
+
+    ws.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log('📍 Ubicación recibida:', data);
+      setDriverLocation({
+        lat: data.lat,
+        lng: data.lng,
+        driver_name: data.driver_name,
+        status: data.status,
+        timestamp: data.timestamp
+      });
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setWsConnected(false);
+    };
+
+    ws.current.onclose = () => {
+      console.log('WebSocket desconectado');
+      setWsConnected(false);
+      // Reconnect after 5 seconds
+      setTimeout(() => {
+        if (order && order.status !== 'delivered') {
+          connectWebSocket();
+        }
+      }, 5000);
+    };
+  };
 
   const fetchOrder = async () => {
     try {
