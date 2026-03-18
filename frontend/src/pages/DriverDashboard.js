@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '@/App';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, Package, MapPin, Clock, Euro, Truck } from 'lucide-react';
+import { LogOut, Package, MapPin, Clock, Euro, Truck, Navigation } from 'lucide-react';
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
@@ -17,6 +17,10 @@ export default function DriverDashboard() {
   const [myOrders, setMyOrders] = useState([]);
   const [isAvailable, setIsAvailable] = useState(user.is_available || false);
   const [loading, setLoading] = useState(false);
+  const [locationSharing, setLocationSharing] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const wsConnections = useRef({});
+  const geoWatchId = useRef(null);
 
   useEffect(() => {
     if (isAvailable) {
@@ -24,6 +28,116 @@ export default function DriverDashboard() {
     }
     fetchMyOrders();
   }, [isAvailable]);
+
+  // Start location sharing for active deliveries
+  useEffect(() => {
+    const activeDeliveries = myOrders.filter(order => 
+      order.status === 'in_transit' && order.driver_id === user.id
+    );
+
+    if (activeDeliveries.length > 0 && !locationSharing) {
+      startLocationSharing(activeDeliveries);
+    } else if (activeDeliveries.length === 0 && locationSharing) {
+      stopLocationSharing();
+    }
+
+    return () => {
+      stopLocationSharing();
+    };
+  }, [myOrders]);
+
+  const startLocationSharing = (activeOrders) => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocalización no disponible');
+      return;
+    }
+
+    setLocationSharing(true);
+    console.log('🐝 Iniciando compartir ubicación para', activeOrders.length, 'pedidos');
+
+    // Watch position
+    geoWatchId.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        setCurrentLocation(location);
+
+        // Send location to all active order tracking websockets
+        activeOrders.forEach(order => {
+          sendLocationToWebSocket(order.id, location);
+        });
+      },
+      (error) => {
+        console.error('Error obteniendo ubicación:', error);
+        toast.error('Error al obtener ubicación GPS');
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 5000
+      }
+    );
+  };
+
+  const stopLocationSharing = () => {
+    if (geoWatchId.current) {
+      navigator.geolocation.clearWatch(geoWatchId.current);
+      geoWatchId.current = null;
+    }
+
+    // Close all WebSocket connections
+    Object.values(wsConnections.current).forEach(ws => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
+    wsConnections.current = {};
+    setLocationSharing(false);
+    console.log('🐝 Ubicación compartida detenida');
+  };
+
+  const sendLocationToWebSocket = (orderId, location) => {
+    const wsUrl = API.replace('http', 'ws').replace('https', 'wss');
+    
+    if (!wsConnections.current[orderId]) {
+      // Create new WebSocket connection
+      const ws = new WebSocket(`${wsUrl}/ws/tracking/${orderId}`);
+      
+      ws.onopen = () => {
+        console.log(`🐝 WebSocket conectado para pedido ${orderId}`);
+        ws.send(JSON.stringify({
+          lat: location.lat,
+          lng: location.lng,
+          driver_name: user.name,
+          status: 'en_camino'
+        }));
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        console.log(`WebSocket cerrado para pedido ${orderId}`);
+        delete wsConnections.current[orderId];
+      };
+
+      wsConnections.current[orderId] = ws;
+    } else {
+      // Send location through existing connection
+      const ws = wsConnections.current[orderId];
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          lat: location.lat,
+          lng: location.lng,
+          driver_name: user.name,
+          status: 'en_camino'
+        }));
+      }
+    }
+  };
 
   const fetchAvailableOrders = async () => {
     try {
