@@ -156,6 +156,35 @@ export default function OrderTracking() {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* WebSocket Status Banner */}
+        {wsConnected && order.status === 'in_transit' && (
+          <Card className="mb-6 border-emerald-200 bg-emerald-50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  <div>
+                    <p className="font-semibold text-emerald-900">🐝 Tracking en Tiempo Real Activo</p>
+                    <p className="text-sm text-emerald-700">
+                      {driverLocation ? (
+                        <>La Abeja está en movimiento • Actualizado hace {Math.floor((Date.now() - new Date(driverLocation.timestamp)) / 1000)}s</>
+                      ) : (
+                        'Esperando ubicación del conductor...'
+                      )}
+                    </p>
+                  </div>
+                </div>
+                {driverLocation && (
+                  <Badge className="bg-emerald-600 text-white">
+                    <Navigation className="w-3 h-3 mr-1" />
+                    En movimiento
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Order Details */}
           <div className="lg:col-span-2 space-y-6">
