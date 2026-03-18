@@ -83,17 +83,15 @@ export default function DeliveryMap({ order, deliveryAddress, businessAddress, d
       }
     ];
 
-    // Add driver location marker (the Bee 🐝)
-    if (driverLocation && driverLocation.lat && driverLocation.lng) {
+    // Add driver location marker (the Bee 🐝) with custom icon
+    if (driverLocation && driverLocation.lat && driverLocation.lng && beeIcon) {
       baseMarkers.push({
         lat: driverLocation.lat,
         lng: driverLocation.lng,
-        title: `🐝 ${driverLocation.driver_name || 'Conductor'}`,
-        icon: {
-          url: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-          scaledSize: { width: 40, height: 40 }
-        },
-        animation: 'DROP'
+        title: `🐝 ${driverLocation.driver_name || 'Conductor Nubo'}`,
+        icon: beeIcon,
+        animation: 'DROP',
+        zIndex: 999 // Ensure bee is on top
       });
     }
 
