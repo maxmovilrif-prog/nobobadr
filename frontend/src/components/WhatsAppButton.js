@@ -1,7 +1,7 @@
 import React from 'react';
 import { MessageCircle } from 'lucide-react';
 
-export default function WhatsAppButton({ phoneNumber = '+34654243848' }) {
+export default function WhatsAppButton({ phoneNumber = '+34654242092' }) {
   const handleClick = () => {
     // Format phone number for WhatsApp (remove spaces and special characters)
     const formattedNumber = phoneNumber.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
