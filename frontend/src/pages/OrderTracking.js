@@ -221,6 +221,7 @@ export default function OrderTracking() {
             <DeliveryMap 
               order={order}
               deliveryAddress={order.delivery_address}
+              driverLocation={driverLocation}
             />
 
             {/* Status Timeline */}
