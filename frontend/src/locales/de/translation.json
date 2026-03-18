@@ -29,7 +29,7 @@
     "brand": "Nubo",
     "hero_title": "Alles was du brauchst,",
     "hero_subtitle": "vor deiner Tür",
-    "hero_description": "Bestelle Essen, kaufe ein oder versende was du brauchst. In Spanien, Europa und Marokko hast du alles mit einem Klick.",
+    "hero_description": "Bestelle Essen, kaufe ein oder versende was du brauchst. In Spanien hast du alles mit einem Klick.",
     "cta_customer": "Jetzt starten",
     "cta_business": "Ich bin ein Unternehmen",
     "services": {
@@ -37,7 +37,7 @@
       "supermarkets": "Supermärkte",
       "courier": "Kurier"
     },
-    "coverage": "Spanien, Europa und Marokko"
+    "coverage": "Spanien"
   },
   "auth": {
     "welcome": "Willkommen bei",
