@@ -852,6 +852,91 @@ async def update_affiliate_links(links_data: AffiliateLinksUpdate, current_user:
     return {"message": "Affiliate links updated successfully"}
 
 # =========================
+# WEBSOCKET REAL-TIME TRACKING
+# =========================
+
+class ConnectionManager:
+    """Gestiona las conexiones WebSocket activas para tracking en tiempo real"""
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+        self.driver_locations: Dict[str, Dict] = {}
+
+    async def connect(self, order_id: str, websocket: WebSocket):
+        await websocket.accept()
+        if order_id not in self.active_connections:
+            self.active_connections[order_id] = []
+        self.active_connections[order_id].append(websocket)
+        logger.info(f"New WebSocket connection for order {order_id}")
+
+    def disconnect(self, order_id: str, websocket: WebSocket):
+        if order_id in self.active_connections:
+            self.active_connections[order_id].remove(websocket)
+            if not self.active_connections[order_id]:
+                del self.active_connections[order_id]
+        logger.info(f"WebSocket disconnected for order {order_id}")
+
+    async def broadcast_location(self, order_id: str, message: dict):
+        """Envía la ubicación de la Abeja 🐝 a todos los clientes conectados"""
+        if order_id in self.active_connections:
+            # Store last known location
+            self.driver_locations[order_id] = message
+            
+            for connection in self.active_connections[order_id]:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    logger.error(f"Error sending to client: {e}")
+
+    def get_driver_location(self, order_id: str):
+        """Obtiene la última ubicación conocida del conductor"""
+        return self.driver_locations.get(order_id)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/tracking/{order_id}")
+async def websocket_tracking_endpoint(websocket: WebSocket, order_id: str):
+    """
+    WebSocket endpoint para tracking en tiempo real de pedidos.
+    Los conductores envían su ubicación y los clientes la reciben en tiempo real.
+    """
+    await manager.connect(order_id, websocket)
+    
+    try:
+        # Send last known location if exists
+        last_location = manager.get_driver_location(order_id)
+        if last_location:
+            await websocket.send_json(last_location)
+        
+        while True:
+            # Recibir ubicación del conductor (lat, lng)
+            data = await websocket.receive_json()
+            
+            # Broadcast a todos los clientes conectados
+            await manager.broadcast_location(order_id, {
+                "order_id": order_id,
+                "lat": data.get("lat"),
+                "lng": data.get("lng"),
+                "driver_name": data.get("driver_name", "Conductor"),
+                "status": data.get("status", "en_camino"),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            
+    except WebSocketDisconnect:
+        manager.disconnect(order_id, websocket)
+        logger.info(f"Client disconnected from order {order_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        manager.disconnect(order_id, websocket)
+
+@api_router.get("/tracking/location/{order_id}")
+async def get_driver_location(order_id: str):
+    """REST endpoint alternativo para obtener última ubicación conocida"""
+    location = manager.get_driver_location(order_id)
+    if location:
+        return location
+    raise HTTPException(status_code=404, detail="No location data available")
+
+# =========================
 # APP CONFIGURATION
 # =========================
 
