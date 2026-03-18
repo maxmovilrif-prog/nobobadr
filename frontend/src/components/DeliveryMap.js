@@ -129,18 +129,16 @@ export default function DeliveryMap({ order, deliveryAddress, businessAddress, d
     window.updateBeeLocation = (lat, lng) => {
       console.log("🐝 Actualizando ubicación de la Abeja:", lat, lng);
       
-      // Update markers with new bee position
+      // Update markers with new bee position using custom icon
       setMarkers(prevMarkers => {
-        const updatedMarkers = prevMarkers.filter(m => m.title !== '🐝 Conductor');
+        const updatedMarkers = prevMarkers.filter(m => !m.title.includes('🐝'));
         updatedMarkers.push({
           lat: lat,
           lng: lng,
-          title: '🐝 Conductor',
-          icon: {
-            url: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-            scaledSize: { width: 40, height: 40 }
-          },
-          animation: 'BOUNCE'
+          title: '🐝 Conductor Nubo',
+          icon: beeIcon || BEE_ICON_OPTIONS.emoji,
+          animation: 'BOUNCE',
+          zIndex: 999
         });
         return updatedMarkers;
       });
@@ -149,7 +147,7 @@ export default function DeliveryMap({ order, deliveryAddress, businessAddress, d
     return () => {
       delete window.updateBeeLocation;
     };
-  }, []);
+  }, [beeIcon]);
 
   return (
     <Card data-testid="delivery-map" className="border-0 shadow-lg">
