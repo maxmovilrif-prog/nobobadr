@@ -5,13 +5,57 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 }; // Madrid
 
+// Icono de Abeja personalizado para los conductores 🐝
+const BEE_ICON_OPTIONS = {
+  // Opción 1: Icono personalizado desde tu dominio (cuando esté listo)
+  custom: {
+    url: "https://noboexpress.com/bee-icon.png",
+    scaledSize: { width: 50, height: 50 }
+  },
+  // Opción 2: Icono de abeja desde iconos públicos
+  public: {
+    url: "https://cdn-icons-png.flaticon.com/512/3629/3629017.png",
+    scaledSize: { width: 45, height: 45 }
+  },
+  // Opción 3: Emoji SVG como data URL
+  emoji: {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
+        <circle cx="25" cy="25" r="24" fill="#FFD700" stroke="#000" stroke-width="2"/>
+        <text x="25" y="35" font-size="35" text-anchor="middle">🐝</text>
+      </svg>
+    `),
+    scaledSize: { width: 50, height: 50 }
+  },
+  // Opción 4: Pin amarillo de Google Maps (fallback)
+  fallback: {
+    url: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+    scaledSize: { width: 40, height: 40 }
+  }
+};
+
 export default function DeliveryMap({ order, deliveryAddress, businessAddress, driverLocation }) {
   const [markers, setMarkers] = useState([]);
   const [origin, setOrigin] = useState(null);
   const [destination, setDestination] = useState(null);
   const [showDirections, setShowDirections] = useState(false);
+  const [beeIcon, setBeeIcon] = useState(null);
   const beeMarkerRef = useRef(null);
   const mapRef = useRef(null);
+
+  // Detectar qué icono usar
+  useEffect(() => {
+    // Intentar cargar el icono personalizado primero
+    const img = new Image();
+    img.onload = () => {
+      setBeeIcon(BEE_ICON_OPTIONS.custom);
+    };
+    img.onerror = () => {
+      // Si falla, usar el emoji SVG
+      setBeeIcon(BEE_ICON_OPTIONS.emoji);
+    };
+    img.src = BEE_ICON_OPTIONS.custom.url;
+  }, []);
 
   useEffect(() => {
     // Parse addresses to coordinates
