@@ -90,6 +90,8 @@ function App() {
           <Route path="/dropshipping-panel" element={user && user.role === 'business' ? <DropshippingPanel /> : <Navigate to="/auth" />} />
           <Route path="/travel" element={<TravelBooking />} />
           <Route path="/affiliate-settings" element={user && user.role === 'business' ? <AffiliateSettings /> : <Navigate to="/auth" />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
         </Routes>
         <InstallPWA />
         <WhatsAppButton phoneNumber="+34654242092" />
