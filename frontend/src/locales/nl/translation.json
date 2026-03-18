@@ -29,7 +29,7 @@
     "brand": "Nubo",
     "hero_title": "Alles wat je nodig hebt,",
     "hero_subtitle": "bij je deur",
-    "hero_description": "Bestel eten, doe boodschappen of verstuur wat je nodig hebt. In Spanje, Europa en Marokko heb je alles met één klik.",
+    "hero_description": "Bestel eten, doe boodschappen of verstuur wat je nodig hebt. In Spanje heb je alles met één klik.",
     "cta_customer": "Begin nu",
     "cta_business": "Ik ben een bedrijf",
     "services": {
@@ -37,7 +37,7 @@
       "supermarkets": "Supermarkten",
       "courier": "Koerier"
     },
-    "coverage": "Spanje, Europa en Marokko"
+    "coverage": "Spanje"
   },
   "auth": {
     "welcome": "Welkom bij",
