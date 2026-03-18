@@ -110,10 +110,10 @@ export default function TravelBooking() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            Viaja por <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Europa y África</span>
+            Viaja por <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">España</span>
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Encuentra las mejores ofertas en vuelos, ferries y hoteles. Reserva de forma segura con nuestros socios de confianza.
+            Encuentra las mejores ofertas en vuelos, ferries y hoteles en España. Reserva de forma segura con nuestros socios de confianza.
           </p>
         </div>
 
