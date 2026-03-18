@@ -103,7 +103,7 @@ export default function DeliveryMap({ order, deliveryAddress, businessAddress, d
       setDestination(deliveryCoords);
       setShowDirections(true);
     }
-  }, [order, deliveryAddress, businessAddress, driverLocation]);
+  }, [order, deliveryAddress, businessAddress, driverLocation, beeIcon]);
 
   // Smooth animation for bee marker movement
   useEffect(() => {
