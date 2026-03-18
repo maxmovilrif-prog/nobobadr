@@ -247,6 +247,33 @@ export default function DriverDashboard() {
           </CardContent>
         </Card>
 
+        {/* Location Sharing Indicator */}
+        {locationSharing && (
+          <Card className="mb-8 border-emerald-200 bg-emerald-50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  <div>
+                    <p className="font-semibold text-emerald-900 flex items-center gap-2">
+                      <Navigation className="w-4 h-4" />
+                      🐝 Ubicación compartida en tiempo real
+                    </p>
+                    <p className="text-sm text-emerald-700">
+                      {currentLocation ? 
+                        `Lat: ${currentLocation.lat.toFixed(6)}, Lng: ${currentLocation.lng.toFixed(6)}` : 
+                        'Obteniendo ubicación GPS...'}
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-emerald-600 text-white">
+                  {myOrders.filter(o => o.status === 'in_transit').length} entregas activas
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Available Orders */}
           <div>
