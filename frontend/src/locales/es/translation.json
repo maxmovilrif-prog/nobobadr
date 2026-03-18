@@ -29,7 +29,7 @@
     "brand": "Nubo",
     "hero_title": "Todo lo que necesitas,",
     "hero_subtitle": "a tu puerta",
-    "hero_description": "Pide comida, haz la compra o envía lo que necesites. En España, Europa y Marruecos, lo tienes todo al alcance de un click.",
+    "hero_description": "Pide comida, haz la compra o envía lo que necesites. En España, lo tienes todo al alcance de un click.",
     "cta_customer": "Empezar Ahora",
     "cta_business": "Soy un Negocio",
     "services": {
@@ -37,7 +37,7 @@
       "supermarkets": "Supermercados",
       "courier": "Paquetería"
     },
-    "coverage": "España, Europa y Marruecos"
+    "coverage": "España"
   },
   "auth": {
     "welcome": "Bienvenido a",
