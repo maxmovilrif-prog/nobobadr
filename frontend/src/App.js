@@ -90,7 +90,7 @@ function App() {
           <Route path="/affiliate-settings" element={user && user.role === 'business' ? <AffiliateSettings /> : <Navigate to="/auth" />} />
         </Routes>
         <InstallPWA />
-        <WhatsAppButton phoneNumber="+34654243848" />
+        <WhatsAppButton phoneNumber="+34654242092" />
         <Toaster position="top-right" />
       </BrowserRouter>
     </AuthContext.Provider>
