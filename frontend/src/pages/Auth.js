@@ -27,6 +27,30 @@ export default function Auth() {
     vehicle_type: ''
   });
 
+  // Extrae un mensaje de error claro y en español a partir de la respuesta del backend
+  const getErrorMessage = (error, fallback) => {
+    if (!error.response) {
+      return 'No se pudo conectar con el servidor. Revisa tu conexión a internet.';
+    }
+    const detail = error.response.data?.detail;
+    if (Array.isArray(detail)) {
+      // Errores de validación de FastAPI (422)
+      const first = detail[0];
+      const field = first?.loc?.slice(-1)[0];
+      if (field === 'email') return 'El email no es válido.';
+      if (field === 'password') return 'La contraseña no cumple los requisitos.';
+      return first?.msg || fallback;
+    }
+    if (typeof detail === 'string') {
+      const map = {
+        'Email already registered': 'Este email ya está registrado. Inicia sesión o usa otro email.',
+        'Invalid credentials': 'Email o contraseña incorrectos.',
+      };
+      return map[detail] || detail;
+    }
+    return fallback;
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -36,7 +60,7 @@ export default function Auth() {
       toast.success('¡Bienvenido!');
       navigate('/dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al iniciar sesión');
+      toast.error(getErrorMessage(error, 'Error al iniciar sesión'));
     } finally {
       setLoading(false);
     }
@@ -56,7 +80,7 @@ export default function Auth() {
       login(loginResponse.data.token, loginResponse.data.user);
       navigate('/dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al registrarse');
+      toast.error(getErrorMessage(error, 'Error al registrarse'));
     } finally {
       setLoading(false);
     }
