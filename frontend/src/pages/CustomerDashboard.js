@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -476,6 +476,7 @@ export default function CustomerDashboard() {
               <DialogContent data-testid="products-dialog" className="max-w-4xl max-h-[90vh]">
                 <DialogHeader>
                   <DialogTitle className="text-2xl">{selectedBusiness?.name}</DialogTitle>
+                  <DialogDescription>{selectedBusiness?.description || 'Explora los productos disponibles y añádelos al carrito.'}</DialogDescription>
                 </DialogHeader>
                 <div className="grid md:grid-cols-3 gap-6">
                   <ScrollArea className="md:col-span-2 h-[500px]">
