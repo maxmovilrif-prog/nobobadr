@@ -10,8 +10,11 @@
 - Password: Cliente123!
 - Route: /dashboard (AI search bar at top)
 
-## Demo Drivers (Bees) — seeded, is_available=true with Spain locations
-- bee.madrid@nuboexpress.com / Bee123!
+## Real Driver (live GPS → Admin map)
+- driver.real@nubotest.com / Driver123!
+- Toggle "Disponible" ON → browser sends GPS every 10s via PATCH /api/drivers/location → appears as a live Bee on /admin map.
+
+## Demo Drivers (Bees) — seeded, is_available=true with Spain locations- bee.madrid@nuboexpress.com / Bee123!
 - bee.barcelona@nuboexpress.com / Bee123!
 - bee.valencia@nuboexpress.com / Bee123!
 - bee.sevilla@nuboexpress.com / Bee123!

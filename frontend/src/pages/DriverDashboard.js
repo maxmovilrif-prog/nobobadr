@@ -21,6 +21,7 @@ export default function DriverDashboard() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const wsConnections = useRef({});
   const geoWatchId = useRef(null);
+  const adminLocIntervalRef = useRef(null);
 
   useEffect(() => {
     if (isAvailable) {
@@ -139,8 +140,39 @@ export default function DriverDashboard() {
     }
   };
 
-  const fetchAvailableOrders = async () => {
-    try {
+  // Envío automático de ubicación GPS al backend mientras el repartidor está Disponible.
+  // Esto hace que su Abeja 🐝 aparezca en vivo en el mapa del Admin.
+  useEffect(() => {
+    if (isAvailable && navigator.geolocation) {
+      const pushLocation = () => {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
+            setCurrentLocation(loc);
+            try {
+              await axios.patch(`${API}/drivers/location`, loc, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+            } catch (e) {
+              console.error('Error enviando ubicación al backend:', e);
+            }
+          },
+          (error) => console.error('Error GPS (admin tracking):', error),
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+        );
+      };
+      pushLocation();
+      adminLocIntervalRef.current = setInterval(pushLocation, 10000);
+    }
+    return () => {
+      if (adminLocIntervalRef.current) {
+        clearInterval(adminLocIntervalRef.current);
+        adminLocIntervalRef.current = null;
+      }
+    };
+  }, [isAvailable]);
+
+  const fetchAvailableOrders = async () => {    try {
       const response = await axios.get(`${API}/drivers/available-orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -246,6 +278,28 @@ export default function DriverDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* GPS en vivo para el mapa del Admin */}
+        {isAvailable && (
+          <Card className="mb-8 border-emerald-200 bg-emerald-50" data-testid="gps-live-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <div>
+                  <p className="font-semibold text-emerald-900 flex items-center gap-2">
+                    <Navigation className="w-4 h-4" />
+                    🐝 Tu ubicación se comparte en vivo con el centro de control
+                  </p>
+                  <p className="text-sm text-emerald-700" data-testid="gps-coords">
+                    {currentLocation
+                      ? `Lat: ${currentLocation.lat.toFixed(5)}, Lng: ${currentLocation.lng.toFixed(5)}`
+                      : 'Obteniendo ubicación GPS...'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Location Sharing Indicator */}
         {locationSharing && (
