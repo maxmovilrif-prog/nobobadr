@@ -62,7 +62,7 @@ Para mayor seguridad:
   - **"Referentes HTTP (sitios web)"**
 - Añade tu dominio:
   ```
-  https://nuboexpress.preview.emergentagent.com/*
+  https://delivery-hub-1041.preview.emergentagent.com/*
   localhost:3000/*
   ```
 
@@ -114,7 +114,7 @@ googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY_HER
 
 ## ✅ Paso 3: Verificar la Instalación
 
-1. Abre tu aplicación: https://nuboexpress.preview.emergentagent.com
+1. Abre tu aplicación: https://delivery-hub-1041.preview.emergentagent.com
 
 2. Inicia sesión como **cliente**
 

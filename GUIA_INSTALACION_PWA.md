@@ -8,7 +8,7 @@ Nubo ahora es una **Progressive Web App (PWA)**, lo que significa que puedes ins
 ## 📱 Instalación en Android (Chrome)
 
 ### Opción 1: Banner Automático
-1. Visita: `https://nuboexpress.preview.emergentagent.com`
+1. Visita: `https://delivery-hub-1041.preview.emergentagent.com`
 2. Aparecerá un banner en la parte inferior con el botón **"Instalar Nubo"**
 3. Toca el botón **"Instalar Ahora"**
 4. Confirma la instalación
@@ -81,7 +81,7 @@ Nubo ahora es una **Progressive Web App (PWA)**, lo que significa que puedes ins
 ---
 
 ## 📍 URL de la Aplicación
-**Sitio web:** https://nuboexpress.preview.emergentagent.com
+**Sitio web:** https://delivery-hub-1041.preview.emergentagent.com
 
 ---
 
