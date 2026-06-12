@@ -64,6 +64,9 @@ export default function DriverDashboard() {
         };
         setCurrentLocation(location);
 
+        // Push to backend for the admin live map
+        pushLocationToBackend(location);
+
         // Send location to all active order tracking websockets
         activeOrders.forEach(order => {
           sendLocationToWebSocket(order.id, location);
@@ -161,6 +164,16 @@ export default function DriverDashboard() {
     }
   };
 
+  const pushLocationToBackend = async (location) => {
+    try {
+      await axios.patch(`${API}/drivers/location`, location, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (error) {
+      console.error('Error updating location:', error);
+    }
+  };
+
   const toggleAvailability = async (checked) => {
     try {
       await axios.patch(`${API}/drivers/availability?is_available=${checked}`, {}, {
@@ -168,6 +181,13 @@ export default function DriverDashboard() {
       });
       setIsAvailable(checked);
       toast.success(checked ? 'Ahora estás disponible' : 'Ahora estás no disponible');
+      // Share location once when going available so admin map shows you
+      if (checked && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => pushLocationToBackend({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          (err) => console.error('Geolocation error:', err)
+        );
+      }
     } catch (error) {
       toast.error('Error al actualizar disponibilidad');
     }

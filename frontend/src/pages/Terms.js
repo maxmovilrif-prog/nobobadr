@@ -85,7 +85,7 @@ export default function Terms() {
                     <li>• Tarjeta de crédito/débito</li>
                     <li>• Visa, Mastercard, AmEx</li>
                     <li>• Procesado por Stripe (seguro)</li>
-                    <li>• Disponible en toda España</li>
+                    <li>• Disponible en España y Marruecos</li>
                   </ul>
                 </div>
                 <div className="bg-gray-100 rounded-lg p-4">

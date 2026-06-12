@@ -10,6 +10,7 @@ import BusinessDashboard from '@/pages/BusinessDashboard';
 import OrderTracking from '@/pages/OrderTracking';
 import OrderSuccess from '@/pages/OrderSuccess';
 import DropshippingPanel from '@/pages/DropshippingPanel';
+import AdminDashboard from '@/pages/AdminDashboard';
 import TravelBooking from '@/pages/TravelBooking';
 import AffiliateSettings from '@/pages/AffiliateSettings';
 import Privacy from '@/pages/Privacy';
@@ -81,9 +82,11 @@ function App() {
             user ? (
               user.role === 'customer' ? <CustomerDashboard /> :
               user.role === 'driver' ? <DriverDashboard /> :
+              user.role === 'admin' ? <AdminDashboard /> :
               <BusinessDashboard />
             ) : <Navigate to="/auth" />
           } />
+          <Route path="/admin" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/auth" />} />
           <Route path="/orders" element={user ? <CustomerDashboard /> : <Navigate to="/auth" />} />
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />

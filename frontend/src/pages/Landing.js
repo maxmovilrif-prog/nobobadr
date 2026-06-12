@@ -15,7 +15,7 @@ export default function Landing() {
     {
       icon: <Store className="w-8 h-8 text-emerald-600" />,
       title: 'Restaurantes y Tiendas',
-      description: 'Pide de tus negocios favoritos en España, Europa y Marruecos'
+      description: 'Pide de tus negocios favoritos en España y Marruecos'
     },
     {
       icon: <Package className="w-8 h-8 text-emerald-600" />,
@@ -40,7 +40,7 @@ export default function Landing() {
     {
       icon: <MapPin className="w-8 h-8 text-emerald-600" />,
       title: 'Cobertura Total',
-      description: 'Servicio en España, Europa y Marruecos'
+      description: 'Servicio en España y Marruecos'
     }
   ];
 
@@ -139,7 +139,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">¿Por qué elegirnos?</h2>
-            <p className="text-lg text-gray-600">Servicio rápido, seguro y confiable en España, Europa y Marruecos</p>
+            <p className="text-lg text-gray-600">Servicio rápido, seguro y confiable en España y Marruecos</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, idx) => (
@@ -161,7 +161,7 @@ export default function Landing() {
       <div className="py-20 px-6 bg-gradient-to-br from-emerald-600 to-teal-700">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">¿Listo para empezar?</h2>
-          <p className="text-xl text-emerald-50 mb-8">Únete a miles de usuarios en España</p>
+          <p className="text-xl text-emerald-50 mb-8">Únete a miles de usuarios en España y Marruecos</p>
           <Button 
             data-testid="footer-cta-btn"
             size="lg" 

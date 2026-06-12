@@ -136,7 +136,7 @@ export default function Privacy() {
                 <p className="font-semibold text-gray-900 mb-2">Datos de contacto:</p>
                 <p className="text-sm">📧 Email: <a href="mailto:exprenobo@hotmail.com" className="text-emerald-600 hover:underline">exprenobo@hotmail.com</a></p>
                 <p className="text-sm">📱 Teléfono: +34 654 24 20 92</p>
-                <p className="text-sm">📍 Servicio: España</p>
+                <p className="text-sm">📍 Servicio: España y Marruecos</p>
               </div>
               <p className="text-sm text-gray-600 mt-4">
                 Nos comprometemos a responder a todas las solicitudes en un plazo máximo de 30 días.

@@ -13,6 +13,9 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+import json
+import re
 import sys
 sys.path.append(str(Path(__file__).parent))
 
@@ -31,6 +34,9 @@ JWT_EXPIRATION_HOURS = 24
 
 # Stripe Configuration
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
+
+# Emergent LLM Key (AI Smart Search)
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
 # Create the main app
 app = FastAPI()
@@ -850,6 +856,150 @@ async def update_affiliate_links(links_data: AffiliateLinksUpdate, current_user:
         await db.affiliate_links.insert_one(new_links.dict())
     
     return {"message": "Affiliate links updated successfully"}
+
+# =========================
+# DRIVER LOCATION (for Admin live map)
+# =========================
+
+class DriverLocationUpdate(BaseModel):
+    lat: float
+    lng: float
+
+@api_router.patch("/drivers/location")
+async def update_driver_location(loc: DriverLocationUpdate, current_user: dict = Depends(get_current_user)):
+    """El driver actualiza su ubicación actual para el mapa de administración"""
+    if current_user['role'] != 'driver':
+        raise HTTPException(status_code=403, detail="Only drivers can update location")
+    await db.users.update_one(
+        {'id': current_user['id']},
+        {'$set': {'current_location': {'lat': loc.lat, 'lng': loc.lng},
+                  'location_updated_at': datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Location updated"}
+
+# =========================
+# AI SMART SEARCH (Emergent LLM)
+# =========================
+
+class SmartSearchRequest(BaseModel):
+    query: str
+
+@api_router.post("/search/smart")
+async def smart_search(req: SmartSearchRequest):
+    """Búsqueda en lenguaje natural. Devuelve los 3 negocios más relevantes/rápidos."""
+    if not req.query or not req.query.strip():
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    businesses = await db.businesses.find({'is_open': True}, {'_id': 0}).to_list(1000)
+    if not businesses:
+        return {"query": req.query, "suggestions": [], "message": "No hay negocios disponibles ahora mismo."}
+
+    catalog = "\n".join([
+        f"- id:{b['id']} | nombre:{b['name']} | categoria:{b['category']} | descripcion:{b.get('description','')} | tiempo_entrega:{b.get('delivery_time','N/D')} | valoracion:{b.get('rating',0)}"
+        for b in businesses
+    ])
+
+    system_message = (
+        "Eres el asistente de búsqueda inteligente de Nubo Express, un marketplace multiservicio de España y Marruecos. "
+        "Recibes una consulta del usuario en lenguaje natural y un catálogo de negocios. "
+        "Elige los 3 negocios MÁS relevantes para la intención del usuario, priorizando los más rápidos (menor tiempo_entrega) y mejor valorados. "
+        "Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, con este formato exacto: "
+        '{"ids": ["id1","id2","id3"], "reason": "breve explicación en español"}'
+    )
+    user_text = f"Consulta del usuario: \"{req.query}\"\n\nCatálogo de negocios:\n{catalog}"
+
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"smart-search-{uuid.uuid4()}",
+            system_message=system_message
+        ).with_model("openai", "gpt-4o-mini")
+        response = await chat.send_message(UserMessage(text=user_text))
+    except Exception as e:
+        logger.error(f"Smart search LLM error: {e}")
+        raise HTTPException(status_code=502, detail="AI search temporarily unavailable")
+
+    ids, reason = [], ""
+    try:
+        match = re.search(r'\{.*\}', response, re.DOTALL)
+        parsed = json.loads(match.group(0)) if match else {}
+        ids = parsed.get('ids', [])
+        reason = parsed.get('reason', '')
+    except Exception as e:
+        logger.error(f"Smart search parse error: {e} | raw: {response}")
+
+    biz_map = {b['id']: b for b in businesses}
+    suggestions = [biz_map[i] for i in ids if i in biz_map][:3]
+    # Fallback: if AI returned nothing valid, return fastest open businesses
+    if not suggestions:
+        suggestions = businesses[:3]
+        reason = reason or "Sugerencias destacadas para ti."
+
+    for b in suggestions:
+        b.pop('created_at', None)
+
+    return {"query": req.query, "suggestions": suggestions, "reason": reason}
+
+# =========================
+# ADMIN ENDPOINTS
+# =========================
+
+@api_router.get("/admin/active-drivers")
+async def admin_active_drivers(current_user: dict = Depends(get_current_user)):
+    """Lista de Abejas 🐝 activas con su ubicación para el mapa global del admin."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    drivers = await db.users.find(
+        {'role': 'driver', 'is_available': True},
+        {'_id': 0, 'password_hash': 0}
+    ).to_list(1000)
+
+    active = []
+    for d in drivers:
+        loc = d.get('current_location')
+        if loc and loc.get('lat') is not None and loc.get('lng') is not None:
+            active.append({
+                'driver_id': d['id'],
+                'name': d['name'],
+                'vehicle_type': d.get('vehicle_type'),
+                'lat': loc['lat'],
+                'lng': loc['lng'],
+                'phone': d.get('phone'),
+                'updated_at': d.get('location_updated_at')
+            })
+
+    return {"count": len(active), "drivers": active}
+
+@api_router.get("/admin/stats")
+async def admin_stats(current_user: dict = Depends(get_current_user)):
+    """Estadísticas globales para el dashboard de administración."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    total_customers = await db.users.count_documents({'role': 'customer'})
+    total_drivers = await db.users.count_documents({'role': 'driver'})
+    available_drivers = await db.users.count_documents({'role': 'driver', 'is_available': True})
+    total_businesses = await db.businesses.count_documents({})
+    total_orders = await db.orders.count_documents({})
+    active_orders = await db.orders.count_documents({'status': {'$in': ['accepted', 'preparing', 'ready', 'in_transit']}})
+    delivered_orders = await db.orders.count_documents({'status': 'delivered'})
+
+    revenue_cursor = db.orders.find({'payment_status': 'paid'}, {'_id': 0, 'total_amount': 1})
+    revenue = 0.0
+    async for o in revenue_cursor:
+        revenue += o.get('total_amount', 0)
+
+    return {
+        'total_customers': total_customers,
+        'total_drivers': total_drivers,
+        'available_drivers': available_drivers,
+        'total_businesses': total_businesses,
+        'total_orders': total_orders,
+        'active_orders': active_orders,
+        'delivered_orders': delivered_orders,
+        'revenue': round(revenue, 2)
+    }
 
 # =========================
 # WEBSOCKET REAL-TIME TRACKING

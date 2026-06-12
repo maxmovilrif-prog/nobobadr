@@ -29,7 +29,7 @@
     "brand": "Nubo",
     "hero_title": "Everything you need,",
     "hero_subtitle": "at your door",
-    "hero_description": "Order food, shop or send what you need. In Spain, you have everything at the click of a button.",
+    "hero_description": "Order food, shop or send what you need. In Spain and Morocco, you have everything at the click of a button.",
     "cta_customer": "Get Started",
     "cta_business": "I'm a Business",
     "services": {
@@ -37,7 +37,7 @@
       "supermarkets": "Supermarkets",
       "courier": "Courier"
     },
-    "coverage": "Spain"
+    "coverage": "Spain and Morocco"
   },
   "auth": {
     "welcome": "Welcome to",
@@ -143,7 +143,7 @@
   },
   "footer": {
     "about": "Nubo",
-    "about_text": "Your marketplace in Spain. Food, shopping, courier, cars and electronics.",
+    "about_text": "Your marketplace in Spain and Morocco. Food, shopping, courier, cars and electronics.",
     "contact": "Contact",
     "links": "Links",
     "home": "Home",

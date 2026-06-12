@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car } from 'lucide-react';
+import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car, Sparkles, Search } from 'lucide-react';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleFilters from '@/components/VehicleFilters';
 import RideBooking from '@/components/RideBooking';
@@ -34,6 +34,10 @@ export default function CustomerDashboard() {
     sortBy: 'name'
   });
   const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
+  const [smartQuery, setSmartQuery] = useState('');
+  const [smartResults, setSmartResults] = useState(null);
+  const [smartReason, setSmartReason] = useState('');
+  const [smartLoading, setSmartLoading] = useState(false);
 
   useEffect(() => {
     fetchBusinesses();
@@ -60,13 +64,32 @@ export default function CustomerDashboard() {
     }
   };
 
-  const fetchProducts = async (businessId) => {
-    try {
+  const fetchProducts = async (businessId) => {    try {
       const response = await axios.get(`${API}/products/${businessId}`);
       setProducts(response.data);
       setSelectedBusiness(businesses.find(b => b.id === businessId));
     } catch (error) {
       toast.error('Error al cargar productos');
+    }
+  };
+
+  const handleSmartSearch = async () => {
+    if (!smartQuery.trim()) return;
+    setSmartLoading(true);
+    setSmartResults(null);
+    setSmartReason('');
+    try {
+      const response = await axios.post(`${API}/search/smart`, { query: smartQuery });
+      setSmartResults(response.data.suggestions || []);
+      setSmartReason(response.data.reason || '');
+      if ((response.data.suggestions || []).length === 0) {
+        toast.info('No encontramos negocios para esa búsqueda.');
+      }
+    } catch (error) {
+      console.error('Smart search error:', error);
+      toast.error('La búsqueda inteligente no está disponible ahora mismo.');
+    } finally {
+      setSmartLoading(false);
     }
   };
 
@@ -298,6 +321,67 @@ export default function CustomerDashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* AI Smart Search */}
+        <Card className="mb-8 border-0 shadow-lg bg-white" data-testid="smart-search-card">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              <h3 className="text-lg font-bold text-gray-900">Búsqueda Inteligente</h3>
+              <Badge className="bg-amber-100 text-amber-700">IA</Badge>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">Escribe lo que necesitas en lenguaje natural. Ej: "tengo hambre", "quiero sushi rápido"</p>
+            <div className="flex gap-2">
+              <Input
+                data-testid="smart-search-input"
+                value={smartQuery}
+                onChange={(e) => setSmartQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSmartSearch()}
+                placeholder="¿Qué te apetece hoy?"
+                className="flex-1"
+              />
+              <Button
+                data-testid="smart-search-btn"
+                onClick={handleSmartSearch}
+                disabled={smartLoading}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {smartLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                ) : (
+                  <><Search className="w-4 h-4 mr-2" /> Buscar</>
+                )}
+              </Button>
+            </div>
+
+            {smartResults && smartResults.length > 0 && (
+              <div className="mt-5" data-testid="smart-search-results">
+                {smartReason && <p className="text-sm text-gray-600 mb-3 italic">💡 {smartReason}</p>}
+                <div className="grid md:grid-cols-3 gap-4">
+                  {smartResults.map((biz) => (
+                    <Card
+                      key={biz.id}
+                      data-testid={`smart-result-${biz.id}`}
+                      className="hover-lift cursor-pointer border border-emerald-100 shadow-sm"
+                      onClick={() => fetchProducts(biz.id)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-semibold text-gray-900">{biz.name}</h4>
+                          <Badge className="bg-emerald-100 text-emerald-700">{biz.category}</Badge>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2 line-clamp-2">{biz.description}</p>
+                        <span className="flex items-center text-xs text-gray-600">
+                          <Clock className="w-3 h-3 mr-1" /> {biz.delivery_time}
+                        </span>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Travel Banner */}
         <Card className="mb-8 bg-gradient-to-r from-blue-500 via-teal-500 to-emerald-500 text-white border-0 overflow-hidden relative">
           <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
@@ -306,7 +390,7 @@ export default function CustomerDashboard() {
               <div className="flex-1">
                 <h3 className="text-2xl font-bold mb-2">✈️ 🚢 🏨 ¿Planeas un viaje?</h3>
                 <p className="text-white/90 mb-4">
-                  Encuentra los mejores vuelos, ferries y hoteles en Europa y Marruecos
+                  Encuentra los mejores vuelos, ferries y hoteles en España y Marruecos
                 </p>
                 <Button
                   onClick={() => navigate('/travel')}
