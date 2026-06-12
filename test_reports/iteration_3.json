@@ -1,0 +1,34 @@
+{
+  "summary": "Retested Admin Live Map Dashboard (/admin) after main agent's fix that replaced react-leaflet MapContainer with vanilla Leaflet (L.map() inside useEffect with map.remove() cleanup). FIX VERIFIED: the StrictMode crash is gone. Admin login at /auth with admin@nuboexpress.com/Admin123! redirects to /admin and renders fully. data-testid='admin-dashboard' and data-testid='admin-map' both present. Leaflet shows exactly 6 green bee markers over Spain (matching the 6 seeded demo drivers). All 4 stat cards render with values: stat-active-drivers=8, stat-total-drivers=9, stat-businesses=15, stat-orders=2. Zero page errors captured, zero 'Map container is already initialized' errors, zero console errors. active-bees-count shows '6 abejas en ruta'.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_nubo_features.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminDashboard.js cleanly migrated to vanilla Leaflet: separate effects for map init (with map.remove() teardown), marker update (clearLayers + re-add on drivers change), and 10s polling. StrictMode-safe.",
+    "mapRef guard `if (mapElRef.current && !mapRef.current)` correctly prevents double init on StrictMode re-mount.",
+    "Consider extracting beeIcon HTML to a small constant module if reused elsewhere; not blocking.",
+    "server.py still exceeds 700 lines (carry-over from iteration_2). Recommend modularizing into routers when time permits."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100% (carried over from iteration_2)", "frontend": "100%" },
+  "test_credentials": {
+    "admin": "admin@nuboexpress.com / Admin123!"
+  },
+  "seed_data_creation": "None this iteration. Admin + 6 demo drivers auto-seeded by backend startup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin Live Map Dashboard is fully working. Backend regression suite at /app/backend/tests/test_nubo_features.py (10 tests, 100% passing in iteration_2). Customer AI search flow already validated in iteration_2. No open issues for the requested scope.",
+  "rca_of_the_issue": {
+    "previous_bug": "react-leaflet MapContainer threw 'Map container is already initialized' under React.StrictMode dev double-mount, crashing AdminDashboard.",
+    "fix_applied_by_main_agent": "Replaced <MapContainer> with manual L.map() init inside a useEffect that guards against re-init via a ref and cleans up via map.remove() on unmount. Markers managed in a separate L.layerGroup updated by a second useEffect on drivers change.",
+    "verification": "Playwright run: admin-dashboard + admin-map present, 6 .leaflet-marker-icon nodes, all stat-* values rendered, 0 pageerrors, 0 'Map container is already initialized' occurrences."
+  }
+}

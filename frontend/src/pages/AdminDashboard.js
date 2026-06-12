@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import axios from 'axios';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { AuthContext } from '@/App';
 import { Button } from '@/components/ui/button';
@@ -40,17 +38,19 @@ const StatCard = ({ icon: Icon, label, value, testid }) => (
 );
 
 export default function AdminDashboard() {
-  const navigate = useNavigate();
   const { user, token, logout, API } = useContext(AuthContext);
   const [drivers, setDrivers] = useState([]);
   const [stats, setStats] = useState({ total_drivers: 0, active_drivers: 0, total_businesses: 0, total_orders: 0 });
   const [refreshing, setRefreshing] = useState(false);
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const mapElRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersLayerRef = useRef(null);
 
   const fetchData = async () => {
     setRefreshing(true);
     try {
+      const headers = { Authorization: `Bearer ${token}` };
       const [d, s] = await Promise.all([
         axios.get(`${API}/admin/active-drivers`, { headers }),
         axios.get(`${API}/admin/stats`, { headers }),
@@ -64,10 +64,45 @@ export default function AdminDashboard() {
     }
   };
 
+  // Initialize Leaflet map manually (StrictMode-safe with proper teardown)
+  useEffect(() => {
+    if (mapElRef.current && !mapRef.current) {
+      const map = L.map(mapElRef.current, { scrollWheelZoom: true }).setView(SPAIN_CENTER, 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+      markersLayerRef.current = L.layerGroup().addTo(map);
+      mapRef.current = map;
+    }
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markersLayerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update markers whenever drivers change
+  useEffect(() => {
+    const layer = markersLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    drivers.forEach((driver) => {
+      L.marker([driver.lat, driver.lng], { icon: beeIcon })
+        .bindPopup(
+          `<div style="font-size:13px"><strong>🐝 ${driver.name}</strong><br/>Vehículo: ${driver.vehicle_type || 'N/D'}<br/>Estado: <span style="color:#10b981;font-weight:600">Activo</span></div>`
+        )
+        .addTo(layer);
+    });
+  }, [drivers]);
+
+  // Poll data
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line
   }, []);
 
   return (
@@ -110,27 +145,7 @@ export default function AdminDashboard() {
                 {drivers.length} abejas en ruta
               </span>
             </div>
-            <div style={{ height: '560px', width: '100%' }} data-testid="admin-map">
-              <MapContainer center={SPAIN_CENTER} zoom={6} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
-                <TileLayer
-                  attribution='&copy; OpenStreetMap contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {drivers.map((driver) => (
-                  <Marker key={driver.id} position={[driver.lat, driver.lng]} icon={beeIcon}>
-                    <Popup>
-                      <div className="text-sm">
-                        <strong>🐝 {driver.name}</strong>
-                        <br />
-                        Vehículo: {driver.vehicle_type || 'N/D'}
-                        <br />
-                        Estado: <span className="text-emerald-600 font-semibold">Activo</span>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
-            </div>
+            <div ref={mapElRef} style={{ height: '560px', width: '100%' }} data-testid="admin-map" />
           </CardContent>
         </Card>
       </div>
