@@ -1,0 +1,58 @@
+{
+  "summary": "Tested Nubo Express new features (AI Smart Search + Admin Live Map). Backend: 10/10 pytest tests PASS — smart search returns relevant businesses (food + courier), admin endpoints return seeded drivers >=6 with stats, RBAC enforced (403 for non-admin/non-driver), driver location update persists and surfaces in admin endpoint. Frontend customer AI Search flow works fully (card visible, 3 results returned, clicking opens products dialog). Frontend AdminDashboard is COMPLETELY BROKEN — react-leaflet MapContainer throws 'Map container is already initialized' under React.StrictMode (dev double-mount). The pageerror crashes the whole component tree: 0 admin-dashboard / admin-map / stat-* nodes are rendered.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminDashboard (/admin)",
+        "issue": "Page crashes with PageError: 'Map container is already initialized.' thrown from react-leaflet MapContainer._initContainer. Nothing renders — no admin-dashboard, no admin-map, no stat-active-drivers/stat-total-drivers/stat-businesses/stat-orders elements in DOM. Caused by react-leaflet 4.2.1 being mounted twice under React.StrictMode in dev (frontend/src/index.js wraps app in <React.StrictMode>).",
+        "selector": "[data-testid=\"admin-dashboard\"]",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_nubo_features.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix AdminDashboard 'Map container is already initialized' crash. Recommended options (pick one): (a) Remove <React.StrictMode> wrapper in /app/frontend/src/index.js (simplest); (b) Upgrade react-leaflet to v5 (better strict-mode handling) and adjust API; (c) Wrap MapContainer in a child component mounted via useEffect after first render with a stable key and ensure the underlying Leaflet map is destroyed on unmount (call map.remove()). Note: the issue also blocks all admin stat cards from rendering because the whole component crashes — not just the map."
+  ],
+  "critical_code_review_comments": [
+    "react-leaflet 4.x is known to crash under React.StrictMode dev double-mount. Either disable StrictMode, upgrade react-leaflet, or isolate MapContainer behind a manual mount controller.",
+    "AdminDashboard polls every 10s (setInterval) — fine, but ensure cleanup is also defensive against fast re-mounts.",
+    "server.py is 1164 lines — exceeds the 700-line guideline; consider splitting into routers (auth, businesses, orders, admin, search).",
+    "Smart search has a sensible LLM-fail fallback (keyword match). Good.",
+    "Admin endpoints correctly exclude MongoDB _id via projection. Good.",
+    "data-testid coverage for new features is good (ai-search-card/input/btn/results/ai-result-<id>, admin-dashboard, admin-map, stat-* cards)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_nubo_features.py",
+    "/app/backend/tests/__init__.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "50%"},
+  "test_credentials": {
+    "admin": "admin@nuboexpress.com / Admin123!",
+    "customer": "cliente@nubotest.com / Cliente123! (auto-registered if missing)",
+    "driver": "bee.madrid@nuboexpress.com / Bee123!"
+  },
+  "seed_data_creation": "Customer cliente@nubotest.com was registered on backend during the customer fixture (login fallback). Admin and 6 demo drivers are auto-seeded by backend on startup.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend pytest at /app/backend/tests/test_nubo_features.py is the regression suite — run with: pytest /app/backend/tests/test_nubo_features.py -v. The Admin /admin route is currently broken in dev due to react-leaflet + React.StrictMode. After main agent applies fix, re-run admin flow Playwright assertions: data-testid='admin-dashboard', 'admin-map', 'stat-active-drivers' (value >=6), and count of .leaflet-marker-icon should be >=6. Customer AI search flow already works end-to-end.",
+  "rca_of_the_issue": {
+    "bug": "AdminDashboard renders nothing in dev because react-leaflet MapContainer throws 'Map container is already initialized.'",
+    "root_cause": "react-leaflet 4.2.1's MapContainer calls L.Map._initContainer on its DOM node. React 18 StrictMode in dev mounts components, unmounts, then re-mounts them. react-leaflet 4 does not always tear the Leaflet instance down on the first unmount, so on the second mount Leaflet sees the same container _leaflet_id and throws. The unhandled error propagates up the tree, so the parent <div data-testid='admin-dashboard'> never renders — confirmed by Playwright: 0 admin-dashboard and 0 admin-map nodes in DOM, only the dev-only red 'Uncaught runtime errors' overlay is visible.",
+    "reproduction": "1) Login as admin@nuboexpress.com / Admin123! → redirects to /admin. 2) Observe red 'Uncaught runtime errors' overlay with 'Map container is already initialized.' 3) document.querySelectorAll('[data-testid=admin-dashboard]').length === 0.",
+    "mitigation_options": [
+      "Remove React.StrictMode in /app/frontend/src/index.js (quick fix, but loses some dev checks).",
+      "Upgrade react-leaflet to v5 (handles StrictMode correctly).",
+      "Wrap MapContainer in a custom component that creates the map manually via L.map() inside useEffect with a proper cleanup (map.remove())."
+    ]
+  }
+}

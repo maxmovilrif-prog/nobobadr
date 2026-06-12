@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car } from 'lucide-react';
+import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car, Sparkles, Search, Loader2 } from 'lucide-react';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleFilters from '@/components/VehicleFilters';
 import RideBooking from '@/components/RideBooking';
@@ -34,6 +34,29 @@ export default function CustomerDashboard() {
     sortBy: 'name'
   });
   const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
+
+  // AI Smart Search
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiReply, setAiReply] = useState('');
+  const [aiResults, setAiResults] = useState([]);
+
+  const smartSearch = async () => {
+    const q = aiQuery.trim();
+    if (!q) return;
+    setAiLoading(true);
+    setAiReply('');
+    setAiResults([]);
+    try {
+      const response = await axios.post(`${API}/search/smart`, { query: q });
+      setAiReply(response.data.reply);
+      setAiResults(response.data.results || []);
+    } catch (error) {
+      toast.error('Error en la búsqueda inteligente');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchBusinesses();
@@ -320,6 +343,69 @@ export default function CustomerDashboard() {
                 🌍
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Smart Search 🪄 */}
+        <Card className="mb-8 border-0 shadow-lg" data-testid="ai-search-card">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Búsqueda Inteligente</h3>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">Escribe lo que necesitas, p. ej. "tengo hambre" o "enviar un paquete".</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Input
+                data-testid="ai-search-input"
+                placeholder="¿Qué te apetece hoy?"
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && smartSearch()}
+                className="flex-1"
+              />
+              <Button
+                data-testid="ai-search-btn"
+                onClick={smartSearch}
+                disabled={aiLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 sm:w-auto"
+              >
+                {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                <span className="ml-2">Buscar</span>
+              </Button>
+            </div>
+
+            {aiReply && (
+              <div className="mt-5" data-testid="ai-search-results">
+                <p className="text-sm font-medium text-emerald-700 mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" /> {aiReply}
+                </p>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  {aiResults.map((b) => (
+                    <Card
+                      key={b.id}
+                      data-testid={`ai-result-${b.id}`}
+                      className="hover-lift cursor-pointer border border-emerald-100"
+                      onClick={() => fetchProducts(b.id)}
+                    >
+                      <div className="aspect-video bg-gradient-to-br from-emerald-400 to-teal-500 rounded-t-lg overflow-hidden">
+                        <img src={b.image_url} alt={b.name} className="w-full h-full object-cover" />
+                      </div>
+                      <CardContent className="p-4">
+                        <h4 className="font-semibold text-gray-900">{b.name}</h4>
+                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">{b.description}</p>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center text-gray-600">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {b.delivery_time}
+                          </span>
+                          <Badge className="bg-emerald-100 text-emerald-700">{b.category}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -13,6 +13,8 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+import json
 import sys
 sys.path.append(str(Path(__file__).parent))
 
@@ -31,6 +33,9 @@ JWT_EXPIRATION_HOURS = 24
 
 # Stripe Configuration
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
+
+# Emergent LLM Key (AI Smart Search)
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
 # Create the main app
 app = FastAPI()
@@ -852,6 +857,161 @@ async def update_affiliate_links(links_data: AffiliateLinksUpdate, current_user:
     return {"message": "Affiliate links updated successfully"}
 
 # =========================
+# AI SMART SEARCH
+# =========================
+
+class SmartSearchRequest(BaseModel):
+    query: str
+
+@api_router.post("/search/smart")
+async def smart_search(req: SmartSearchRequest):
+    """Búsqueda inteligente con IA: interpreta lenguaje natural y devuelve los mejores negocios."""
+    query = (req.query or "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    businesses = await db.businesses.find({}, {'_id': 0}).to_list(1000)
+    if not businesses:
+        return {"reply": "No hay negocios disponibles todavía.", "results": []}
+
+    # Build compact catalog for the LLM
+    catalog = [
+        {
+            "id": b["id"],
+            "name": b.get("name", ""),
+            "category": b.get("category", ""),
+            "description": b.get("description", ""),
+            "delivery_time": b.get("delivery_time", "")
+        }
+        for b in businesses
+    ]
+
+    system_message = (
+        "Eres el asistente de búsqueda de Nubo Express, un marketplace de delivery en España. "
+        "El usuario describe lo que quiere en lenguaje natural (puede estar en español, árabe o inglés). "
+        "A partir del catálogo JSON de negocios, selecciona hasta 3 negocios más relevantes ordenados de mejor a peor. "
+        "Prioriza coincidencia de categoría/intención (ej. 'tengo hambre' -> restaurantes rápidos) y menor tiempo de entrega. "
+        "Responde SOLO con JSON válido con este formato exacto: "
+        '{"reply": "<frase corta y amable en el idioma del usuario>", "ids": ["id1","id2","id3"]}. '
+        "No incluyas texto fuera del JSON."
+    )
+
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"smart-search-{uuid.uuid4()}",
+            system_message=system_message
+        ).with_model("openai", "gpt-4o-mini")
+
+        user_msg = UserMessage(
+            text=f"Consulta del usuario: \"{query}\"\n\nCatálogo de negocios (JSON):\n{json.dumps(catalog, ensure_ascii=False)}"
+        )
+        raw = await chat.send_message(user_msg)
+    except Exception as e:
+        logger.error(f"Smart search LLM error: {e}")
+        # Fallback: simple keyword match
+        ql = query.lower()
+        matched = [b for b in businesses if ql in b.get("name", "").lower() or ql in b.get("description", "").lower() or ql in b.get("category", "").lower()]
+        results = (matched or businesses)[:3]
+        for b in results:
+            if isinstance(b.get('created_at'), str):
+                b['created_at'] = b['created_at']
+        return {"reply": "Esto es lo que encontré para ti:", "results": results}
+
+    # Parse LLM JSON response
+    reply = "Esto es lo que encontré para ti:"
+    ids = []
+    try:
+        text = raw.strip()
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            text = text.split("```", 2)[1]
+            if text.startswith("json"):
+                text = text[4:]
+        text = text.strip().strip("`").strip()
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1:
+            text = text[start:end + 1]
+        parsed = json.loads(text)
+        reply = parsed.get("reply", reply)
+        ids = parsed.get("ids", []) or []
+    except Exception as e:
+        logger.error(f"Smart search parse error: {e} | raw: {raw}")
+
+    by_id = {b["id"]: b for b in businesses}
+    seen = set()
+    results = []
+    for i in ids:
+        if i in by_id and i not in seen:
+            seen.add(i)
+            results.append(by_id[i])
+        if len(results) >= 3:
+            break
+    if not results:
+        results = businesses[:3]
+
+    return {"reply": reply, "results": results}
+
+# =========================
+# DRIVER LOCATION & ADMIN
+# =========================
+
+class DriverLocationUpdate(BaseModel):
+    lat: float
+    lng: float
+
+@api_router.patch("/drivers/location")
+async def update_driver_location(loc: DriverLocationUpdate, current_user: dict = Depends(get_current_user)):
+    """El repartidor (Abeja 🐝) actualiza su ubicación actual."""
+    if current_user['role'] != 'driver':
+        raise HTTPException(status_code=403, detail="Only drivers can update location")
+    await db.users.update_one(
+        {'id': current_user['id']},
+        {'$set': {'current_location': {'lat': loc.lat, 'lng': loc.lng}}}
+    )
+    return {'message': 'Location updated', 'lat': loc.lat, 'lng': loc.lng}
+
+@api_router.get("/admin/active-drivers")
+async def get_active_drivers(current_user: dict = Depends(get_current_user)):
+    """Devuelve todas las Abejas 🐝 activas con ubicación para el mapa del Admin."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    drivers = await db.users.find(
+        {'role': 'driver', 'is_available': True, 'current_location': {'$ne': None}},
+        {'_id': 0, 'password_hash': 0}
+    ).to_list(1000)
+    result = []
+    for d in drivers:
+        loc = d.get('current_location') or {}
+        if loc.get('lat') is None or loc.get('lng') is None:
+            continue
+        result.append({
+            'id': d['id'],
+            'name': d.get('name', 'Abeja'),
+            'vehicle_type': d.get('vehicle_type'),
+            'lat': loc['lat'],
+            'lng': loc['lng'],
+        })
+    return {'count': len(result), 'drivers': result}
+
+@api_router.get("/admin/stats")
+async def get_admin_stats(current_user: dict = Depends(get_current_user)):
+    """Métricas rápidas para el dashboard del Admin."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    total_drivers = await db.users.count_documents({'role': 'driver'})
+    active_drivers = await db.users.count_documents({'role': 'driver', 'is_available': True})
+    total_businesses = await db.businesses.count_documents({})
+    total_orders = await db.orders.count_documents({})
+    return {
+        'total_drivers': total_drivers,
+        'active_drivers': active_drivers,
+        'total_businesses': total_businesses,
+        'total_orders': total_orders,
+    }
+
+# =========================
 # WEBSOCKET REAL-TIME TRACKING
 # =========================
 
@@ -952,6 +1112,53 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def seed_admin_and_drivers():
+    """Crea un usuario admin y Abejas 🐝 demo con ubicación en España si no existen."""
+    try:
+        admin = await db.users.find_one({'email': 'admin@nuboexpress.com'})
+        if not admin:
+            admin_user = User(
+                email='admin@nuboexpress.com',
+                name='Administrador Nubo',
+                phone='+34 654 24 20 92',
+                role='admin',
+                password_hash=hash_password('Admin123!')
+            )
+            doc = admin_user.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.users.insert_one(doc)
+            logger.info("Seeded admin user admin@nuboexpress.com")
+
+        # Demo drivers (Abejas) across Spain so the admin map shows activity
+        demo_drivers = [
+            {'email': 'bee.madrid@nuboexpress.com', 'name': 'Abeja Madrid', 'lat': 40.4168, 'lng': -3.7038, 'vehicle_type': 'motorcycle'},
+            {'email': 'bee.barcelona@nuboexpress.com', 'name': 'Abeja Barcelona', 'lat': 41.3874, 'lng': 2.1686, 'vehicle_type': 'bike'},
+            {'email': 'bee.valencia@nuboexpress.com', 'name': 'Abeja Valencia', 'lat': 39.4699, 'lng': -0.3763, 'vehicle_type': 'car'},
+            {'email': 'bee.sevilla@nuboexpress.com', 'name': 'Abeja Sevilla', 'lat': 37.3891, 'lng': -5.9845, 'vehicle_type': 'motorcycle'},
+            {'email': 'bee.algeciras@nuboexpress.com', 'name': 'Abeja Algeciras', 'lat': 36.1408, 'lng': -5.4562, 'vehicle_type': 'bike'},
+            {'email': 'bee.malaga@nuboexpress.com', 'name': 'Abeja Málaga', 'lat': 36.7213, 'lng': -4.4214, 'vehicle_type': 'car'},
+        ]
+        for d in demo_drivers:
+            existing = await db.users.find_one({'email': d['email']})
+            if not existing:
+                driver = User(
+                    email=d['email'],
+                    name=d['name'],
+                    phone='+34 600 000 000',
+                    role='driver',
+                    vehicle_type=d['vehicle_type'],
+                    is_available=True,
+                    current_location={'lat': d['lat'], 'lng': d['lng']},
+                    password_hash=hash_password('Bee123!')
+                )
+                doc = driver.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.users.insert_one(doc)
+        logger.info("Seeded demo drivers")
+    except Exception as e:
+        logger.error(f"Seed error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
