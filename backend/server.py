@@ -1246,6 +1246,44 @@ async def seed_admin_and_drivers():
     except Exception as e:
         logger.error(f"Seed error: {e}")
 
+@app.on_event("startup")
+async def init_collections_and_indexes():
+    """Inicializa el 'esquema' MongoDB: crea colecciones e índices (Users, Orders, Drivers, etc.).
+    En MongoDB las colecciones son schemaless y se crean al primer insert; aquí las creamos
+    explícitamente y añadimos índices para rendimiento e integridad."""
+    try:
+        existing = await db.list_collection_names()
+        for coll in ['users', 'orders', 'businesses', 'products', 'messages',
+                     'payment_transactions', 'affiliate_links', 'admin_login_attempts']:
+            if coll not in existing:
+                await db.create_collection(coll)
+
+        # Users (incluye clientes, repartidores/Drivers, negocios y admin)
+        await db.users.create_index('email', unique=True)
+        await db.users.create_index('id', unique=True)
+        await db.users.create_index('role')
+        # Drivers: consultas del mapa admin (repartidores disponibles)
+        await db.users.create_index([('role', 1), ('is_available', 1)])
+
+        # Orders
+        await db.orders.create_index('id', unique=True)
+        await db.orders.create_index('customer_id')
+        await db.orders.create_index('driver_id')
+        await db.orders.create_index('status')
+        await db.orders.create_index('created_at')
+
+        # Businesses / Products
+        await db.businesses.create_index('id', unique=True)
+        await db.businesses.create_index('category')
+        await db.products.create_index('business_id')
+
+        # Seguridad: bloqueo de login admin por email
+        await db.admin_login_attempts.create_index('email', unique=True)
+
+        logger.info("DB collections & indexes initialized")
+    except Exception as e:
+        logger.error(f"Index init error: {e}")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
