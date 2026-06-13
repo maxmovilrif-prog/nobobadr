@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header, WebSocket, WebSocketDisconnect, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -17,6 +17,8 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 import json
 import sys
 import hmac
+import csv
+import io
 sys.path.append(str(Path(__file__).parent))
 
 ROOT_DIR = Path(__file__).parent
@@ -516,6 +518,22 @@ async def log_assignment(order_id, driver, action, actor, distance_km=None, reas
         'reason': reason,
         'created_at': datetime.now(timezone.utc).isoformat(),
     })
+
+def _history_query(action=None, driver_id=None, date_from=None, date_to=None):
+    """Construye el filtro de MongoDB para el historial de asignaciones."""
+    q = {}
+    if action:
+        q['action'] = action
+    if driver_id:
+        q['driver_id'] = driver_id
+    created = {}
+    if date_from:
+        created['$gte'] = f"{date_from}T00:00:00"
+    if date_to:
+        created['$lte'] = f"{date_to}T23:59:59.999999"
+    if created:
+        q['created_at'] = created
+    return q
 
 @api_router.get("/drivers/available-orders", response_model=List[Order])
 async def get_available_orders(current_user: dict = Depends(get_current_user)):
@@ -1189,12 +1207,59 @@ async def return_order_to_queue(order_id: str, current_user: dict = Depends(get_
     return {'message': 'Order returned to queue', 'order_id': order_id}
 
 @api_router.get("/admin/assignment-history")
-async def get_assignment_history(limit: int = 50, current_user: dict = Depends(get_current_user)):
-    """Historial de asignaciones para trazabilidad total (admin)."""
+async def get_assignment_history(
+    limit: int = 50,
+    action: Optional[str] = None,
+    driver_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Historial de asignaciones para trazabilidad total (admin). Soporta filtros."""
     if current_user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    events = await db.assignment_history.find({}, {'_id': 0}).sort('created_at', -1).to_list(max(1, min(limit, 200)))
-    return {'count': len(events), 'events': events}
+    query = _history_query(action, driver_id, date_from, date_to)
+    events = await db.assignment_history.find(query, {'_id': 0}).sort('created_at', -1).to_list(max(1, min(limit, 500)))
+    # Lista de repartidores presentes en el historial (para el filtro del frontend)
+    raw = await db.assignment_history.find({}, {'_id': 0, 'driver_id': 1, 'driver_name': 1}).to_list(2000)
+    seen, drivers_in_history = set(), []
+    for r in raw:
+        did = r.get('driver_id')
+        if did and did not in seen:
+            seen.add(did)
+            drivers_in_history.append({'id': did, 'name': r.get('driver_name') or 'N/D'})
+    return {'count': len(events), 'events': events, 'drivers': drivers_in_history}
+
+@api_router.get("/admin/assignment-history/export")
+async def export_assignment_history(
+    action: Optional[str] = None,
+    driver_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Exporta el historial de asignaciones filtrado a CSV (admin)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    query = _history_query(action, driver_id, date_from, date_to)
+    events = await db.assignment_history.find(query, {'_id': 0}).sort('created_at', -1).to_list(5000)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(['fecha', 'accion', 'pedido_id', 'repartidor', 'repartidor_id',
+                     'realizado_por', 'rol', 'distancia_km', 'motivo'])
+    for e in events:
+        writer.writerow([
+            e.get('created_at', ''), e.get('action', ''), e.get('order_id', ''),
+            e.get('driver_name', ''), e.get('driver_id', ''), e.get('actor_name', ''),
+            e.get('actor_role', ''), e.get('distance_km', ''), e.get('reason', ''),
+        ])
+    filename = f"historial_asignaciones_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
 
 @api_router.get("/admin/active-drivers")
 async def get_active_drivers(current_user: dict = Depends(get_current_user)):

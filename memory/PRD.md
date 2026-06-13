@@ -14,13 +14,18 @@ Marketplace multiservicio tipo Glovo para España ("Nubo Express"): delivery de 
 - Emergent LLM Key (búsqueda IA) — openai gpt-4o-mini
 
 ## Implementado (Jun 2026)
-- ✅ **Logística geoespacial:** índice 2dsphere en `users.geo_location`; endpoints `GET /api/drivers/nearest` y `POST /api/orders/{id}/assign-nearest` (admin/business). En el panel admin, card "Pedidos pendientes" + botón **"Asignar más cercano"** con **diálogo de confirmación** ("¿Confirmar asignación a {repartidor} a X km?") y, al confirmar, el mapa **vuela y resalta** la Abeja elegida (marcador dorado pulsante, auto-limpiado a los 15s).
-- ✅ **Inicialización de esquema MongoDB:** colecciones + índices (email/id únicos, role, order indexes, 2dsphere) en `init_collections_and_indexes` al arranque.
-- ✅ **Portal Admin separado y oculto** (`/admin-nubo`): login oscuro con email + contraseña + código secreto, bloqueo anti fuerza bruta (5/15min), validación en servidor. `/auth` rechaza admin. `robots.txt` + `noindex`. Credenciales en backend/.env. Panel en `/admin-nubo/panel`.
-- ✅ Mensajes de error de Auth específicos (email duplicado, credenciales, conexión).
-- ✅ GPS automático del repartidor (Disponible → geo_location en vivo).
-- ✅ Búsqueda Inteligente IA (openai gpt-4o-mini) + Admin Live Map (Leaflet).
+- ✅ **Historial: filtros + exportación CSV** (`GET /api/admin/assignment-history` con filtros action/driver/fechas + `/export` CSV). Card con selects de acción/repartidor, rango de fechas, Limpiar y "Exportar CSV". Verificado 14/14.
+- ✅ **Stealth redirect:** un usuario no-admin que entre a `/admin-nubo` va a `/dashboard`; solo visitantes anónimos ven el login admin. El código secreto se valida 100% en servidor (nunca se expone al navegador).
+- ✅ **Retorno automático a la cola** (Abeja "No disponible" → sus pedidos pre-entrega vuelven a pendientes) + devolución manual (`/orders/{id}/return-to-queue`).
+- ✅ **Historial de asignaciones** (colección `assignment_history`): registra assigned/auto_returned/returned con quién, qué, cuándo, distancia y motivo.
+- ✅ **Logística geoespacial 2dsphere:** `/drivers/nearest`, `/orders/{id}/assign-nearest`; botón "Asignar más cercano" con confirmación + el mapa vuela y resalta la Abeja elegida.
+- ✅ **Inicialización de esquema MongoDB** (colecciones + índices) al arranque.
+- ✅ **Portal Admin separado/oculto** (`/admin-nubo`): login oscuro email+contraseña+código secreto, bloqueo anti fuerza bruta, robots/noindex; `/auth` rechaza admin.
+- ✅ Mensajes de error de Auth específicos · GPS automático del repartidor · Búsqueda IA · Admin Live Map (Leaflet).
 - (Sesiones previas) Páginas legales, WebSockets tracking, 7 idiomas, viajes afiliados, NuboRide, dropshipping.
+
+## Producción
+- Dominio en vivo: https://noboexpress.com (los cambios requieren Redeploy).
 
 ## Credenciales de prueba
 Ver /app/memory/test_credentials.md

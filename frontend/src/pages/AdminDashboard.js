@@ -10,7 +10,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft } from 'lucide-react';
+import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft, Download, Filter } from 'lucide-react';
 
 const SPAIN_CENTER = [40.0, -3.7];
 
@@ -62,6 +62,9 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ total_drivers: 0, active_drivers: 0, total_businesses: 0, total_orders: 0 });
   const [pendingOrders, setPendingOrders] = useState([]);
   const [history, setHistory] = useState([]);
+  const [historyDrivers, setHistoryDrivers] = useState([]);
+  const [historyFilters, setHistoryFilters] = useState({ action: '', driver_id: '', date_from: '', date_to: '' });
+  const [exporting, setExporting] = useState(false);
   const [assigningId, setAssigningId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmData, setConfirmData] = useState(null); // { order, driver }
@@ -71,6 +74,68 @@ export default function AdminDashboard() {
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const markersLayerRef = useRef(null);
+  const filtersRef = useRef({ action: '', driver_id: '', date_from: '', date_to: '' });
+
+  const buildHistoryParams = () => {
+    const f = filtersRef.current;
+    const p = { limit: 100 };
+    if (f.action) p.action = f.action;
+    if (f.driver_id) p.driver_id = f.driver_id;
+    if (f.date_from) p.date_from = f.date_from;
+    if (f.date_to) p.date_to = f.date_to;
+    return p;
+  };
+
+  const fetchHistory = async () => {
+    try {
+      const h = await axios.get(`${API}/admin/assignment-history`, {
+        params: buildHistoryParams(),
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setHistory(h.data.events || []);
+      setHistoryDrivers(h.data.drivers || []);
+    } catch (e) { /* noop */ }
+  };
+
+  const applyFilter = (patch) => {
+    const next = { ...filtersRef.current, ...patch };
+    filtersRef.current = next;
+    setHistoryFilters(next);
+    fetchHistory();
+  };
+
+  const clearFilters = () => {
+    const empty = { action: '', driver_id: '', date_from: '', date_to: '' };
+    filtersRef.current = empty;
+    setHistoryFilters(empty);
+    fetchHistory();
+  };
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const params = { ...buildHistoryParams() };
+      delete params.limit;
+      const res = await axios.get(`${API}/admin/assignment-history/export`, {
+        params,
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `historial_asignaciones_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('CSV exportado');
+    } catch (e) {
+      toast.error('No se pudo exportar el CSV');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const fetchData = async () => {
     setRefreshing(true);
@@ -84,9 +149,7 @@ export default function AdminDashboard() {
       setDrivers(d.data.drivers || []);
       setStats(s.data);
       setPendingOrders(p.data.orders || []);
-      axios.get(`${API}/admin/assignment-history`, { params: { limit: 30 }, headers })
-        .then((h) => setHistory(h.data.events || []))
-        .catch(() => {});
+      fetchHistory();
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
@@ -309,6 +372,61 @@ export default function AdminDashboard() {
               <span data-testid="history-count" className="text-sm font-medium text-gray-500">
                 {history.length} eventos
               </span>
+            </div>
+
+            {/* Filtros + exportación */}
+            <div className="px-6 py-3 border-b bg-gray-50 flex flex-wrap items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-400" />
+              <select
+                data-testid="filter-action"
+                value={historyFilters.action}
+                onChange={(e) => applyFilter({ action: e.target.value })}
+                className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+              >
+                <option value="">Todas las acciones</option>
+                <option value="assigned">Asignado</option>
+                <option value="auto_returned">Retorno automático</option>
+                <option value="returned">Devuelto a cola</option>
+              </select>
+              <select
+                data-testid="filter-driver"
+                value={historyFilters.driver_id}
+                onChange={(e) => applyFilter({ driver_id: e.target.value })}
+                className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+              >
+                <option value="">Todos los repartidores</option>
+                {historyDrivers.map((dv) => (
+                  <option key={dv.id} value={dv.id}>{dv.name}</option>
+                ))}
+              </select>
+              <input
+                data-testid="filter-date-from"
+                type="date"
+                value={historyFilters.date_from}
+                onChange={(e) => applyFilter({ date_from: e.target.value })}
+                className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+              />
+              <span className="text-gray-400 text-sm">→</span>
+              <input
+                data-testid="filter-date-to"
+                type="date"
+                value={historyFilters.date_to}
+                onChange={(e) => applyFilter({ date_to: e.target.value })}
+                className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+              />
+              <Button data-testid="clear-filters-btn" onClick={clearFilters} variant="outline" size="sm">
+                Limpiar
+              </Button>
+              <Button
+                data-testid="export-csv-btn"
+                onClick={exportCsv}
+                disabled={exporting}
+                size="sm"
+                className="bg-gray-900 hover:bg-gray-800 text-white ml-auto"
+              >
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                {exporting ? '' : 'Exportar CSV'}
+              </Button>
             </div>
             <div className="divide-y max-h-[420px] overflow-y-auto" data-testid="assignment-history-list">
               {history.length === 0 ? (

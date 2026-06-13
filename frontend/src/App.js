@@ -88,8 +88,16 @@ function App() {
             ) : <Navigate to="/auth" />
           } />
           {/* Hidden, decoupled admin portal */}
-          <Route path="/admin-nubo" element={user && user.role === 'admin' ? <Navigate to="/admin-nubo/panel" /> : <AdminLogin />} />
-          <Route path="/admin-nubo/panel" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/admin-nubo" />} />
+          <Route path="/admin-nubo" element={
+            !user ? <AdminLogin /> :
+            user.role === 'admin' ? <Navigate to="/admin-nubo/panel" /> :
+            <Navigate to="/dashboard" />
+          } />
+          <Route path="/admin-nubo/panel" element={
+            user && user.role === 'admin' ? <AdminDashboard /> :
+            user ? <Navigate to="/dashboard" /> :
+            <Navigate to="/admin-nubo" />
+          } />
           <Route path="/orders" element={user ? <CustomerDashboard /> : <Navigate to="/auth" />} />
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />
