@@ -14,6 +14,7 @@ Marketplace multiservicio tipo Glovo para España ("Nubo Express"): delivery de 
 - Emergent LLM Key (búsqueda IA) — openai gpt-4o-mini
 
 ## Implementado (Jun 2026)
+- ✅ **Ciudades + Geofencing:** colección `cities` (Tánger, Casablanca, Meknes, Nador con coords). `GET /api/cities`. El cliente elige ciudad al pedir (`order.city_id`/`city_name`). El repartidor solo ve pedidos **de su ciudad**, detectada por GPS (≤10 km del centro); fuera de zona ve solo pedidos sin ciudad. Badge "Tu zona" en el panel del repartidor. Verificado 9/9.
 - ✅ **Pagos por repartidor (comisiones):** panel admin con rango de fechas, % comisión configurable, tabla por Abeja (entregas/ingresos/comisión) + totales + CSV. Endpoints `/admin/finances/summary`, `/report/{driver_id}`, `/export`. `delivered_at` se registra al entregar. Verificado 13/13.
 - ✅ **Fix seguridad:** `PATCH /orders/{id}/status` ahora solo admin / repartidor asignado / dueño del negocio (antes cualquiera podía marcar "delivered").
 - ✅ **Historial: filtros + exportación CSV** (`GET /api/admin/assignment-history` con filtros action/driver/fechas + `/export` CSV). Card con selects de acción/repartidor, rango de fechas, Limpiar y "Exportar CSV". Verificado 14/14.
