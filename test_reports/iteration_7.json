@@ -1,0 +1,40 @@
+{
+  "summary": "E2E verification of the NEW two-step 'Asignar más cercano' admin flow (preview → confirm dialog → assign + highlight). Backend pytest 11/11 PASS on REACT_APP_BACKEND_URL preview (no regressions). Frontend Playwright PASS: (1) Admin login at /admin-nubo → /admin-nubo/panel with pending-orders-card showing 4 pending orders. (2) Clicking [data-testid='assign-nearest-<id>'] fires exactly ONE GET /api/drivers/nearest (no POST yet) and opens [data-testid='assign-confirm-dialog'] with text '¿Confirmar asignación a la Abeja Abeja Madrid a 46.4 km?'. (3) Cancel ([data-testid='assign-cancel-btn']) closes the dialog without any /assign-nearest POST and pending-orders-count stays at '4 sin asignar'. (4) Reopen + Confirm ([data-testid='assign-confirm-btn']) triggers POST /api/orders/{id}/assign-nearest exactly once, order disappears from pending list (count 4 → 3), and on the Leaflet map exactly 1 .bee-marker-highlight + 1 .bee-pulse + 1 .leaflet-popup appear on the assigned driver (Abeja Madrid). Screenshot confirms the gold pulsing marker with 'Asignado ahora' popup open and the map recentered on Madrid. Backend RBAC retested: pending-orders 401/403 for unauth/customer/driver, nearest 403 for customer, assign-nearest 403 for customer/driver, 404 for unknown order, 400 on double-assign.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Assign confirm dialog (AdminDashboard.js line 305)",
+        "issues": [
+          "Double 'Abeja' in copy: driver names are stored as 'Abeja Madrid' / 'Abeja Barcelona' etc., and the template prepends another 'Abeja' producing '¿Confirmar asignación a la Abeja Abeja Madrid a 46.4 km?'. Spec literally said '<name>' so this matches the spec verbatim, but the rendered Spanish reads awkwardly. Consider stripping the leading 'Abeja ' from driver.name OR changing the template to '¿Confirmar asignación a <name> a <X> km?'."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_assign_nearest.py",
+    "/app/test_reports/pytest/assign_nearest_results.xml"
+  ],
+  "action_items": [
+    "[Cosmetic only — not blocking] Fix double-'Abeja' wording in confirm dialog by stripping the 'Abeja ' prefix from driver.name before interpolating, or by rewording the template to '¿Confirmar asignación a {driver.name} a {distance_km} km?'."
+  ],
+  "critical_code_review_comments": [
+    "Toast not captured by Playwright selectors in 5s window — feature works (POST succeeded, list updated, highlight applied) but toast may dismiss too quickly for visual verification. Consider extending toast duration on success in confirmAssign() so admin can read 'Asignado: <driver> (<km>)'. Use Sonner duration prop (e.g. duration: 4000) to be safe.",
+    "AdminDashboard.requestAssign() silently aborts if mapRef.current is null and clears assigningId — good. But there is no visual feedback to user when GET /drivers/nearest returns 0 drivers and we toast.error; consider also closing/skipping the dialog state (no leftover state), currently OK since confirmOpen stays false.",
+    "highlightId persists indefinitely until a new assignment overrides it. After 10–30s the popup auto-closes (Leaflet behavior), but the gold pulse remains. Consider auto-clearing highlightId after ~15s with a setTimeout in confirmAssign(), or when admin clicks elsewhere on map, to avoid lingering 'Asignado ahora' state across refreshes.",
+    "confirmData stores driver.ref = {lat, lng} (map center at click time) and POSTs that same ref. If the admin pans the map between opening the dialog and confirming, the POST still uses the OLD center (matches the previewed nearest driver) — this is actually correct behaviour for the preview-then-commit pattern and prevents a 'bait-and-switch' assignment. Good design.",
+    "Regression note from iteration 5–6: 'Abejas activas: 9' (card) vs '7 abejas en ruta' (map header) inconsistency still present. Not related to this feature."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100% (11/11)", "frontend": "100% (full two-step assign flow E2E with cancel + confirm + highlight)" },
+  "test_credentials": {
+    "admin_portal": "control@nuboexpress.com / Fn6FcMveVf%--1o- / NUBO-84D2-C159-E3CF"
+  },
+  "seed_data_creation": "Consumed 1 of 4 demo pending orders during the confirm-flow test (order 3b5b5aa5...). 3 pending orders remain. Re-seed if next iteration needs more.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Two-step assign-nearest flow is fully functional. Test selectors verified: assign-nearest-<id>, assign-confirm-dialog, assign-confirm-text, assign-cancel-btn, assign-confirm-btn, pending-orders-card, pending-orders-count, pending-order-<id>. Map highlight uses CSS class chain: leaflet div-icon class 'bee-marker-highlight' > inner div class 'bee-pulse'. Screenshot evidence at /app/test_reports/confirm_assigned.png. Backend tests unchanged (test_assign_nearest.py, 11 tests, all pass). Network verification confirmed: clicking the button calls ONLY GET /api/drivers/nearest (limit=1) — POST /api/orders/<id>/assign-nearest fires ONLY after clicking Confirmar. Cancel produces zero POSTs.",
+  "rca of the issue": "N/A — no bugs found. The double-'Abeja' wording is a copy issue (not a bug) and matches the literal spec '<name>'."
+}

@@ -5,6 +5,10 @@ import 'leaflet/dist/leaflet.css';
 import { AuthContext } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin } from 'lucide-react';
 
@@ -22,6 +26,20 @@ const beeIcon = L.divIcon({
   iconSize: [38, 38],
   iconAnchor: [19, 19],
   popupAnchor: [0, -20],
+});
+
+// Highlighted Bee marker (chosen driver) — gold pulsing ring 🐝
+const beeIconHighlight = L.divIcon({
+  className: 'bee-marker-highlight',
+  html: `<div class="bee-pulse" style="
+      width:46px;height:46px;border-radius:50%;
+      background:#f59e0b;border:3px solid #fff;
+      box-shadow:0 0 0 4px rgba(245,158,11,.45),0 2px 10px rgba(0,0,0,.5);
+      display:flex;align-items:center;justify-content:center;
+      font-size:24px;">🐝</div>`,
+  iconSize: [46, 46],
+  iconAnchor: [23, 23],
+  popupAnchor: [0, -24],
 });
 
 const StatCard = ({ icon: Icon, label, value, testid }) => (
@@ -45,6 +63,9 @@ export default function AdminDashboard() {
   const [pendingOrders, setPendingOrders] = useState([]);
   const [assigningId, setAssigningId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmData, setConfirmData] = useState(null); // { order, driver }
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [highlightId, setHighlightId] = useState(null);
 
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
@@ -69,19 +90,49 @@ export default function AdminDashboard() {
     }
   };
 
-  const assignNearest = async (orderId) => {
+  // Step 1: preview the nearest available driver to the current map center
+  const requestAssign = async (order) => {
     if (!mapRef.current) return;
     const c = mapRef.current.getCenter();
-    setAssigningId(orderId);
+    setAssigningId(order.id);
+    try {
+      const res = await axios.get(`${API}/drivers/nearest`, {
+        params: { lat: c.lat, lng: c.lng, limit: 1 },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const nearest = (res.data.drivers || [])[0];
+      if (!nearest) {
+        toast.error('No hay repartidores disponibles cerca de este punto.');
+        return;
+      }
+      setConfirmData({ order, driver: { ...nearest, ref: { lat: c.lat, lng: c.lng } } });
+      setConfirmOpen(true);
+    } catch (error) {
+      toast.error('No se pudo buscar el repartidor más cercano.');
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
+  // Step 2: commit the assignment, then center + highlight the chosen driver
+  const confirmAssign = async () => {
+    if (!confirmData) return;
+    const { order, driver } = confirmData;
+    setAssigningId(order.id);
     try {
       const res = await axios.post(
-        `${API}/orders/${orderId}/assign-nearest`,
-        { lat: c.lat, lng: c.lng },
+        `${API}/orders/${order.id}/assign-nearest`,
+        { lat: driver.ref.lat, lng: driver.ref.lng },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const drv = res.data.driver;
-      toast.success(`Asignado: ${drv.name} (${drv.distance_km} km)`);
-      fetchData();
+      const assigned = res.data.driver;
+      toast.success(`Asignado: ${assigned.name} (${assigned.distance_km} km)`);
+      // Center map on the chosen driver and highlight it
+      if (mapRef.current && driver.lat != null && driver.lng != null) {
+        mapRef.current.flyTo([driver.lat, driver.lng], 11, { duration: 1.2 });
+      }
+      setHighlightId(assigned.id);
+      await fetchData();
     } catch (error) {
       const detail = error.response?.data?.detail;
       toast.error(
@@ -91,6 +142,8 @@ export default function AdminDashboard() {
       );
     } finally {
       setAssigningId(null);
+      setConfirmOpen(false);
+      setConfirmData(null);
     }
   };
 
@@ -122,19 +175,21 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // Update markers whenever drivers change
+  // Update markers whenever drivers or the highlighted driver change
   useEffect(() => {
     const layer = markersLayerRef.current;
     if (!layer) return;
     layer.clearLayers();
     drivers.forEach((driver) => {
-      L.marker([driver.lat, driver.lng], { icon: beeIcon })
+      const isHi = driver.id === highlightId;
+      const m = L.marker([driver.lat, driver.lng], { icon: isHi ? beeIconHighlight : beeIcon, zIndexOffset: isHi ? 1000 : 0 })
         .bindPopup(
-          `<div style="font-size:13px"><strong>🐝 ${driver.name}</strong><br/>Vehículo: ${driver.vehicle_type || 'N/D'}<br/>Estado: <span style="color:#10b981;font-weight:600">Activo</span></div>`
+          `<div style="font-size:13px"><strong>🐝 ${driver.name}</strong><br/>Vehículo: ${driver.vehicle_type || 'N/D'}<br/>Estado: <span style="color:${isHi ? '#f59e0b' : '#10b981'};font-weight:600">${isHi ? 'Asignado ahora' : 'Activo'}</span></div>`
         )
         .addTo(layer);
+      if (isHi) m.openPopup();
     });
-  }, [drivers]);
+  }, [drivers, highlightId]);
 
   // Poll data
   useEffect(() => {
@@ -224,7 +279,7 @@ export default function AdminDashboard() {
                       <Button
                         data-testid={`assign-nearest-${order.id}`}
                         size="sm"
-                        onClick={() => assignNearest(order.id)}
+                        onClick={() => requestAssign(order)}
                         disabled={assigningId === order.id}
                         className="bg-emerald-600 hover:bg-emerald-500 text-white"
                       >
@@ -239,6 +294,30 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Confirmación de asignación */}
+      <AlertDialog open={confirmOpen} onOpenChange={(o) => { if (!o) { setConfirmOpen(false); setConfirmData(null); } }}>
+        <AlertDialogContent data-testid="assign-confirm-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar asignación</AlertDialogTitle>
+            <AlertDialogDescription data-testid="assign-confirm-text">
+              {confirmData
+                ? `¿Confirmar asignación a la Abeja ${confirmData.driver.name} a ${confirmData.driver.distance_km} km?`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="assign-cancel-btn">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="assign-confirm-btn"
+              onClick={confirmAssign}
+              className="bg-emerald-600 hover:bg-emerald-500"
+            >
+              Confirmar asignación
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

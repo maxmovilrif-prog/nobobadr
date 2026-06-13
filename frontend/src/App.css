@@ -85,3 +85,12 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(-4px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
 }
+/* Highlighted Bee marker pulse (admin assign-nearest) */
+@keyframes bee-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(245,158,11,.55), 0 2px 10px rgba(0,0,0,.5); }
+  70%  { box-shadow: 0 0 0 14px rgba(245,158,11,0), 0 2px 10px rgba(0,0,0,.5); }
+  100% { box-shadow: 0 0 0 0 rgba(245,158,11,0), 0 2px 10px rgba(0,0,0,.5); }
+}
+.bee-pulse {
+  animation: bee-pulse-ring 1.4s ease-out infinite;
+}
