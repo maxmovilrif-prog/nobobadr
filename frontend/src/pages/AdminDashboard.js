@@ -126,12 +126,13 @@ export default function AdminDashboard() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const assigned = res.data.driver;
-      toast.success(`Asignado: ${assigned.name} (${assigned.distance_km} km)`);
+      toast.success(`Asignado: ${assigned.name} (${assigned.distance_km} km)`, { duration: 4000 });
       // Center map on the chosen driver and highlight it
       if (mapRef.current && driver.lat != null && driver.lng != null) {
         mapRef.current.flyTo([driver.lat, driver.lng], 11, { duration: 1.2 });
       }
       setHighlightId(assigned.id);
+      setTimeout(() => setHighlightId((cur) => (cur === assigned.id ? null : cur)), 15000);
       await fetchData();
     } catch (error) {
       const detail = error.response?.data?.detail;
@@ -302,7 +303,7 @@ export default function AdminDashboard() {
             <AlertDialogTitle>Confirmar asignación</AlertDialogTitle>
             <AlertDialogDescription data-testid="assign-confirm-text">
               {confirmData
-                ? `¿Confirmar asignación a la Abeja ${confirmData.driver.name} a ${confirmData.driver.distance_km} km?`
+                ? `¿Confirmar asignación a ${confirmData.driver.name} a ${confirmData.driver.distance_km} km?`
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -14,12 +14,13 @@ Marketplace multiservicio tipo Glovo para España ("Nubo Express"): delivery de 
 - Emergent LLM Key (búsqueda IA) — openai gpt-4o-mini
 
 ## Implementado (Jun 2026)
-- ✅ **Portal Admin separado y oculto** (`/admin-nubo`): login oscuro independiente con email + contraseña + **código secreto**, bloqueo anti fuerza bruta (5 intentos/15 min), validación 100% en servidor (`POST /api/admin-auth/login`). El login público `/auth` RECHAZA el rol admin. Sin enlaces públicos, `robots.txt` Disallow + meta `noindex`. Credenciales nuevas exclusivas en backend/.env (ADMIN_EMAIL/PASSWORD/SECRET_CODE). Admin antiguo eliminado. Panel en `/admin-nubo/panel`.
-- ✅ Mensajes de error de Auth específicos (email duplicado, credenciales inválidas, conexión).
-- ✅ GPS automático del repartidor (Disponible → PATCH /api/drivers/location cada 10s → Abeja en vivo en el mapa).
-- ✅ Búsqueda Inteligente IA: POST /api/search/smart (openai gpt-4o-mini). Barra en CustomerDashboard.
-- ✅ Admin Live Map Dashboard: mapa Leaflet de España con Abejas 🐝 verdes + métricas. Auto-refresh 10s.
-- (Sesiones previas) Páginas legales, WebSockets tracking, 7 idiomas, reservas de viajes afiliados, NuboRide, dropshipping.
+- ✅ **Logística geoespacial:** índice 2dsphere en `users.geo_location`; endpoints `GET /api/drivers/nearest` y `POST /api/orders/{id}/assign-nearest` (admin/business). En el panel admin, card "Pedidos pendientes" + botón **"Asignar más cercano"** con **diálogo de confirmación** ("¿Confirmar asignación a {repartidor} a X km?") y, al confirmar, el mapa **vuela y resalta** la Abeja elegida (marcador dorado pulsante, auto-limpiado a los 15s).
+- ✅ **Inicialización de esquema MongoDB:** colecciones + índices (email/id únicos, role, order indexes, 2dsphere) en `init_collections_and_indexes` al arranque.
+- ✅ **Portal Admin separado y oculto** (`/admin-nubo`): login oscuro con email + contraseña + código secreto, bloqueo anti fuerza bruta (5/15min), validación en servidor. `/auth` rechaza admin. `robots.txt` + `noindex`. Credenciales en backend/.env. Panel en `/admin-nubo/panel`.
+- ✅ Mensajes de error de Auth específicos (email duplicado, credenciales, conexión).
+- ✅ GPS automático del repartidor (Disponible → geo_location en vivo).
+- ✅ Búsqueda Inteligente IA (openai gpt-4o-mini) + Admin Live Map (Leaflet).
+- (Sesiones previas) Páginas legales, WebSockets tracking, 7 idiomas, viajes afiliados, NuboRide, dropshipping.
 
 ## Credenciales de prueba
 Ver /app/memory/test_credentials.md
