@@ -1,9 +1,14 @@
 # Test Credentials — Nubo Express
 
-## Admin (Live Map Dashboard)
-- Email: admin@nuboexpress.com
-- Password: Admin123!
-- Route after login: /admin (live map of active "Bee" drivers across Spain)
+## Admin Portal (SEPARATE, hidden) — /admin-nubo
+- Login URL: /admin-nubo   (dashboard at /admin-nubo/panel)
+- Email: control@nuboexpress.com
+- Password: Fn6FcMveVf%--1o-
+- Secret code (código secreto): NUBO-84D2-C159-E3CF
+- Requires ALL THREE (email + password + secret_code) at POST /api/admin-auth/login.
+- Brute-force: 5 failed attempts → 15 min lockout (HTTP 429).
+- Admins CANNOT log in via the public /auth page (returns 401). Legacy admin@nuboexpress.com was removed.
+- Stored in backend/.env: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_SECRET_CODE.
 
 ## Customer (AI Smart Search)
 - Email: cliente@nubotest.com

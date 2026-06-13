@@ -8,6 +8,7 @@ import CustomerDashboard from '@/pages/CustomerDashboard';
 import DriverDashboard from '@/pages/DriverDashboard';
 import BusinessDashboard from '@/pages/BusinessDashboard';
 import AdminDashboard from '@/pages/AdminDashboard';
+import AdminLogin from '@/pages/AdminLogin';
 import OrderTracking from '@/pages/OrderTracking';
 import OrderSuccess from '@/pages/OrderSuccess';
 import DropshippingPanel from '@/pages/DropshippingPanel';
@@ -76,17 +77,19 @@ function App() {
     <AuthContext.Provider value={{ user, token, login, logout, API }}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={!user ? <Landing /> : <Navigate to="/dashboard" />} />
-          <Route path="/auth" element={!user ? <Auth /> : <Navigate to="/dashboard" />} />
+          <Route path="/" element={!user ? <Landing /> : <Navigate to={user.role === 'admin' ? '/admin-nubo/panel' : '/dashboard'} />} />
+          <Route path="/auth" element={!user ? <Auth /> : <Navigate to={user.role === 'admin' ? '/admin-nubo/panel' : '/dashboard'} />} />
           <Route path="/dashboard" element={
             user ? (
               user.role === 'customer' ? <CustomerDashboard /> :
               user.role === 'driver' ? <DriverDashboard /> :
-              user.role === 'admin' ? <Navigate to="/admin" /> :
+              user.role === 'admin' ? <Navigate to="/admin-nubo/panel" /> :
               <BusinessDashboard />
             ) : <Navigate to="/auth" />
           } />
-          <Route path="/admin" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/auth" />} />
+          {/* Hidden, decoupled admin portal */}
+          <Route path="/admin-nubo" element={user && user.role === 'admin' ? <Navigate to="/admin-nubo/panel" /> : <AdminLogin />} />
+          <Route path="/admin-nubo/panel" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/admin-nubo" />} />
           <Route path="/orders" element={user ? <CustomerDashboard /> : <Navigate to="/auth" />} />
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />

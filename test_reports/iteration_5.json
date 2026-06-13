@@ -1,0 +1,35 @@
+{
+  "summary": "End-to-end verification of the new separate hidden Admin Portal (/admin-nubo). Backend pytest (5/5 PASS) and Playwright UI (6/6 scenarios PASS) on REACT_APP_BACKEND_URL preview. Backend: (1) POST /api/admin-auth/login with email+password+secret returns 200 with admin token+user (no _id leak). (2) Wrong secret returns 401. (3) Wrong password returns 401. (4) Public POST /api/auth/login with admin email rejected with 401. (5) Brute-force lockout: 6th attempt with throwaway @example.com email returns 429 (first 5 are 401). Frontend: (1) Direct nav to /admin-nubo/panel without auth correctly redirects to /admin-nubo and renders admin-login-page. (2) Wrong secret on /admin-nubo shows toast 'Credenciales o código de acceso inválidos. Te quedan 2 intento(s) antes del bloqueo.' and stays on /admin-nubo. (3) /auth (public login) with admin email shows 'Email o contraseña incorrectos.' and stays on /auth. (4) Successful admin login with all three credentials shows 'Acceso concedido' toast, redirects to /admin-nubo/panel, renders admin-dashboard with admin-map (Leaflet w/ bee markers) and 4 stat cards (Abejas activas 9, Total repartidores 15, Negocios 15, Pedidos 2). (5) Decoupling: NO links/buttons referencing /admin-nubo or 'admin' on landing '/' or '/auth'. (6) robots.txt at preview URL contains 'Disallow: /admin-nubo' and 'Disallow: /admin-nubo/'. AdminLogin component sets <meta name='robots' content='noindex,nofollow,noarchive'>. No console errors aside from expected 401 network logs and benign rrweb warning.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_portal.py",
+    "/app/test_reports/pytest/admin_portal_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Brute-force lockout for unknown emails returns 429 with the same Spanish message — good UX/security parity. Verified message correctness on real admin: 'Te quedan N intento(s) antes del bloqueo.'",
+    "AdminLogin.js correctly uses meta noindex/nofollow/noarchive and is paired with robots.txt Disallow — defense in depth is in place.",
+    "App.js routes correctly gate /admin-nubo/panel behind user.role==='admin' and redirect anonymous users to /admin-nubo login. Customer/driver users would also be redirected (login page shown), confirmed by direct-access test.",
+    "Public /auth and Landing carry no link or visible reference to the admin portal — invisibility requirement satisfied.",
+    "Minor: AdminLogin POST sends email lowercased+trimmed which is good. Consider trimming password too only if backend tolerates leading/trailing whitespace (current behavior is correct: preserve password).",
+    "Minor: the dashboard 'Abejas activas' card shows 9 while admin-map header says '7 abejas en ruta' — possibly two different definitions (active vs. with recent GPS ping). Not a bug, but worth aligning copy if intended to match."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_portal.py"
+  ],
+  "success_rate": { "backend": "100% (5/5)", "frontend": "100% (6/6 scenarios)" },
+  "test_credentials": {
+    "admin_portal": "control@nuboexpress.com / Fn6FcMveVf%--1o- / NUBO-84D2-C159-E3CF",
+    "note": "Real admin had 1 wrong-secret attempt during UI test then 1 successful login (counter reset on success). Throwaway @example.com email was used for brute-force lockout test, so real admin is NOT locked."
+  },
+  "seed_data_creation": "None. Brute-force test used uuid-based junk emails at example.com; they never existed in DB.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Separate hidden admin portal is fully functional E2E. Backend admin-auth login enforces email+password+secret_code, rejects bad secret/password (401), and locks per-email after 5 failures (429, 15min window). Public /auth/login rejects role=admin (401). Public pages have zero references to /admin-nubo and robots.txt disallows it. AdminDashboard renders Leaflet map with bee markers and 4 stat cards. Run backend tests with: REACT_APP_BACKEND_URL=<preview-url> pytest backend/tests/test_admin_portal.py -v",
+  "rca of the issue": "N/A — no bugs found in this iteration. Initial brute-force test got 422s because the throwaway email used a .test TLD that FastAPI/Pydantic EmailStr rejects as invalid; switched to @example.com and lockout returned 429 as expected."
+}

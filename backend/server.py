@@ -16,6 +16,7 @@ from emergentintegrations.payments.stripe.checkout import StripeCheckout, Checko
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 import json
 import sys
+import hmac
 sys.path.append(str(Path(__file__).parent))
 
 ROOT_DIR = Path(__file__).parent
@@ -36,6 +37,13 @@ STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 
 # Emergent LLM Key (AI Smart Search)
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+
+# Separate Admin Portal Configuration
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+ADMIN_SECRET_CODE = os.environ.get('ADMIN_SECRET_CODE')
+ADMIN_MAX_ATTEMPTS = 5
+ADMIN_LOCKOUT_MINUTES = 15
 
 # Create the main app
 app = FastAPI()
@@ -242,10 +250,76 @@ async def login(credentials: UserLogin):
     user = await db.users.find_one({'email': credentials.email}, {'_id': 0})
     if not user or not verify_password(credentials.password, user['password_hash']):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
+    # Admin accounts cannot authenticate via the public login. They must use the
+    # separate, hidden admin portal (/admin-nubo). Return a generic error to avoid
+    # revealing that the account exists or is an admin.
+    if user.get('role') == 'admin':
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
     token = create_token(user['id'], user['role'])
     user.pop('password_hash')
     
+    return {'token': token, 'user': user}
+
+# =========================
+# SEPARATE ADMIN PORTAL AUTH (hidden, server-side protected)
+# =========================
+
+class AdminLogin(BaseModel):
+    email: EmailStr
+    password: str
+    secret_code: str
+
+async def _admin_check_lockout(email: str):
+    """Devuelve los minutos restantes de bloqueo si la cuenta está bloqueada, si no None."""
+    rec = await db.admin_login_attempts.find_one({'email': email}, {'_id': 0})
+    if rec and rec.get('locked_until'):
+        locked_until = datetime.fromisoformat(rec['locked_until'])
+        now = datetime.now(timezone.utc)
+        if locked_until > now:
+            return max(1, int((locked_until - now).total_seconds() // 60) + 1)
+    return None
+
+async def _admin_record_failure(email: str):
+    """Incrementa intentos fallidos y bloquea tras ADMIN_MAX_ATTEMPTS."""
+    rec = await db.admin_login_attempts.find_one({'email': email}, {'_id': 0})
+    count = (rec.get('failed_count', 0) if rec else 0) + 1
+    update = {'email': email, 'failed_count': count, 'updated_at': datetime.now(timezone.utc).isoformat(), 'locked_until': None}
+    if count >= ADMIN_MAX_ATTEMPTS:
+        update['locked_until'] = (datetime.now(timezone.utc) + timedelta(minutes=ADMIN_LOCKOUT_MINUTES)).isoformat()
+        update['failed_count'] = 0  # reset counter once locked
+    await db.admin_login_attempts.update_one({'email': email}, {'$set': update}, upsert=True)
+    return max(0, ADMIN_MAX_ATTEMPTS - count)
+
+async def _admin_reset_attempts(email: str):
+    await db.admin_login_attempts.delete_one({'email': email})
+
+@api_router.post("/admin-auth/login")
+async def admin_login(credentials: AdminLogin):
+    """Login exclusivo del portal admin: email + contraseña + código secreto.
+    Incluye bloqueo anti fuerza bruta. Validación 100% en servidor."""
+    email = credentials.email.lower().strip()
+
+    locked_minutes = await _admin_check_lockout(email)
+    if locked_minutes:
+        raise HTTPException(status_code=429, detail=f"Demasiados intentos. Cuenta bloqueada {locked_minutes} min.")
+
+    user = await db.users.find_one({'email': email}, {'_id': 0})
+
+    password_ok = bool(user) and user.get('role') == 'admin' and verify_password(credentials.password, user['password_hash'])
+    code_ok = bool(ADMIN_SECRET_CODE) and hmac.compare_digest(str(credentials.secret_code), str(ADMIN_SECRET_CODE))
+
+    if not (password_ok and code_ok):
+        remaining = await _admin_record_failure(email)
+        detail = "Credenciales o código de acceso inválidos."
+        if remaining <= 2 and remaining > 0:
+            detail += f" Te quedan {remaining} intento(s) antes del bloqueo."
+        raise HTTPException(status_code=401, detail=detail)
+
+    await _admin_reset_attempts(email)
+    token = create_token(user['id'], user['role'])
+    user.pop('password_hash', None)
     return {'token': token, 'user': user}
 
 @api_router.get("/auth/me", response_model=UserResponse)
@@ -1115,21 +1189,33 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def seed_admin_and_drivers():
-    """Crea un usuario admin y Abejas 🐝 demo con ubicación en España si no existen."""
+    """Crea el admin exclusivo y Abejas 🐝 demo con ubicación en España si no existen."""
     try:
-        admin = await db.users.find_one({'email': 'admin@nuboexpress.com'})
-        if not admin:
-            admin_user = User(
-                email='admin@nuboexpress.com',
-                name='Administrador Nubo',
-                phone='+34 654 24 20 92',
-                role='admin',
-                password_hash=hash_password('Admin123!')
-            )
-            doc = admin_user.model_dump()
-            doc['created_at'] = doc['created_at'].isoformat()
-            await db.users.insert_one(doc)
-            logger.info("Seeded admin user admin@nuboexpress.com")
+        # Remove the legacy/insecure admin account if it exists
+        await db.users.delete_many({'email': 'admin@nuboexpress.com'})
+
+        # Seed/refresh the dedicated admin from env (idempotent)
+        if ADMIN_EMAIL and ADMIN_PASSWORD:
+            admin_email = ADMIN_EMAIL.lower().strip()
+            existing_admin = await db.users.find_one({'email': admin_email})
+            if not existing_admin:
+                admin_user = User(
+                    email=admin_email,
+                    name='Centro de Control Nubo',
+                    phone='+34 654 24 20 92',
+                    role='admin',
+                    password_hash=hash_password(ADMIN_PASSWORD)
+                )
+                doc = admin_user.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.users.insert_one(doc)
+                logger.info(f"Seeded dedicated admin {admin_email}")
+            elif not verify_password(ADMIN_PASSWORD, existing_admin['password_hash']):
+                await db.users.update_one(
+                    {'email': admin_email},
+                    {'$set': {'password_hash': hash_password(ADMIN_PASSWORD), 'role': 'admin'}}
+                )
+                logger.info(f"Updated admin password for {admin_email}")
 
         # Demo drivers (Abejas) across Spain so the admin map shows activity
         demo_drivers = [

@@ -64,6 +64,15 @@ export default function AdminDashboard() {
     }
   };
 
+  // Privacy: keep the admin panel out of search engines while mounted
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow, noarchive';
+    document.head.appendChild(meta);
+    return () => { document.head.removeChild(meta); };
+  }, []);
+
   // Initialize Leaflet map manually (StrictMode-safe with proper teardown)
   useEffect(() => {
     if (mapElRef.current && !mapRef.current) {

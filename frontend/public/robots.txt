@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /admin-nubo
+Disallow: /admin-nubo/
+
+Sitemap:
