@@ -14,11 +14,12 @@ Marketplace multiservicio tipo Glovo para España ("Nubo Express"): delivery de 
 - Emergent LLM Key (búsqueda IA) — openai gpt-4o-mini
 
 ## Implementado (Jun 2026)
-- ✅ Búsqueda Inteligente IA: POST /api/search/smart (lenguaje natural → top 3 negocios). Barra en CustomerDashboard (ai-search-card/input/btn/results).
-- ✅ Admin Live Map Dashboard: /admin (rol admin), mapa Leaflet de España con Abejas 🐝 verdes en vivo. Endpoints /api/admin/active-drivers, /api/admin/stats. Auto-refresh 10s.
-- ✅ PATCH /api/drivers/location (repartidor actualiza ubicación).
-- ✅ Seed automático: admin@nuboexpress.com + 6 drivers demo con ubicación en España.
-- (Sesiones previas) Páginas legales, WebSockets tracking con icono Bee, 7 idiomas, reservas de viajes afiliados, NuboRide, dropshipping.
+- ✅ **Portal Admin separado y oculto** (`/admin-nubo`): login oscuro independiente con email + contraseña + **código secreto**, bloqueo anti fuerza bruta (5 intentos/15 min), validación 100% en servidor (`POST /api/admin-auth/login`). El login público `/auth` RECHAZA el rol admin. Sin enlaces públicos, `robots.txt` Disallow + meta `noindex`. Credenciales nuevas exclusivas en backend/.env (ADMIN_EMAIL/PASSWORD/SECRET_CODE). Admin antiguo eliminado. Panel en `/admin-nubo/panel`.
+- ✅ Mensajes de error de Auth específicos (email duplicado, credenciales inválidas, conexión).
+- ✅ GPS automático del repartidor (Disponible → PATCH /api/drivers/location cada 10s → Abeja en vivo en el mapa).
+- ✅ Búsqueda Inteligente IA: POST /api/search/smart (openai gpt-4o-mini). Barra en CustomerDashboard.
+- ✅ Admin Live Map Dashboard: mapa Leaflet de España con Abejas 🐝 verdes + métricas. Auto-refresh 10s.
+- (Sesiones previas) Páginas legales, WebSockets tracking, 7 idiomas, reservas de viajes afiliados, NuboRide, dropshipping.
 
 ## Credenciales de prueba
 Ver /app/memory/test_credentials.md
