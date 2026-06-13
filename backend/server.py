@@ -1153,6 +1153,37 @@ async def get_active_drivers(current_user: dict = Depends(get_current_user)):
         })
     return {'count': len(result), 'drivers': result}
 
+@api_router.get("/admin/pending-orders")
+async def get_pending_orders(current_user: dict = Depends(get_current_user)):
+    """Pedidos pendientes sin repartidor asignado (para asignación manual desde el mapa)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    orders = await db.orders.find(
+        {'$or': [{'driver_id': None}, {'driver_id': {'$exists': False}}]},
+        {'_id': 0}
+    ).sort('created_at', -1).to_list(200)
+
+    # Resolve business names without N+1
+    biz_ids = list({o.get('business_id') for o in orders if o.get('business_id')})
+    biz_map = {}
+    if biz_ids:
+        async for b in db.businesses.find({'id': {'$in': biz_ids}}, {'_id': 0, 'id': 1, 'name': 1}):
+            biz_map[b['id']] = b.get('name')
+
+    result = []
+    for o in orders:
+        pickup = o.get('pickup_location') or {}
+        coords = pickup.get('coordinates') if isinstance(pickup, dict) else None
+        result.append({
+            'id': o['id'],
+            'business_name': biz_map.get(o.get('business_id'), 'Negocio'),
+            'delivery_address': o.get('delivery_address', ''),
+            'total_amount': o.get('total_amount', 0),
+            'status': o.get('status', 'pending'),
+            'created_at': o.get('created_at'),
+        })
+    return {'count': len(result), 'orders': result}
+
 @api_router.get("/admin/stats")
 async def get_admin_stats(current_user: dict = Depends(get_current_user)):
     """Métricas rápidas para el dashboard del Admin."""

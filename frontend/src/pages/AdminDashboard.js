@@ -5,7 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import { AuthContext } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { LogOut, Bike, Store, Package, Users, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin } from 'lucide-react';
 
 const SPAIN_CENTER = [40.0, -3.7];
 
@@ -41,6 +42,8 @@ export default function AdminDashboard() {
   const { user, token, logout, API } = useContext(AuthContext);
   const [drivers, setDrivers] = useState([]);
   const [stats, setStats] = useState({ total_drivers: 0, active_drivers: 0, total_businesses: 0, total_orders: 0 });
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [assigningId, setAssigningId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const mapElRef = useRef(null);
@@ -51,16 +54,43 @@ export default function AdminDashboard() {
     setRefreshing(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [d, s] = await Promise.all([
+      const [d, s, p] = await Promise.all([
         axios.get(`${API}/admin/active-drivers`, { headers }),
         axios.get(`${API}/admin/stats`, { headers }),
+        axios.get(`${API}/admin/pending-orders`, { headers }),
       ]);
       setDrivers(d.data.drivers || []);
       setStats(s.data);
+      setPendingOrders(p.data.orders || []);
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const assignNearest = async (orderId) => {
+    if (!mapRef.current) return;
+    const c = mapRef.current.getCenter();
+    setAssigningId(orderId);
+    try {
+      const res = await axios.post(
+        `${API}/orders/${orderId}/assign-nearest`,
+        { lat: c.lat, lng: c.lng },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const drv = res.data.driver;
+      toast.success(`Asignado: ${drv.name} (${drv.distance_km} km)`);
+      fetchData();
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      toast.error(
+        detail === 'No available drivers nearby'
+          ? 'No hay repartidores disponibles cerca de este punto.'
+          : (typeof detail === 'string' ? detail : 'No se pudo asignar el repartidor.')
+      );
+    } finally {
+      setAssigningId(null);
     }
   };
 
@@ -155,6 +185,57 @@ export default function AdminDashboard() {
               </span>
             </div>
             <div ref={mapElRef} style={{ height: '560px', width: '100%' }} data-testid="admin-map" />
+          </CardContent>
+        </Card>
+
+        {/* Pedidos pendientes — asignación manual desde el mapa */}
+        <Card className="border-0 shadow-xl mt-8" data-testid="pending-orders-card">
+          <CardContent className="p-0">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Pedidos pendientes</h2>
+              <span data-testid="pending-orders-count" className="text-sm font-medium text-amber-600">
+                {pendingOrders.length} sin asignar
+              </span>
+            </div>
+            <div className="px-6 py-3 bg-amber-50 text-amber-800 text-sm flex items-center gap-2">
+              <Crosshair className="w-4 h-4 flex-shrink-0" />
+              Centra el mapa sobre la zona de recogida y pulsa "Asignar más cercano".
+            </div>
+            <div className="divide-y" data-testid="pending-orders-list">
+              {pendingOrders.length === 0 ? (
+                <div className="px-6 py-10 text-center text-gray-500">
+                  <Package className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                  No hay pedidos pendientes de asignar.
+                </div>
+              ) : (
+                pendingOrders.map((order) => (
+                  <div key={order.id} data-testid={`pending-order-${order.id}`} className="px-6 py-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 truncate">
+                        #{order.id.slice(0, 8)} · {order.business_name}
+                      </p>
+                      <p className="text-sm text-gray-500 flex items-center gap-1 truncate">
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                        {order.delivery_address || 'Sin dirección'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-emerald-600 font-semibold">€{Number(order.total_amount).toFixed(2)}</span>
+                      <Button
+                        data-testid={`assign-nearest-${order.id}`}
+                        size="sm"
+                        onClick={() => assignNearest(order.id)}
+                        disabled={assigningId === order.id}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                      >
+                        {assigningId === order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crosshair className="w-4 h-4 mr-2" />}
+                        {assigningId === order.id ? '' : 'Asignar más cercano'}
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

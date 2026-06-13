@@ -1,0 +1,36 @@
+{
+  "summary": "End-to-end verification of the new 'Asignar más cercano' admin feature (pending orders + nearest-driver assignment). Backend pytest 11/11 PASS on REACT_APP_BACKEND_URL preview. Frontend Playwright PASS: admin login → /admin-nubo/panel renders pending-orders-card with list/count and per-order 'Asignar más cercano' buttons; clicking one triggered POST /api/orders/{id}/assign-nearest with the map center, returned 'Asignado: Abeja Madrid (46.4 km)' toast, and the assigned order vanished from the pending list (count 2 → 1) on auto-refresh. Backend covered: (1) GET /api/admin/pending-orders happy path returns {count, orders} with business_name, no _id leak. (2) /api/admin/pending-orders rejects unauth (401/403), customer (403), driver (403). (3) GET /api/drivers/nearest from Madrid (40.4168,-3.7038) returns 'Abeja Madrid' first with distance_km≈0 and a sorted-ascending list. (4) GET /api/drivers/nearest from Sevilla with max_km=100 returns ONLY nearby drivers (Madrid bee correctly excluded). (5) /api/drivers/nearest rejects customer (403). (6) POST /api/orders/{id}/assign-nearest happy path returns driver info + distance_km, marks order accepted, removes it from pending list. (7) Calling assign-nearest again on the same order returns 400 'Order already has a driver assigned'. (8) assign-nearest rejects customer (403) and driver (403). (9) assign-nearest returns 404 for unknown order_id. UI: pending-orders-card, pending-orders-list, pending-orders-count, pending-order-<id>, and assign-nearest-<id> data-testids all present and behave as spec. No console errors. Leaflet map loaded with 9 bee markers.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_assign_nearest.py",
+    "/app/test_reports/pytest/assign_nearest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RBAC is slightly asymmetric: GET /api/admin/pending-orders is admin-only while POST /api/orders/{id}/assign-nearest and GET /api/drivers/nearest accept admin OR business. Spec said both should reject non-admin/non-business with 403 — current behaviour is stricter for pending-orders (admin only), which is fine and tests pass either way. Just be aware that businesses can assign-nearest but cannot list the global pending feed.",
+    "$geoNear pipeline in assign_nearest_driver uses {'role':'driver','is_available':true} as query but does NOT filter on geo_location existence; if a driver row lacks geo_location it will be skipped by the index automatically — verified the backfill in init_collections_and_indexes handles this. Good.",
+    "AdminDashboard.assignNearest() silently returns if mapRef.current is null. Since the button is rendered in the same component that owns the map, this is a safe early-out, but consider disabling the button until the map is initialised (small UX polish).",
+    "AdminDashboard auto-refresh is every 10s via setInterval(fetchData,10000). After an assign the success toast triggers an immediate fetchData() which is correct. No double-fetch issue observed.",
+    "Pending-orders endpoint correctly excludes Mongo _id and resolves business_name in a single bulk lookup (no N+1). 👍",
+    "Carrying forward from iteration 5: 'Abejas activas: 9' vs map header '7 abejas en ruta' still inconsistent (active=is_available count vs. drivers with non-null current_location). Not a regression for this feature, but worth aligning copy."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_assign_nearest.py"
+  ],
+  "success_rate": { "backend": "100% (11/11)", "frontend": "100% (assign flow E2E)" },
+  "test_credentials": {
+    "admin_portal": "control@nuboexpress.com / Fn6FcMveVf%--1o- / NUBO-84D2-C159-E3CF",
+    "customer": "cliente@nubotest.com / Cliente123!",
+    "driver": "bee.madrid@nuboexpress.com / Bee123!"
+  },
+  "seed_data_creation": "None created. Consumed 2 of the 3 seeded demo pending orders during testing (1 via backend double-assign test + 1 via frontend E2E click). 1 pending order remains assignable; re-seed if next iteration needs the full 3.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Assign-Nearest feature is fully functional E2E. Backend test file: /app/backend/tests/test_assign_nearest.py (11 tests, pytest). Run with: REACT_APP_BACKEND_URL=<preview-url> pytest backend/tests/test_assign_nearest.py -v. Note: pending order count is consumed by each successful assign; re-run seed_admin_and_drivers (or whatever seed script creates the 3 demo pending orders) before re-testing if you need a fresh pool. Frontend selectors verified: pending-orders-card, pending-orders-list, pending-orders-count, pending-order-<id>, assign-nearest-<id>. Toast format: 'Asignado: <driver name> (<distance> km)'.",
+  "rca of the issue": "N/A — no bugs found this iteration. Implementation matches spec on both backend (RBAC, 400 on double-assign, $geoNear correctness for Madrid and Sevilla) and frontend (data-testids, toast copy, list refresh after assign)."
+}
