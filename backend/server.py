@@ -1037,14 +1037,98 @@ class DriverLocationUpdate(BaseModel):
 
 @api_router.patch("/drivers/location")
 async def update_driver_location(loc: DriverLocationUpdate, current_user: dict = Depends(get_current_user)):
-    """El repartidor (Abeja 🐝) actualiza su ubicación actual."""
+    """El repartidor (Abeja 🐝) actualiza su ubicación actual.
+    Guarda current_location (lat/lng para el frontend) y geo_location (GeoJSON para 2dsphere)."""
     if current_user['role'] != 'driver':
         raise HTTPException(status_code=403, detail="Only drivers can update location")
     await db.users.update_one(
         {'id': current_user['id']},
-        {'$set': {'current_location': {'lat': loc.lat, 'lng': loc.lng}}}
+        {'$set': {
+            'current_location': {'lat': loc.lat, 'lng': loc.lng},
+            'geo_location': {'type': 'Point', 'coordinates': [loc.lng, loc.lat]},
+        }}
     )
     return {'message': 'Location updated', 'lat': loc.lat, 'lng': loc.lng}
+
+@api_router.get("/drivers/nearest")
+async def nearest_drivers(lat: float, lng: float, max_km: Optional[float] = None,
+                          limit: int = 5, current_user: dict = Depends(get_current_user)):
+    """Devuelve los repartidores disponibles más cercanos a un punto, ordenados por distancia.
+    Usa el índice 2dsphere (consulta $geoNear). Solo admin o negocio."""
+    if current_user['role'] not in ('admin', 'business'):
+        raise HTTPException(status_code=403, detail="Admin or business access required")
+    geo_near = {
+        'near': {'type': 'Point', 'coordinates': [lng, lat]},
+        'distanceField': 'distance_m',
+        'spherical': True,
+        'query': {'role': 'driver', 'is_available': True},
+    }
+    if max_km:
+        geo_near['maxDistance'] = max_km * 1000
+    pipeline = [
+        {'$geoNear': geo_near},
+        {'$limit': max(1, min(limit, 50))},
+        {'$project': {'_id': 0, 'password_hash': 0, 'geo_location': 0}},
+    ]
+    docs = await db.users.aggregate(pipeline).to_list(50)
+    result = [{
+        'id': d['id'],
+        'name': d.get('name', 'Abeja'),
+        'vehicle_type': d.get('vehicle_type'),
+        'lat': (d.get('current_location') or {}).get('lat'),
+        'lng': (d.get('current_location') or {}).get('lng'),
+        'distance_km': round(d.get('distance_m', 0) / 1000, 2),
+    } for d in docs]
+    return {'count': len(result), 'drivers': result}
+
+class AssignNearestRequest(BaseModel):
+    lat: float
+    lng: float
+    max_km: Optional[float] = None
+
+@api_router.post("/orders/{order_id}/assign-nearest")
+async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
+                                current_user: dict = Depends(get_current_user)):
+    """Auto-asigna el repartidor disponible más cercano al punto dado (recogida del pedido).
+    Solo admin o negocio. Marca el pedido como 'accepted' y guarda el driver_id."""
+    if current_user['role'] not in ('admin', 'business'):
+        raise HTTPException(status_code=403, detail="Admin or business access required")
+
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.get('driver_id'):
+        raise HTTPException(status_code=400, detail="Order already has a driver assigned")
+
+    geo_near = {
+        'near': {'type': 'Point', 'coordinates': [req.lng, req.lat]},
+        'distanceField': 'distance_m',
+        'spherical': True,
+        'query': {'role': 'driver', 'is_available': True},
+    }
+    if req.max_km:
+        geo_near['maxDistance'] = req.max_km * 1000
+    pipeline = [{'$geoNear': geo_near}, {'$limit': 1}, {'$project': {'_id': 0, 'password_hash': 0}}]
+    nearest = await db.users.aggregate(pipeline).to_list(1)
+    if not nearest:
+        raise HTTPException(status_code=404, detail="No available drivers nearby")
+
+    driver = nearest[0]
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$set': {'driver_id': driver['id'], 'status': 'accepted',
+                  'updated_at': datetime.now(timezone.utc).isoformat()}}
+    )
+    return {
+        'message': 'Nearest driver assigned',
+        'order_id': order_id,
+        'driver': {
+            'id': driver['id'],
+            'name': driver.get('name', 'Abeja'),
+            'vehicle_type': driver.get('vehicle_type'),
+            'distance_km': round(driver.get('distance_m', 0) / 1000, 2),
+        }
+    }
 
 @api_router.get("/admin/active-drivers")
 async def get_active_drivers(current_user: dict = Depends(get_current_user)):
@@ -1241,6 +1325,7 @@ async def seed_admin_and_drivers():
                 )
                 doc = driver.model_dump()
                 doc['created_at'] = doc['created_at'].isoformat()
+                doc['geo_location'] = {'type': 'Point', 'coordinates': [d['lng'], d['lat']]}
                 await db.users.insert_one(doc)
         logger.info("Seeded demo drivers")
     except Exception as e:
@@ -1264,6 +1349,17 @@ async def init_collections_and_indexes():
         await db.users.create_index('role')
         # Drivers: consultas del mapa admin (repartidores disponibles)
         await db.users.create_index([('role', 1), ('is_available', 1)])
+        # Drivers: índice geoespacial 2dsphere para "repartidor más cercano"
+        await db.users.create_index([('geo_location', '2dsphere')])
+
+        # Backfill: genera geo_location (GeoJSON) para drivers que solo tienen current_location
+        async for d in db.users.find({'role': 'driver', 'current_location': {'$ne': None}, 'geo_location': {'$exists': False}}, {'id': 1, 'current_location': 1}):
+            loc = d.get('current_location') or {}
+            if loc.get('lat') is not None and loc.get('lng') is not None:
+                await db.users.update_one(
+                    {'id': d['id']},
+                    {'$set': {'geo_location': {'type': 'Point', 'coordinates': [loc['lng'], loc['lat']]}}}
+                )
 
         # Orders
         await db.orders.create_index('id', unique=True)
