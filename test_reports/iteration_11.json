@@ -1,0 +1,37 @@
+{
+  "summary": "E2E verification of new CITIES + GEOFENCING feature (Tánger, Casablanca, Meknes, Nador, 10km radius). Backend pytest: 9/9 PASS via /app/backend/tests/test_cities_geofencing.py covering: GET /api/cities returns the 4 seeded Moroccan cities with id/name/lat/lng (no _id leak) and requires auth; POST /api/orders with city_id resolves city_name (Tánger) and without city_id leaves both fields null; geofencing on GET /api/drivers/available-orders — driver with current_location at Tánger center sees Tánger-city order + no-city order, driver in Madrid sees only no-city order (not Tánger), driver in Casablanca does NOT see Tánger order. Frontend Playwright PASS for both flows: (1) Customer (cliente@nubotest.com) opens 'Test Restaurant Algeciras', adds Pizza Margherita to cart — data-testid='city-select' is populated with all 4 cities ['Casablanca','Meknes','Nador','Tánger'] plus placeholder; clicking data-testid='checkout-btn' WITHOUT selecting city shows toast 'Por favor selecciona tu ciudad' and does not proceed; after selecting Tánger, intercepted POST /api/orders body contains city_id (e.g. '8937cdff-3d7c-4431-95f5-b4c4f21b87b0'). (2) Driver (driver.real@nubotest.com) with Playwright geolocation set to 35.76,-5.83 + 'Disponible' ON: data-testid='gps-live-card' shows data-testid='driver-zone' reading '📍 Tu zona: Tánger · verás pedidos de esta ciudad'; after switching geolocation to (10,-30) Atlantic (far from any seeded city) and waiting one GPS polling cycle, driver-zone reads 'Fuera de zona · solo verás pedidos sin ciudad asignada'. All test data (orders) cleaned up by fixture finally blocks. Backend curl-precondition reconfirmed via pytest.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cities_geofencing.py",
+    "/app/test_reports/pytest/cities_geofencing.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py get_available_orders uses query['$or'] for city filter but the outer query already sets driver_id=None / status=pending / payment_status=paid via top-level keys, then overwrites $or — fine for current usage. However if any future caller adds another $or, it will silently overwrite. Consider using $and: [{'city_id': ...}] with explicit grouping to keep the filter composable.",
+    "haversine_km in server.py is duplicated as JS in DriverDashboard.js detectZone(). Both implementations use R=6371 and ≤10 km. Single source of truth would be preferable; since FE needs it locally for badge, accept duplication but unit-test parity (current pytest only validates BE side).",
+    "City model is unused at runtime (cities are inserted/read as raw dicts). Either remove the Pydantic class or use it for validation on the seed and response_model on /api/cities to lock the contract.",
+    "Seed of cities only runs when db.cities.count_documents({}) == 0; if coordinates of a city ever change in code they will NOT be updated in the existing DB. Consider an upsert by unique name (the unique index is already on 'name').",
+    "OrderCreate has city_id Optional[str] but no validation that the id actually exists; create_order silently sets city_name=None for unknown ids instead of 400. Low risk because FE constrains to /api/cities entries but a stricter check (city_name is None when city_id is provided) would surface integration bugs faster.",
+    "Frontend DriverDashboard detectZone uses a hard-coded 10 (not pulled from any config) — fine, but keep in sync if BE CITY_ZONE_RADIUS_KM changes.",
+    "CustomerDashboard createOrder sends Origin header manually — browser refuses ('Refused to set unsafe header Origin') and prints a console error. Harmless functionally but visible noise; safe to remove that header.",
+    "Carry-over from iter 10: PATCH /orders/{id}/status still has no role check — any authenticated user can mark any order delivered (authz gap, out of scope here)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_cities_geofencing.py"
+  ],
+  "success_rate": { "backend": "100% (9/9)", "frontend": "100% (city-select populated with 4 cities, no-city toast verified, city_id present in POST /api/orders, driver-zone shows 'Tánger' near Tánger GPS and 'Fuera de zona' far away)" },
+  "test_credentials": {
+    "customer": "cliente@nubotest.com / Cliente123!",
+    "driver": "driver.real@nubotest.com / Driver123!"
+  },
+  "seed_data_creation": "None permanent. Tests insert paid+pending+unassigned orders directly into Mongo (customer_id=TEST_customer_geo, business_id=TEST_business_geo) and delete them in finally blocks. The /api/orders test creates 2 orders via the customer flow and deletes them via direct Mongo cleanup. The Playwright customer flow also created 1 order via POST /api/orders (then redirected to Stripe — order remains as 'pending', payment_status='pending', city_id=Tánger UUID; can be ignored as it's not paid).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cities + Geofencing fully verified. New test file: /app/backend/tests/test_cities_geofencing.py (9 tests). Run with: REACT_APP_BACKEND_URL=<url> MONGO_URL=mongodb://localhost:27017 DB_NAME=glovo_algeciras pytest backend/tests/test_cities_geofencing.py. Auth endpoint returns 'token' (not 'access_token') — relevant for any new tests. Order model fields: business_id (NOT restaurant_id), items use product_name (NOT name), no delivery_location required. Cities seed runs only when empty — to test a coord change you'd need to drop db.cities first. PATCH /api/drivers/location accepts {lat,lng} and updates both current_location and geo_location. Frontend driver-zone copy: '📍 Tu zona: <City> · verás pedidos de esta ciudad' / 'Fuera de zona · solo verás pedidos sin ciudad asignada'. Driver dashboard route is /dashboard (role-based), not /driver. Playwright geolocation must be set via context.grant_permissions(['geolocation'], origin=...) + context.set_geolocation(...). GPS polling interval ≈10s so waits of 12-14s are required after geolocation change to see badge update.",
+  "rca of the issue": "N/A — feature works as specified."
+}

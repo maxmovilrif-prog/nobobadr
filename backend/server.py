@@ -150,6 +150,8 @@ class Order(BaseModel):
     items: List[OrderItem]
     total_amount: float
     delivery_address: str
+    city_id: Optional[str] = None
+    city_name: Optional[str] = None
     status: str  # pending, accepted, preparing, ready, in_transit, delivered, cancelled
     payment_status: str = "pending"  # pending, paid, failed
     payment_session_id: Optional[str] = None
@@ -160,9 +162,43 @@ class OrderCreate(BaseModel):
     business_id: str
     items: List[OrderItem]
     delivery_address: str
+    city_id: Optional[str] = None
 
 class OrderStatusUpdate(BaseModel):
     status: str
+
+class City(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    lat: float
+    lng: float
+
+# Radio de zona de trabajo (km) para el geofencing de repartidores
+CITY_ZONE_RADIUS_KM = 10
+
+def haversine_km(lat1, lng1, lat2, lng2):
+    """Distancia en km entre dos puntos (lat/lng)."""
+    R = 6371.0
+    from math import radians, sin, cos, sqrt, atan2
+    dlat = radians(lat2 - lat1)
+    dlng = radians(lng2 - lng1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+async def get_driver_city(driver):
+    """Determina la ciudad/zona del repartidor según su GPS (centro de ciudad ≤ radio)."""
+    loc = (driver or {}).get('current_location') or {}
+    lat, lng = loc.get('lat'), loc.get('lng')
+    if lat is None or lng is None:
+        return None
+    cities = await db.cities.find({}, {'_id': 0}).to_list(1000)
+    best, best_dist = None, None
+    for c in cities:
+        d = haversine_km(lat, lng, c['lat'], c['lng'])
+        if d <= CITY_ZONE_RADIUS_KM and (best_dist is None or d < best_dist):
+            best, best_dist = c, d
+    return best
 
 class Message(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -416,6 +452,10 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     order_dict['customer_id'] = current_user['id']
     order_dict['total_amount'] = total
     order_dict['status'] = 'pending'
+    # Resolver nombre de ciudad si se indicó city_id
+    if order_dict.get('city_id'):
+        city = await db.cities.find_one({'id': order_dict['city_id']}, {'_id': 0, 'name': 1})
+        order_dict['city_name'] = city['name'] if city else None
     
     order = Order(**order_dict)
     doc = order.model_dump()
@@ -544,12 +584,29 @@ def _history_query(action=None, driver_id=None, date_from=None, date_to=None):
         q['created_at'] = created
     return q
 
+@api_router.get("/cities")
+async def list_cities(current_user: dict = Depends(get_current_user)):
+    """Lista de ciudades/zonas disponibles."""
+    cities = await db.cities.find({}, {'_id': 0}).sort('name', 1).to_list(1000)
+    return {'cities': cities}
+
 @api_router.get("/drivers/available-orders", response_model=List[Order])
 async def get_available_orders(current_user: dict = Depends(get_current_user)):
     if current_user['role'] != 'driver':
         raise HTTPException(status_code=403, detail="Only drivers can view available orders")
-    
-    orders = await db.orders.find({'driver_id': None, 'status': 'pending', 'payment_status': 'paid'}, {'_id': 0}).to_list(1000)
+
+    # Zona del repartidor según su GPS (geofencing de ciudad)
+    driver = await db.users.find_one({'id': current_user['id']}, {'_id': 0, 'current_location': 1})
+    driver_city = await get_driver_city(driver)
+
+    query = {'driver_id': None, 'status': 'pending', 'payment_status': 'paid'}
+    if driver_city:
+        # Pedidos de su ciudad + pedidos sin ciudad asignada (no quedan huérfanos)
+        query['$or'] = [{'city_id': driver_city['id']}, {'city_id': None}, {'city_id': {'$exists': False}}]
+    else:
+        # Fuera de toda zona: solo ve pedidos sin ciudad asignada
+        query['$or'] = [{'city_id': None}, {'city_id': {'$exists': False}}]
+    orders = await db.orders.find(query, {'_id': 0}).to_list(1000)
     
     for order in orders:
         if isinstance(order.get('created_at'), str):
@@ -1425,6 +1482,7 @@ async def get_pending_orders(current_user: dict = Depends(get_current_user)):
             'id': o['id'],
             'business_name': biz_map.get(o.get('business_id'), 'Negocio'),
             'delivery_address': o.get('delivery_address', ''),
+            'city_name': o.get('city_name'),
             'total_amount': o.get('total_amount', 0),
             'status': o.get('status', 'pending'),
             'created_at': o.get('created_at'),
@@ -1618,7 +1676,7 @@ async def init_collections_and_indexes():
         existing = await db.list_collection_names()
         for coll in ['users', 'orders', 'businesses', 'products', 'messages',
                      'payment_transactions', 'affiliate_links', 'admin_login_attempts',
-                     'assignment_history']:
+                     'assignment_history', 'cities']:
             if coll not in existing:
                 await db.create_collection(coll)
 
@@ -1658,6 +1716,19 @@ async def init_collections_and_indexes():
         # Historial de asignaciones (trazabilidad)
         await db.assignment_history.create_index('created_at')
         await db.assignment_history.create_index('order_id')
+
+        # Ciudades / zonas + seed inicial (con coordenadas del centro)
+        await db.cities.create_index('name', unique=True)
+        if await db.cities.count_documents({}) == 0:
+            seed_cities = [
+                {'name': 'Tánger', 'lat': 35.7595, 'lng': -5.8340},
+                {'name': 'Casablanca', 'lat': 33.5731, 'lng': -7.5898},
+                {'name': 'Meknes', 'lat': 33.8935, 'lng': -5.5473},
+                {'name': 'Nador', 'lat': 35.1681, 'lng': -2.9335},
+            ]
+            for c in seed_cities:
+                await db.cities.insert_one({'id': str(uuid.uuid4()), **c})
+            logger.info("Seeded cities")
 
         logger.info("DB collections & indexes initialized")
     except Exception as e:

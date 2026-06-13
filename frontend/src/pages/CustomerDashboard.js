@@ -24,6 +24,8 @@ export default function CustomerDashboard() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [cities, setCities] = useState([]);
+  const [selectedCityId, setSelectedCityId] = useState('');
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [vehicleFilters, setVehicleFilters] = useState({
@@ -61,7 +63,19 @@ export default function CustomerDashboard() {
   useEffect(() => {
     fetchBusinesses();
     fetchOrders();
+    fetchCities();
   }, []);
+
+  const fetchCities = async () => {
+    try {
+      const response = await axios.get(`${API}/cities`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCities(response.data.cities || []);
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+    }
+  };
 
   const fetchBusinesses = async () => {
     try {
@@ -130,6 +144,10 @@ export default function CustomerDashboard() {
       toast.error('Por favor ingresa una dirección de entrega');
       return;
     }
+    if (!selectedCityId) {
+      toast.error('Por favor selecciona tu ciudad');
+      return;
+    }
     if (cart.length === 0) {
       toast.error('El carrito está vacío');
       return;
@@ -140,7 +158,8 @@ export default function CustomerDashboard() {
       const response = await axios.post(`${API}/orders`, {
         business_id: selectedBusiness.id,
         items: cart,
-        delivery_address: deliveryAddress
+        delivery_address: deliveryAddress,
+        city_id: selectedCityId
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -562,6 +581,17 @@ export default function CustomerDashboard() {
                             value={deliveryAddress}
                             onChange={(e) => setDeliveryAddress(e.target.value)}
                           />
+                          <select
+                            data-testid="city-select"
+                            value={selectedCityId}
+                            onChange={(e) => setSelectedCityId(e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white"
+                          >
+                            <option value="">Selecciona tu ciudad</option>
+                            {cities.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
                           <div className="flex items-center justify-between py-2 border-t">
                             <span className="font-semibold">Total:</span>
                             <span className="text-xl font-bold text-emerald-600">€{cartTotal.toFixed(2)}</span>

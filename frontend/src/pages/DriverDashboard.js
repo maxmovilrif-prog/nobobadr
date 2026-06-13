@@ -19,9 +19,38 @@ export default function DriverDashboard() {
   const [loading, setLoading] = useState(false);
   const [locationSharing, setLocationSharing] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [cities, setCities] = useState([]);
   const wsConnections = useRef({});
   const geoWatchId = useRef(null);
   const adminLocIntervalRef = useRef(null);
+
+  useEffect(() => {
+    const loadCities = async () => {
+      try {
+        const res = await axios.get(`${API}/cities`, { headers: { Authorization: `Bearer ${token}` } });
+        setCities(res.data.cities || []);
+      } catch (e) { /* noop */ }
+    };
+    loadCities();
+    // eslint-disable-next-line
+  }, []);
+
+  // Zona de trabajo detectada por GPS (ciudad cuyo centro está a <=10 km)
+  const detectZone = () => {
+    if (!currentLocation || cities.length === 0) return null;
+    const R = 6371;
+    const toRad = (x) => (x * Math.PI) / 180;
+    let best = null, bestD = Infinity;
+    cities.forEach((c) => {
+      const dLat = toRad(c.lat - currentLocation.lat);
+      const dLng = toRad(c.lng - currentLocation.lng);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(currentLocation.lat)) * Math.cos(toRad(c.lat)) * Math.sin(dLng / 2) ** 2;
+      const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (d <= 10 && d < bestD) { best = c; bestD = d; }
+    });
+    return best;
+  };
+  const currentZone = detectZone();
 
   useEffect(() => {
     if (isAvailable) {
@@ -294,6 +323,11 @@ export default function DriverDashboard() {
                     {currentLocation
                       ? `Lat: ${currentLocation.lat.toFixed(5)}, Lng: ${currentLocation.lng.toFixed(5)}`
                       : 'Obteniendo ubicación GPS...'}
+                  </p>
+                  <p className="text-sm mt-1" data-testid="driver-zone">
+                    {currentZone
+                      ? <span className="text-emerald-800 font-medium">📍 Tu zona: {currentZone.name} · verás pedidos de esta ciudad</span>
+                      : <span className="text-amber-700">Fuera de zona · solo verás pedidos sin ciudad asignada</span>}
                   </p>
                 </div>
               </div>
