@@ -1,0 +1,39 @@
+{
+  "summary": "E2E verification of new 'Pagos por repartidor' (driver commissions) feature on admin portal. Backend pytest: 13/13 PASS covering /admin/finances/summary (default rate 0.10, custom rate, double-when-rate-doubles, date filter, RBAC 403 non-admin, 401/403 anon), /admin/finances/report/{driver_id} (per-driver totals match summary row, unknown driver returns zeros, 403 non-admin), /admin/finances/export (text/csv content-type, attachment disposition, header row exact match ['repartidor','repartidor_id','entregas','ingresos_eur','comision_eur','tasa'], TOTAL row, rate column reflects param 0.25, 403 non-admin), and delivered_at tracking (summary returns rows with positive revenue, confirming delivered_at/fallback bucketing works). Frontend Playwright PASS: admin login at /admin-nubo with control@nuboexpress.com + Fn6FcMveVf%--1o- + NUBO-84D2-C159-E3CF → /admin-nubo/panel. 'Pagos por repartidor' card (data-testid=finance-card) renders below 'Historial de asignaciones' with all required testids present: finance-table, finance-date-from, finance-date-to, finance-rate (default value '10'), finance-calc-btn, finance-export-btn, finance-total-earnings. Table shows 1 row finance-row-9f3d098a-2dd7-42b4-b740-b6372ab9c518 for '🐝 Test Driver' with 3 entregas, €70.00 ingresos, €7.00 comisión at 10%; tfoot Total matches (3 / €70.00 / €7.00) and header reads 'Total comisiones: €7.00'. Changing finance-rate to 20 and clicking finance-calc-btn recalculates: row commission becomes €14.00, total becomes €14.00 (exactly double, as expected). Clicking finance-export-btn triggers GET /api/admin/finances/export?rate=0.2 → HTTP 200 with content-type 'text/csv; charset=utf-8' and a success toast 'CSV de pagos exportado' appears.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_finances.py",
+    "/app/test_reports/pytest/finances_results.xml",
+    "/app/test_reports/finance_10pct.png",
+    "/app/test_reports/finance_20pct.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "_compute_earnings loads orders with .to_list(50000) — a hard cap that will silently truncate at scale. For an analytics endpoint consider Mongo aggregation pipeline ($match → $group on driver_id with $sum) instead of in-process Python aggregation; both faster and avoids the 50k ceiling.",
+    "_order_eff_date slices ISO string with [:10] which assumes the date is stored as a string. If delivered_at/updated_at are ever stored as native datetime (e.g., from datetime.now() without isoformat()), the slice would silently return a wrong substring (e.g., '2026-01-13' vs 'datetime.d'). Add isinstance check or normalize at write time.",
+    "Date filter is inclusive on both ends via string comparison on YYYY-MM-DD; works fine for the current ISO-string storage but couples query semantics to storage format. Document this or move to true date-range Mongo query.",
+    "finances_export calls finances_summary(...) directly as a function — fine, but it passes current_user explicitly which bypasses Depends. Acceptable internal call pattern but worth a comment so future refactors don't accidentally enforce Depends twice.",
+    "Frontend finance-rate input has no client-side guard against negative / >100; backend accepts any float. Low-risk (admin-only) but worth bounding to [0, 1] server-side.",
+    "CSV filename in Response uses datetime.now(timezone.utc) — good (UTC, no locale). However the per-row Ingresos/Comision are written as raw floats — Excel locales using comma as decimal separator will parse '70.0' fine but '€' is not in the CSV (only in UI). Acceptable.",
+    "PATCH /orders/{id}/status sets delivered_at only if not previously set (idempotent) — good. But the endpoint has no role check; any authenticated user (customer included) can mark any order delivered. Out of scope for this iteration but a high-severity authz gap worth flagging.",
+    "Carry-over: AdminDashboard.js is 634 lines and growing; the finance section (~80 lines) could be extracted to a FinancePanel component for maintainability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_finances.py"
+  ],
+  "success_rate": { "backend": "100% (13/13)", "frontend": "100% (all finance-* selectors, recalc on rate change, CSV export 200 + text/csv + toast all verified)" },
+  "test_credentials": {
+    "admin_portal": "control@nuboexpress.com / Fn6FcMveVf%--1o- / NUBO-84D2-C159-E3CF",
+    "customer": "cliente@nubotest.com / Cliente123!"
+  },
+  "seed_data_creation": "None created — used pre-existing 3 delivered orders for driver 'Test Driver' (€70 total revenue) already present in Mongo. Test 'test_per_driver_unknown_driver' uses a synthetic id that doesn't match any user (returns zeros, no writes).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests at /app/backend/tests/test_finances.py (13 tests, all passing). Frontend selectors verified working: finance-card, finance-table, finance-date-from, finance-date-to, finance-rate (default '10'), finance-calc-btn, finance-export-btn, finance-total-earnings, finance-row-<driver_id>. Pre-existing finance state in Mongo: 1 driver (9f3d098a-... 'Test Driver') with 3 delivered orders totalling €70 revenue. Commission rate is sent as fraction (UI input ÷ 100). CSV export uses responseType='blob' on the frontend; network response is text/csv with attachment disposition. Note PATCH /api/orders/{id}/status currently has no role check (any authenticated user can mark any order delivered) — flagged in code review but out of scope for this iteration.",
+  "rca of the issue": "N/A — no bugs found. All acceptance criteria from the review_request met: (1) finance-card and all sub-testids render below 'Historial de asignaciones'; (2) earnings = revenue × rate verified at 10% (€7) and doubles at 20% (€14); totals row matches finance-total-earnings; (3) /admin/finances/summary returns correct shape with currency='EUR', period, rate, rows (driver_id/driver_name/total_deliveries/total_revenue/total_earnings) and totals (deliveries/revenue/earnings); 403 for non-admin; date filters respect range; (4) /admin/finances/report/{driver_id} mirrors per-driver totals; admin-only; (5) /admin/finances/export returns text/csv with exact header and TOTAL row; admin-only; UI export click → 200 + text/csv + success toast; (6) PATCH /orders/{id}/status='delivered' sets delivered_at — used as the bucket date in finance summary (verified indirectly via summary rows being non-empty and revenue>0 with no date filter)."
+}

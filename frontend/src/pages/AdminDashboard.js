@@ -10,7 +10,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft, Download, Filter } from 'lucide-react';
+import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft, Download, Filter, Wallet } from 'lucide-react';
 
 const SPAIN_CENTER = [40.0, -3.7];
 
@@ -66,6 +66,11 @@ export default function AdminDashboard() {
   const [historyFilters, setHistoryFilters] = useState({ action: '', driver_id: '', date_from: '', date_to: '' });
   const [exporting, setExporting] = useState(false);
   const [assigningId, setAssigningId] = useState(null);
+  // Finanzas — pagos por repartidor
+  const [finance, setFinance] = useState({ rows: [], totals: { deliveries: 0, revenue: 0, earnings: 0 } });
+  const [financeFilters, setFinanceFilters] = useState({ start_date: '', end_date: '', rate_pct: 10 });
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [financeExporting, setFinanceExporting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmData, setConfirmData] = useState(null); // { order, driver }
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -134,6 +139,53 @@ export default function AdminDashboard() {
       toast.error('No se pudo exportar el CSV');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const buildFinanceParams = () => {
+    const f = financeFilters;
+    const p = { rate: (Number(f.rate_pct) || 0) / 100 };
+    if (f.start_date) p.start_date = f.start_date;
+    if (f.end_date) p.end_date = f.end_date;
+    return p;
+  };
+
+  const fetchFinance = async () => {
+    setFinanceLoading(true);
+    try {
+      const res = await axios.get(`${API}/admin/finances/summary`, {
+        params: buildFinanceParams(),
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setFinance({ rows: res.data.rows || [], totals: res.data.totals || { deliveries: 0, revenue: 0, earnings: 0 } });
+    } catch (e) {
+      toast.error('No se pudo calcular los pagos');
+    } finally {
+      setFinanceLoading(false);
+    }
+  };
+
+  const exportFinanceCsv = async () => {
+    setFinanceExporting(true);
+    try {
+      const res = await axios.get(`${API}/admin/finances/export`, {
+        params: buildFinanceParams(),
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pagos_repartidores_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('CSV de pagos exportado');
+    } catch (e) {
+      toast.error('No se pudo exportar el CSV');
+    } finally {
+      setFinanceExporting(false);
     }
   };
 
@@ -262,6 +314,7 @@ export default function AdminDashboard() {
   // Poll data
   useEffect(() => {
     fetchData();
+    fetchFinance();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
     // eslint-disable-next-line
@@ -464,6 +517,89 @@ export default function AdminDashboard() {
                   );
                 })
               )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pagos por repartidor (comisiones) */}
+        <Card className="border-0 shadow-xl mt-8" data-testid="finance-card">
+          <CardContent className="p-0">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-emerald-600" /> Pagos por repartidor
+              </h2>
+              <span className="text-sm font-medium text-emerald-700" data-testid="finance-total-earnings">
+                Total comisiones: €{Number(finance.totals.earnings).toFixed(2)}
+              </span>
+            </div>
+
+            <div className="px-6 py-3 border-b bg-gray-50 flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Desde</label>
+                <input data-testid="finance-date-from" type="date" value={financeFilters.start_date}
+                  onChange={(e) => setFinanceFilters({ ...financeFilters, start_date: e.target.value })}
+                  className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+                <input data-testid="finance-date-to" type="date" value={financeFilters.end_date}
+                  onChange={(e) => setFinanceFilters({ ...financeFilters, end_date: e.target.value })}
+                  className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Comisión (%)</label>
+                <input data-testid="finance-rate" type="number" min="0" max="100" step="0.5" value={financeFilters.rate_pct}
+                  onChange={(e) => setFinanceFilters({ ...financeFilters, rate_pct: e.target.value })}
+                  className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white w-24" />
+              </div>
+              <Button data-testid="finance-calc-btn" onClick={fetchFinance} disabled={financeLoading}
+                size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white">
+                {financeLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Calcular'}
+              </Button>
+              <Button data-testid="finance-export-btn" onClick={exportFinanceCsv} disabled={financeExporting}
+                size="sm" variant="outline" className="ml-auto">
+                {financeExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                {financeExporting ? '' : 'Exportar CSV'}
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto" data-testid="finance-table">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-left">
+                  <tr>
+                    <th className="px-6 py-3 font-medium">Repartidor</th>
+                    <th className="px-6 py-3 font-medium text-right">Entregas</th>
+                    <th className="px-6 py-3 font-medium text-right">Ingresos</th>
+                    <th className="px-6 py-3 font-medium text-right">Comisión</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {finance.rows.length === 0 ? (
+                    <tr><td colSpan="4" className="px-6 py-10 text-center text-gray-500">
+                      No hay entregas en este periodo.
+                    </td></tr>
+                  ) : (
+                    finance.rows.map((r) => (
+                      <tr key={r.driver_id} data-testid={`finance-row-${r.driver_id}`}>
+                        <td className="px-6 py-3 text-gray-900">🐝 {r.driver_name}</td>
+                        <td className="px-6 py-3 text-right text-gray-700">{r.total_deliveries}</td>
+                        <td className="px-6 py-3 text-right text-gray-700">€{Number(r.total_revenue).toFixed(2)}</td>
+                        <td className="px-6 py-3 text-right font-semibold text-emerald-700">€{Number(r.total_earnings).toFixed(2)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {finance.rows.length > 0 && (
+                  <tfoot className="bg-gray-50 font-semibold text-gray-900">
+                    <tr>
+                      <td className="px-6 py-3">Total</td>
+                      <td className="px-6 py-3 text-right">{finance.totals.deliveries}</td>
+                      <td className="px-6 py-3 text-right">€{Number(finance.totals.revenue).toFixed(2)}</td>
+                      <td className="px-6 py-3 text-right text-emerald-700">€{Number(finance.totals.earnings).toFixed(2)}</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
             </div>
           </CardContent>
         </Card>

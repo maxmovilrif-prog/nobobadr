@@ -467,11 +467,11 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    # Update order status
-    await db.orders.update_one(
-        {'id': order_id},
-        {'$set': {'status': status_update.status, 'updated_at': datetime.now(timezone.utc).isoformat()}}
-    )
+    update_fields = {'status': status_update.status, 'updated_at': datetime.now(timezone.utc).isoformat()}
+    # Marca de tiempo de entrega para los reportes financieros (pagos por repartidor)
+    if status_update.status == 'delivered' and not order.get('delivered_at'):
+        update_fields['delivered_at'] = datetime.now(timezone.utc).isoformat()
+    await db.orders.update_one({'id': order_id}, {'$set': update_fields})
     
     return {'message': 'Order status updated', 'status': status_update.status}
 
@@ -1260,6 +1260,113 @@ async def export_assignment_history(
         media_type='text/csv',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
+
+# =========================
+# FINANCES — Pagos / comisiones por repartidor (Abeja)
+# =========================
+
+DEFAULT_COMMISSION_RATE = 0.10  # 10% del importe del pedido por defecto
+
+def _order_eff_date(o):
+    """Fecha efectiva de entrega para los reportes (delivered_at > updated_at > created_at)."""
+    return (o.get('delivered_at') or o.get('updated_at') or o.get('created_at') or '')[:10]
+
+def _in_range(d, start_date, end_date):
+    if start_date and d < start_date:
+        return False
+    if end_date and d > end_date:
+        return False
+    return True
+
+async def _compute_earnings(query, start_date, end_date, rate):
+    """Agrega entregas y comisiones por repartidor a partir de pedidos 'delivered'."""
+    orders = await db.orders.find(query, {'_id': 0, 'driver_id': 1, 'total_amount': 1,
+                                          'delivered_at': 1, 'updated_at': 1, 'created_at': 1}).to_list(50000)
+    per = {}
+    for o in orders:
+        if not _in_range(_order_eff_date(o), start_date, end_date):
+            continue
+        did = o.get('driver_id')
+        if not did:
+            continue
+        amt = float(o.get('total_amount') or 0)
+        e = per.setdefault(did, {'deliveries': 0, 'revenue': 0.0})
+        e['deliveries'] += 1
+        e['revenue'] += amt
+    return per
+
+@api_router.get("/admin/finances/summary")
+async def finances_summary(start_date: Optional[str] = None, end_date: Optional[str] = None,
+                           rate: float = DEFAULT_COMMISSION_RATE,
+                           current_user: dict = Depends(get_current_user)):
+    """Pagos por repartidor en un periodo (tabla agregada)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    per = await _compute_earnings({'status': 'delivered', 'driver_id': {'$ne': None}}, start_date, end_date, rate)
+    names = {}
+    if per:
+        async for u in db.users.find({'id': {'$in': list(per.keys())}}, {'_id': 0, 'id': 1, 'name': 1}):
+            names[u['id']] = u.get('name')
+    rows = []
+    for did, v in per.items():
+        rows.append({
+            'driver_id': did,
+            'driver_name': names.get(did, 'N/D'),
+            'total_deliveries': v['deliveries'],
+            'total_revenue': round(v['revenue'], 2),
+            'total_earnings': round(v['revenue'] * rate, 2),
+        })
+    rows.sort(key=lambda r: -r['total_earnings'])
+    totals = {
+        'deliveries': sum(r['total_deliveries'] for r in rows),
+        'revenue': round(sum(r['total_revenue'] for r in rows), 2),
+        'earnings': round(sum(r['total_earnings'] for r in rows), 2),
+    }
+    return {
+        'period': f"{start_date or 'inicio'} → {end_date or 'hoy'}",
+        'rate': rate, 'currency': 'EUR', 'rows': rows, 'totals': totals,
+    }
+
+@api_router.get("/admin/finances/report/{driver_id}")
+async def bee_earnings_report(driver_id: str, start_date: Optional[str] = None, end_date: Optional[str] = None,
+                              rate: float = DEFAULT_COMMISSION_RATE,
+                              current_user: dict = Depends(get_current_user)):
+    """Reporte de comisiones de un repartidor concreto en un periodo."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    per = await _compute_earnings({'status': 'delivered', 'driver_id': driver_id}, start_date, end_date, rate)
+    v = per.get(driver_id, {'deliveries': 0, 'revenue': 0.0})
+    driver = await db.users.find_one({'id': driver_id}, {'_id': 0, 'id': 1, 'name': 1})
+    return {
+        'driver_id': driver_id,
+        'driver_name': driver.get('name') if driver else 'N/D',
+        'period': f"{start_date or 'inicio'} → {end_date or 'hoy'}",
+        'total_deliveries': v['deliveries'],
+        'total_revenue': round(v['revenue'], 2),
+        'total_earnings': round(v['revenue'] * rate, 2),
+        'rate': rate, 'currency': 'EUR',
+    }
+
+@api_router.get("/admin/finances/export")
+async def finances_export(start_date: Optional[str] = None, end_date: Optional[str] = None,
+                          rate: float = DEFAULT_COMMISSION_RATE,
+                          current_user: dict = Depends(get_current_user)):
+    """Exporta los pagos por repartidor a CSV (admin)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    summary = await finances_summary(start_date, end_date, rate, current_user)
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(['repartidor', 'repartidor_id', 'entregas', 'ingresos_eur', 'comision_eur', 'tasa'])
+    for r in summary['rows']:
+        writer.writerow([r['driver_name'], r['driver_id'], r['total_deliveries'],
+                         r['total_revenue'], r['total_earnings'], rate])
+    t = summary['totals']
+    writer.writerow([])
+    writer.writerow(['TOTAL', '', t['deliveries'], t['revenue'], t['earnings'], rate])
+    filename = f"pagos_repartidores_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.csv"
+    return Response(content=buf.getvalue(), media_type='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
 @api_router.get("/admin/active-drivers")
 async def get_active_drivers(current_user: dict = Depends(get_current_user)):
