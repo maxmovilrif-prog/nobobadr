@@ -466,7 +466,16 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
     order = await db.orders.find_one({'id': order_id}, {'_id': 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
+    # Autorización: solo admin, el repartidor asignado o el dueño del negocio del pedido
+    role = current_user['role']
+    allowed = role == 'admin' or (role == 'driver' and order.get('driver_id') == current_user['id'])
+    if not allowed and role == 'business':
+        biz = await db.businesses.find_one({'id': order.get('business_id')}, {'_id': 0, 'owner_id': 1})
+        allowed = bool(biz) and biz.get('owner_id') == current_user['id']
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Not authorized to update this order")
+
     update_fields = {'status': status_update.status, 'updated_at': datetime.now(timezone.utc).isoformat()}
     # Marca de tiempo de entrega para los reportes financieros (pagos por repartidor)
     if status_update.status == 'delivered' and not order.get('delivered_at'):

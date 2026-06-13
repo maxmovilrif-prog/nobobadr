@@ -14,6 +14,8 @@ Marketplace multiservicio tipo Glovo para España ("Nubo Express"): delivery de 
 - Emergent LLM Key (búsqueda IA) — openai gpt-4o-mini
 
 ## Implementado (Jun 2026)
+- ✅ **Pagos por repartidor (comisiones):** panel admin con rango de fechas, % comisión configurable, tabla por Abeja (entregas/ingresos/comisión) + totales + CSV. Endpoints `/admin/finances/summary`, `/report/{driver_id}`, `/export`. `delivered_at` se registra al entregar. Verificado 13/13.
+- ✅ **Fix seguridad:** `PATCH /orders/{id}/status` ahora solo admin / repartidor asignado / dueño del negocio (antes cualquiera podía marcar "delivered").
 - ✅ **Historial: filtros + exportación CSV** (`GET /api/admin/assignment-history` con filtros action/driver/fechas + `/export` CSV). Card con selects de acción/repartidor, rango de fechas, Limpiar y "Exportar CSV". Verificado 14/14.
 - ✅ **Stealth redirect:** un usuario no-admin que entre a `/admin-nubo` va a `/dashboard`; solo visitantes anónimos ven el login admin. El código secreto se valida 100% en servidor (nunca se expone al navegador).
 - ✅ **Retorno automático a la cola** (Abeja "No disponible" → sus pedidos pre-entrega vuelven a pendientes) + devolución manual (`/orders/{id}/return-to-queue`).
