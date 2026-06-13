@@ -489,12 +489,33 @@ async def assign_driver(order_id: str, current_user: dict = Depends(get_current_
         {'id': order_id},
         {'$set': {'driver_id': current_user['id'], 'status': 'accepted', 'updated_at': datetime.now(timezone.utc).isoformat()}}
     )
+    await log_assignment(order_id, current_user, 'assigned', current_user, reason='driver_self_accept')
     
     return {'message': 'Order assigned successfully'}
 
 # =========================
 # DRIVER ENDPOINTS
 # =========================
+
+# Estados de pedido que pueden volver a la cola si la Abeja queda libre
+RETURNABLE_STATUSES = ['accepted', 'assigned', 'preparing']
+
+async def log_assignment(order_id, driver, action, actor, distance_km=None, reason=None):
+    """Registra un evento de asignación para trazabilidad total."""
+    drv = driver if isinstance(driver, dict) else None
+    await db.assignment_history.insert_one({
+        'id': str(uuid.uuid4()),
+        'order_id': order_id,
+        'driver_id': (drv or {}).get('id'),
+        'driver_name': (drv or {}).get('name'),
+        'action': action,  # assigned | returned | auto_returned
+        'actor_id': (actor or {}).get('id'),
+        'actor_role': (actor or {}).get('role'),
+        'actor_name': (actor or {}).get('name'),
+        'distance_km': distance_km,
+        'reason': reason,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+    })
 
 @api_router.get("/drivers/available-orders", response_model=List[Order])
 async def get_available_orders(current_user: dict = Depends(get_current_user)):
@@ -515,13 +536,28 @@ async def get_available_orders(current_user: dict = Depends(get_current_user)):
 async def update_availability(is_available: bool, current_user: dict = Depends(get_current_user)):
     if current_user['role'] != 'driver':
         raise HTTPException(status_code=403, detail="Only drivers can update availability")
-    
+
     await db.users.update_one(
         {'id': current_user['id']},
         {'$set': {'is_available': is_available}}
     )
-    
-    return {'message': 'Availability updated', 'is_available': is_available}
+
+    returned = 0
+    # Si la Abeja queda libre (No disponible), sus pedidos pre-entrega vuelven a la cola
+    if not is_available:
+        pending_of_driver = await db.orders.find(
+            {'driver_id': current_user['id'], 'status': {'$in': RETURNABLE_STATUSES}},
+            {'_id': 0, 'id': 1}
+        ).to_list(1000)
+        for o in pending_of_driver:
+            await db.orders.update_one(
+                {'id': o['id']},
+                {'$set': {'driver_id': None, 'status': 'pending', 'updated_at': datetime.now(timezone.utc).isoformat()}}
+            )
+            await log_assignment(o['id'], current_user, 'auto_returned', current_user, reason='driver_unavailable')
+            returned += 1
+
+    return {'message': 'Availability updated', 'is_available': is_available, 'orders_returned_to_queue': returned}
 
 # =========================
 # CHAT ENDPOINTS
@@ -1119,6 +1155,8 @@ async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
         {'$set': {'driver_id': driver['id'], 'status': 'accepted',
                   'updated_at': datetime.now(timezone.utc).isoformat()}}
     )
+    distance_km = round(driver.get('distance_m', 0) / 1000, 2)
+    await log_assignment(order_id, driver, 'assigned', current_user, distance_km=distance_km)
     return {
         'message': 'Nearest driver assigned',
         'order_id': order_id,
@@ -1126,9 +1164,37 @@ async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
             'id': driver['id'],
             'name': driver.get('name', 'Abeja'),
             'vehicle_type': driver.get('vehicle_type'),
-            'distance_km': round(driver.get('distance_m', 0) / 1000, 2),
+            'distance_km': distance_km,
         }
     }
+
+@api_router.post("/orders/{order_id}/return-to-queue")
+async def return_order_to_queue(order_id: str, current_user: dict = Depends(get_current_user)):
+    """Devuelve manualmente un pedido asignado a la cola (admin/business)."""
+    if current_user['role'] not in ('admin', 'business'):
+        raise HTTPException(status_code=403, detail="Admin or business access required")
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if not order.get('driver_id'):
+        raise HTTPException(status_code=400, detail="Order is already in the queue (no driver assigned)")
+
+    prev_driver_id = order.get('driver_id')
+    prev_driver = await db.users.find_one({'id': prev_driver_id}, {'_id': 0, 'id': 1, 'name': 1})
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$set': {'driver_id': None, 'status': 'pending', 'updated_at': datetime.now(timezone.utc).isoformat()}}
+    )
+    await log_assignment(order_id, prev_driver, 'returned', current_user, reason='manual_return')
+    return {'message': 'Order returned to queue', 'order_id': order_id}
+
+@api_router.get("/admin/assignment-history")
+async def get_assignment_history(limit: int = 50, current_user: dict = Depends(get_current_user)):
+    """Historial de asignaciones para trazabilidad total (admin)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    events = await db.assignment_history.find({}, {'_id': 0}).sort('created_at', -1).to_list(max(1, min(limit, 200)))
+    return {'count': len(events), 'events': events}
 
 @api_router.get("/admin/active-drivers")
 async def get_active_drivers(current_user: dict = Depends(get_current_user)):
@@ -1370,7 +1436,8 @@ async def init_collections_and_indexes():
     try:
         existing = await db.list_collection_names()
         for coll in ['users', 'orders', 'businesses', 'products', 'messages',
-                     'payment_transactions', 'affiliate_links', 'admin_login_attempts']:
+                     'payment_transactions', 'affiliate_links', 'admin_login_attempts',
+                     'assignment_history']:
             if coll not in existing:
                 await db.create_collection(coll)
 
@@ -1406,6 +1473,10 @@ async def init_collections_and_indexes():
 
         # Seguridad: bloqueo de login admin por email
         await db.admin_login_attempts.create_index('email', unique=True)
+
+        # Historial de asignaciones (trazabilidad)
+        await db.assignment_history.create_index('created_at')
+        await db.assignment_history.create_index('order_id')
 
         logger.info("DB collections & indexes initialized")
     except Exception as e:

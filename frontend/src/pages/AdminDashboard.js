@@ -10,7 +10,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin } from 'lucide-react';
+import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft } from 'lucide-react';
 
 const SPAIN_CENTER = [40.0, -3.7];
 
@@ -61,6 +61,7 @@ export default function AdminDashboard() {
   const [drivers, setDrivers] = useState([]);
   const [stats, setStats] = useState({ total_drivers: 0, active_drivers: 0, total_businesses: 0, total_orders: 0 });
   const [pendingOrders, setPendingOrders] = useState([]);
+  const [history, setHistory] = useState([]);
   const [assigningId, setAssigningId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmData, setConfirmData] = useState(null); // { order, driver }
@@ -83,6 +84,9 @@ export default function AdminDashboard() {
       setDrivers(d.data.drivers || []);
       setStats(s.data);
       setPendingOrders(p.data.orders || []);
+      axios.get(`${API}/admin/assignment-history`, { params: { limit: 30 }, headers })
+        .then((h) => setHistory(h.data.events || []))
+        .catch(() => {});
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
@@ -290,6 +294,57 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Historial de asignaciones — trazabilidad */}
+        <Card className="border-0 shadow-xl mt-8" data-testid="assignment-history-card">
+          <CardContent className="p-0">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <History className="w-5 h-5 text-gray-500" /> Historial de asignaciones
+              </h2>
+              <span data-testid="history-count" className="text-sm font-medium text-gray-500">
+                {history.length} eventos
+              </span>
+            </div>
+            <div className="divide-y max-h-[420px] overflow-y-auto" data-testid="assignment-history-list">
+              {history.length === 0 ? (
+                <div className="px-6 py-10 text-center text-gray-500">
+                  <History className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                  Aún no hay eventos de asignación.
+                </div>
+              ) : (
+                history.map((ev) => {
+                  const meta = ev.action === 'assigned'
+                    ? { label: 'Asignado', cls: 'bg-emerald-100 text-emerald-700' }
+                    : ev.action === 'auto_returned'
+                      ? { label: 'Retorno automático', cls: 'bg-amber-100 text-amber-700' }
+                      : { label: 'Devuelto a cola', cls: 'bg-gray-200 text-gray-700' };
+                  return (
+                    <div key={ev.id} data-testid={`history-event-${ev.id}`} className="px-6 py-3 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <ArrowRightLeft className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-900 truncate">
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mr-2 ${meta.cls}`}>{meta.label}</span>
+                            Pedido #{ev.order_id?.slice(0, 8)} · 🐝 {ev.driver_name || 'N/D'}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            por {ev.actor_name || ev.actor_role || 'sistema'}
+                            {ev.distance_km != null ? ` · ${ev.distance_km} km` : ''}
+                            {ev.reason ? ` · ${ev.reason}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                        {ev.created_at ? new Date(ev.created_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </CardContent>

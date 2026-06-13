@@ -1,0 +1,36 @@
+{
+  "summary": "E2E verification of new logistics features: automatic return-to-queue when driver becomes unavailable + full assignment history with traceability. Backend pytest 10/10 PASS (4 history-endpoint RBAC tests + 1 end-to-end auto-return flow + 5 manual return-to-queue tests). Frontend Playwright PASS: Admin login at /admin-nubo (control@nuboexpress.com + Fn6FcMveVf%--1o- + NUBO-84D2-C159-E3CF) → /admin-nubo/panel renders the new 'Historial de asignaciones' card under 'Pedidos pendientes' with data-testid='assignment-history-card', a list (assignment-history-list) showing 12 pre-existing events, count badge (history-count) reading '12 eventos'. Action badges 'Asignado' / 'Retorno automático' / 'Devuelto a cola' all visible with order #, driver name (🐝 Abeja Madrid / Repartidor Real), actor (Centro de Control Nubo / Repartidor Real), distance (46.4 km / 0 km), reason (driver_unavailable / manual_return) and timestamp (13/6, 03:21). Clicked assign-nearest-<id> on order d4246353 → confirm dialog opened with text '¿Confirmar asignación a Abeja Madrid a 46.4 km?' → clicked assign-confirm-btn → POST succeeded, pending-orders-count 4 → 3, history-count 12 → 13, and the new top event displays the 'Asignado' badge for that order with the driver name + 46.4 km distance + 'Centro de Control Nubo' actor. Backend curl-verified end-to-end (auto-return logged with action='auto_returned' reason='driver_unavailable', orders_returned_to_queue>=1, order reappears in pending; manual return logged with action='returned' reason='manual_return'; 400 if order has no driver, 404 unknown order, 403 customer/driver).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_assignment_history.py",
+    "/app/test_reports/pytest/assignment_history_results.xml",
+    "/app/test_reports/history_after_assign.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "log_assignment(): when action='auto_returned' the 'driver' arg is passed as current_user (the driver toggling unavailable), so driver_id/driver_name correctly identify the abeja whose order is being returned. Good.",
+    "PATCH /api/drivers/availability is keyed off the driver token (not order_id), so a malicious driver flipping availability rapidly could spam auto-return events. Consider de-duplicating identical (order_id, action) events within the same second to avoid log noise.",
+    "GET /api/admin/assignment-history caps limit at 200 (good). No pagination/cursor — fine for now but consider indexed range queries if history grows beyond a few thousand events.",
+    "Frontend AdminDashboard.js fetches /admin/assignment-history with .then().catch(() => {}) AFTER Promise.all — meaning history loads slightly later than the rest of the panel. Acceptable UX, but a transient blank state until the second fetch resolves. Could be inlined into the Promise.all for atomic refresh.",
+    "Driver name 'Repartidor Real' is shown without the bee icon prefix in some rows while 'Abeja Madrid' shows '🐝 Abeja Madrid' (icon comes from template '🐝 {ev.driver_name}'); inconsistent because seeded driver.real name does not start with 'Abeja '. Purely cosmetic.",
+    "Carry-over from iteration_7: 'Abejas activas: 9' vs '7 abejas en ruta' header inconsistency still present (not related to this feature)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_assignment_history.py"
+  ],
+  "success_rate": { "backend": "100% (10/10)", "frontend": "100% (history card + assign-creates-event flow fully E2E verified)" },
+  "test_credentials": {
+    "admin_portal": "control@nuboexpress.com / Fn6FcMveVf%--1o- / NUBO-84D2-C159-E3CF",
+    "driver_real": "driver.real@nubotest.com / Driver123! (re-enabled to is_available=true after test)"
+  },
+  "seed_data_creation": "Consumed 1 pending order during the UI confirm-assign flow (d4246353-...). Mongo state after run: 3 pending paid orders remain in queue, 13 assignment_history events. driver.real.is_available reset to true after auto-return test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests live at /app/backend/tests/test_assignment_history.py (run with REACT_APP_BACKEND_URL exported). Frontend selectors confirmed working: assignment-history-card, assignment-history-list, history-count, history-event-<id>, assign-nearest-<id>, assign-confirm-dialog, assign-confirm-text, assign-confirm-btn, assign-cancel-btn, pending-orders-card, pending-orders-count. Three action badge labels rendered exactly as spec: 'Asignado' (emerald), 'Retorno automático' (amber), 'Devuelto a cola' (gray). Auto-return only fires for the actual assigned driver (verified via /auth/me id match before toggling). If queue is empty: insert pending paid orders directly into Mongo db 'glovo_algeciras' collection 'orders' with driver_id=null status='pending' payment_status='paid'.",
+  "rca of the issue": "N/A — no bugs found. All acceptance criteria from the review_request are met end-to-end (backend RBAC + auto-return + manual return + history persistence; frontend card rendering, count, action badges, event details, live update after assign)."
+}
