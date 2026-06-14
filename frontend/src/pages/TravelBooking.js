@@ -46,8 +46,8 @@ export default function TravelBooking() {
       icon: <Plane className="w-16 h-16 text-blue-600" />,
       title: 'Vuelos',
       titleEn: 'Flights',
-      description: 'Encuentra los mejores vuelos para tu destino en España',
-      descriptionEn: 'Find the best flights to your destination in Spain',
+      description: 'Encuentra los mejores vuelos para tu destino en España y Marruecos',
+      descriptionEn: 'Find the best flights to your destination in Spain and Morocco',
       gradient: 'from-blue-400 to-cyan-500',
       provider: affiliateLinks?.flights_provider,
       url: affiliateLinks?.flights_url,
@@ -58,8 +58,8 @@ export default function TravelBooking() {
       icon: <Ship className="w-16 h-16 text-teal-600" />,
       title: 'Ferries',
       titleEn: 'Ferries',
-      description: 'Reserva ferries en España',
-      descriptionEn: 'Book ferries in Spain',
+      description: 'Reserva ferries en España y Marruecos',
+      descriptionEn: 'Book ferries in Spain and Morocco',
       gradient: 'from-teal-400 to-emerald-500',
       provider: affiliateLinks?.ferries_provider,
       url: affiliateLinks?.ferries_url,
@@ -70,8 +70,8 @@ export default function TravelBooking() {
       icon: <Hotel className="w-16 h-16 text-purple-600" />,
       title: 'Hoteles',
       titleEn: 'Hotels',
-      description: 'Reserva hoteles en España al mejor precio',
-      descriptionEn: 'Book hotels in Spain at the best price',
+      description: 'Reserva hoteles en España y Marruecos al mejor precio',
+      descriptionEn: 'Book hotels in Spain and Morocco at the best price',
       gradient: 'from-purple-400 to-pink-500',
       provider: affiliateLinks?.hotels_provider,
       url: affiliateLinks?.hotels_url,
@@ -110,10 +110,10 @@ export default function TravelBooking() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            Viaja por <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">España</span>
+            Viaja por <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">España y Marruecos</span>
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Encuentra las mejores ofertas en vuelos, ferries y hoteles en España. Reserva de forma segura con nuestros socios de confianza.
+            Encuentra las mejores ofertas en vuelos, ferries y hoteles en España y Marruecos. Reserva de forma segura con nuestros socios de confianza.
           </p>
         </div>
 

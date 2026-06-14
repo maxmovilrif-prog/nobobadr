@@ -1755,16 +1755,23 @@ async def init_collections_and_indexes():
 
         # Ciudades / zonas + seed inicial (con coordenadas del centro)
         await db.cities.create_index('name', unique=True)
-        if await db.cities.count_documents({}) == 0:
-            seed_cities = [
-                {'name': 'Tánger', 'lat': 35.7595, 'lng': -5.8340},
-                {'name': 'Casablanca', 'lat': 33.5731, 'lng': -7.5898},
-                {'name': 'Meknes', 'lat': 33.8935, 'lng': -5.5473},
-                {'name': 'Nador', 'lat': 35.1681, 'lng': -2.9335},
-            ]
-            for c in seed_cities:
+        seed_cities = [
+            # Marruecos
+            {'name': 'Tánger', 'lat': 35.7595, 'lng': -5.8340},
+            {'name': 'Casablanca', 'lat': 33.5731, 'lng': -7.5898},
+            {'name': 'Meknes', 'lat': 33.8935, 'lng': -5.5473},
+            {'name': 'Nador', 'lat': 35.1681, 'lng': -2.9335},
+            # España
+            {'name': 'Algeciras', 'lat': 36.1408, 'lng': -5.4562},
+            {'name': 'Madrid', 'lat': 40.4168, 'lng': -3.7038},
+            {'name': 'Barcelona', 'lat': 41.3874, 'lng': 2.1686},
+            {'name': 'Málaga', 'lat': 36.7213, 'lng': -4.4214},
+        ]
+        for c in seed_cities:
+            existing_city = await db.cities.find_one({'name': c['name']})
+            if not existing_city:
                 await db.cities.insert_one({'id': str(uuid.uuid4()), **c})
-            logger.info("Seeded cities")
+        logger.info("Seeded/verified cities (ES + MA)")
 
         logger.info("DB collections & indexes initialized")
     except Exception as e:

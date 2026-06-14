@@ -12,7 +12,7 @@ import {
 import { toast } from 'sonner';
 import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft, Download, Filter, Wallet } from 'lucide-react';
 
-const SPAIN_CENTER = [40.0, -3.7];
+const SPAIN_CENTER = [37.5, -4.8];
 
 // Custom green Bee marker 🐝
 const beeIcon = L.divIcon({
@@ -393,7 +393,7 @@ export default function AdminDashboard() {
         <Card className="border-0 shadow-xl overflow-hidden">
           <CardContent className="p-0">
             <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Mapa en vivo de España 🗺️</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Mapa en vivo · España y Marruecos 🗺️</h2>
               <span data-testid="active-bees-count" className="text-sm font-medium text-emerald-600">
                 {drivers.length} abejas en ruta
               </span>
