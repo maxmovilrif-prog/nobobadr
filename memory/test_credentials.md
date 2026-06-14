@@ -1,7 +1,8 @@
 # Test Credentials — Nubo Express
 
-## Admin Portal (SEPARATE, hidden) — /admin-nubo
-- Login URL: /admin-nubo   (dashboard at /admin-nubo/panel)
+## Admin Portal (SEPARATE, hidden) — secret URL /nubo-private-control-badr
+- Login URL: /nubo-private-control-badr   (dashboard at /nubo-private-control-badr/panel)
+- Old paths /admin and /admin-nubo now redirect to the public site (/).
 - Email: control@nuboexpress.com
 - Password: Fn6FcMveVf%--1o-
 - Secret code (código secreto): NUBO-84D2-C159-E3CF

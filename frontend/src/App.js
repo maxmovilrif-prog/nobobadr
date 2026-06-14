@@ -77,27 +77,31 @@ function App() {
     <AuthContext.Provider value={{ user, token, login, logout, API }}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={!user ? <Landing /> : <Navigate to={user.role === 'admin' ? '/admin-nubo/panel' : '/dashboard'} />} />
-          <Route path="/auth" element={!user ? <Auth /> : <Navigate to={user.role === 'admin' ? '/admin-nubo/panel' : '/dashboard'} />} />
+          <Route path="/" element={!user ? <Landing /> : <Navigate to={user.role === 'admin' ? '/nubo-private-control-badr/panel' : '/dashboard'} />} />
+          <Route path="/auth" element={!user ? <Auth /> : <Navigate to={user.role === 'admin' ? '/nubo-private-control-badr/panel' : '/dashboard'} />} />
           <Route path="/dashboard" element={
             user ? (
               user.role === 'customer' ? <CustomerDashboard /> :
               user.role === 'driver' ? <DriverDashboard /> :
-              user.role === 'admin' ? <Navigate to="/admin-nubo/panel" /> :
+              user.role === 'admin' ? <Navigate to="/nubo-private-control-badr/panel" /> :
               <BusinessDashboard />
             ) : <Navigate to="/auth" />
           } />
-          {/* Hidden, decoupled admin portal */}
-          <Route path="/admin-nubo" element={
+          {/* Hidden, decoupled admin portal — secret URL */}
+          <Route path="/nubo-private-control-badr" element={
             !user ? <AdminLogin /> :
-            user.role === 'admin' ? <Navigate to="/admin-nubo/panel" /> :
+            user.role === 'admin' ? <Navigate to="/nubo-private-control-badr/panel" /> :
             <Navigate to="/dashboard" />
           } />
-          <Route path="/admin-nubo/panel" element={
+          <Route path="/nubo-private-control-badr/panel" element={
             user && user.role === 'admin' ? <AdminDashboard /> :
             user ? <Navigate to="/dashboard" /> :
-            <Navigate to="/admin-nubo" />
+            <Navigate to="/nubo-private-control-badr" />
           } />
+          {/* Old/guessable admin paths are hidden -> redirected to the public site */}
+          <Route path="/admin" element={<Navigate to="/" />} />
+          <Route path="/admin-nubo" element={<Navigate to="/" />} />
+          <Route path="/admin-nubo/panel" element={<Navigate to="/" />} />
           <Route path="/orders" element={user ? <CustomerDashboard /> : <Navigate to="/auth" />} />
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />

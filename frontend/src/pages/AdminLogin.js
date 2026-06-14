@@ -39,7 +39,7 @@ export default function AdminLogin() {
       });
       login(res.data.token, res.data.user);
       toast.success('Acceso concedido');
-      navigate('/admin-nubo/panel');
+      navigate('/nubo-private-control-badr/panel');
     } catch (error) {
       const status = error.response?.status;
       const detail = error.response?.data?.detail;

@@ -1,5 +1,5 @@
 User-agent: *
+Disallow: /admin
 Disallow: /admin-nubo
-Disallow: /admin-nubo/
 
 Sitemap:
