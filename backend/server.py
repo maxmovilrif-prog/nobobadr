@@ -1489,6 +1489,42 @@ async def get_pending_orders(current_user: dict = Depends(get_current_user)):
         })
     return {'count': len(result), 'orders': result}
 
+@api_router.get("/admin/orders")
+async def admin_all_orders(status: Optional[str] = None, city_id: Optional[str] = None,
+                           limit: int = 200, current_user: dict = Depends(get_current_user)):
+    """Todos los pedidos para el panel admin, con filtros opcionales por estado y ciudad."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    q = {}
+    if status:
+        q['status'] = status
+    if city_id:
+        q['city_id'] = city_id
+    orders = await db.orders.find(q, {'_id': 0}).sort('created_at', -1).to_list(max(1, min(limit, 1000)))
+
+    driver_ids = list({o['driver_id'] for o in orders if o.get('driver_id')})
+    biz_ids = list({o['business_id'] for o in orders if o.get('business_id')})
+    driver_map, biz_map = {}, {}
+    if driver_ids:
+        async for u in db.users.find({'id': {'$in': driver_ids}}, {'_id': 0, 'id': 1, 'name': 1}):
+            driver_map[u['id']] = u.get('name')
+    if biz_ids:
+        async for b in db.businesses.find({'id': {'$in': biz_ids}}, {'_id': 0, 'id': 1, 'name': 1}):
+            biz_map[b['id']] = b.get('name')
+
+    rows = [{
+        'id': o['id'],
+        'business_name': biz_map.get(o.get('business_id'), 'Negocio'),
+        'driver_name': driver_map.get(o.get('driver_id')) if o.get('driver_id') else None,
+        'city_name': o.get('city_name'),
+        'delivery_address': o.get('delivery_address', ''),
+        'total_amount': o.get('total_amount', 0),
+        'status': o.get('status', 'pending'),
+        'payment_status': o.get('payment_status', 'pending'),
+        'created_at': o.get('created_at'),
+    } for o in orders]
+    return {'count': len(rows), 'orders': rows}
+
 @api_router.get("/admin/stats")
 async def get_admin_stats(current_user: dict = Depends(get_current_user)):
     """Métricas rápidas para el dashboard del Admin."""

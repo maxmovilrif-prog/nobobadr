@@ -71,6 +71,11 @@ export default function AdminDashboard() {
   const [financeFilters, setFinanceFilters] = useState({ start_date: '', end_date: '', rate_pct: 10 });
   const [financeLoading, setFinanceLoading] = useState(false);
   const [financeExporting, setFinanceExporting] = useState(false);
+  // Todos los pedidos
+  const [allOrders, setAllOrders] = useState([]);
+  const [ordersFilters, setOrdersFilters] = useState({ status: '', city_id: '' });
+  const [citiesList, setCitiesList] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmData, setConfirmData] = useState(null); // { order, driver }
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -187,6 +192,37 @@ export default function AdminDashboard() {
     } finally {
       setFinanceExporting(false);
     }
+  };
+
+  const fetchCitiesList = async () => {
+    try {
+      const res = await axios.get(`${API}/cities`, { headers: { Authorization: `Bearer ${token}` } });
+      setCitiesList(res.data.cities || []);
+    } catch (e) { /* noop */ }
+  };
+
+  const fetchAllOrders = async (filters) => {
+    const f = filters || ordersFilters;
+    setOrdersLoading(true);
+    try {
+      const params = { limit: 200 };
+      if (f.status) params.status = f.status;
+      if (f.city_id) params.city_id = f.city_id;
+      const res = await axios.get(`${API}/admin/orders`, {
+        params, headers: { Authorization: `Bearer ${token}` },
+      });
+      setAllOrders(res.data.orders || []);
+    } catch (e) {
+      toast.error('No se pudieron cargar los pedidos');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const applyOrdersFilter = (patch) => {
+    const next = { ...ordersFilters, ...patch };
+    setOrdersFilters(next);
+    fetchAllOrders(next);
   };
 
   const fetchData = async () => {
@@ -315,6 +351,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData();
     fetchFinance();
+    fetchCitiesList();
+    fetchAllOrders();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
     // eslint-disable-next-line
@@ -599,6 +637,82 @@ export default function AdminDashboard() {
                     </tr>
                   </tfoot>
                 )}
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Todos los pedidos */}
+        <Card className="border-0 shadow-xl mt-8" data-testid="all-orders-card">
+          <CardContent className="p-0">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Package className="w-5 h-5 text-gray-500" /> Todos los pedidos
+              </h2>
+              <span data-testid="all-orders-count" className="text-sm font-medium text-gray-500">
+                {allOrders.length} pedidos
+              </span>
+            </div>
+
+            <div className="px-6 py-3 border-b bg-gray-50 flex flex-wrap items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-400" />
+              <select data-testid="orders-filter-status" value={ordersFilters.status}
+                onChange={(e) => applyOrdersFilter({ status: e.target.value })}
+                className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white">
+                <option value="">Todos los estados</option>
+                <option value="pending">Pendiente</option>
+                <option value="accepted">Aceptado</option>
+                <option value="preparing">Preparando</option>
+                <option value="ready">Listo</option>
+                <option value="in_transit">En camino</option>
+                <option value="delivered">Entregado</option>
+                <option value="cancelled">Cancelado</option>
+              </select>
+              <select data-testid="orders-filter-city" value={ordersFilters.city_id}
+                onChange={(e) => applyOrdersFilter({ city_id: e.target.value })}
+                className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white">
+                <option value="">Todas las ciudades</option>
+                {citiesList.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              {ordersLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+            </div>
+
+            <div className="overflow-x-auto max-h-[480px] overflow-y-auto" data-testid="all-orders-table">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-left sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Pedido</th>
+                    <th className="px-4 py-3 font-medium">Negocio</th>
+                    <th className="px-4 py-3 font-medium">Ciudad</th>
+                    <th className="px-4 py-3 font-medium">Repartidor</th>
+                    <th className="px-4 py-3 font-medium">Estado</th>
+                    <th className="px-4 py-3 font-medium text-right">Importe</th>
+                    <th className="px-4 py-3 font-medium">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {allOrders.length === 0 ? (
+                    <tr><td colSpan="7" className="px-6 py-10 text-center text-gray-500">No hay pedidos.</td></tr>
+                  ) : (
+                    allOrders.map((o) => (
+                      <tr key={o.id} data-testid={`order-row-${o.id}`}>
+                        <td className="px-4 py-3 font-mono text-xs text-gray-700">#{o.id.slice(0, 8)}</td>
+                        <td className="px-4 py-3 text-gray-900">{o.business_name}</td>
+                        <td className="px-4 py-3 text-gray-700">{o.city_name || '—'}</td>
+                        <td className="px-4 py-3 text-gray-700">{o.driver_name ? `🐝 ${o.driver_name}` : '—'}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{o.status}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-900">€{Number(o.total_amount).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                          {o.created_at ? new Date(o.created_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
               </table>
             </div>
           </CardContent>
