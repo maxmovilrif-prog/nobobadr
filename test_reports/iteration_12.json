@@ -1,0 +1,35 @@
+{
+  "summary": "Backend-only verification of the new ATOMIC nearest-driver assignment + driver release flow (Nubo Express). Created /app/backend/tests/test_atomic_assignment.py with 8 tests covering all requested scenarios; combined with the existing /app/backend/tests/test_assign_nearest.py the full suite is 19/19 PASS. Verified: (1) Admin login (control@nuboexpress.com + secret) returns JWT. (2) POST /api/orders/{id}/assign-nearest at Madrid coords picks Abeja Madrid (distance_km≈0), atomically flips that driver to is_available=False / status='busy' in db.users, and the same driver immediately disappears from GET /api/drivers/nearest. (3) Two consecutive assignments at the same Madrid coords go to DIFFERENT drivers (Abeja Madrid then a different bee) — atomic claim prevents double-assignment. (4) Re-calling assign-nearest on an already-assigned order returns 400 'Order already has a driver assigned'. (5) PATCH /api/orders/{id}/status with 'delivered' (and 'cancelled') releases the driver back to is_available=True / status='available' and the driver reappears in /api/drivers/nearest. (6) POST /api/orders/{id}/return-to-queue releases the driver and re-pends the order (status='pending', driver_id=None). (7) return-to-queue on an order without a driver returns 400. (8) assign-nearest at a far point (Arctic 85°N, max_km=50) returns 404 'No available drivers nearby'. Test orders inserted directly into Mongo (paid+pending+no driver) and removed in finally blocks; autouse fixture resets all demo bees to available and Repartidor Real to offline before/after each test for determinism.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": [
+    "/app/backend/tests/test_atomic_assignment.py",
+    "/app/backend/tests/test_assign_nearest.py",
+    "/app/test_reports/pytest/atomic_assignment.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py assign_nearest_driver claims the driver atomically (find_one_and_update with {is_available: True} filter) and then claims the order atomically (find_one_and_update with {driver_id: None} filter) — correct two-step CAS. If the order claim fails (someone else got it), release_driver is called to roll back the driver — good. However the rollback is only on the order CAS, not on a partial failure between the two steps if release_driver itself raised; consider try/except around order_claim to guarantee release.",
+    "release_driver() unconditionally sets is_available=True even if the driver toggled themselves offline mid-delivery. A safer rule would be: only set to available if status was 'busy' (find_one_and_update {status:'busy'} -> {status:'available', is_available:True}). Today an offline driver finishing a delivered order becomes available again automatically.",
+    "ASSIGN_MAX_ATTEMPTS=3 hard-coded; consider moving to env var to ease load testing tuning. Each retry repeats a full $geoNear aggregation — fine for current scale (≈8 bees) but watch as fleet grows.",
+    "update_order_status releases the driver on 'delivered'/'cancelled' but NOT on other terminal-ish states (e.g. 'failed', 'refunded'). If those statuses are ever added the driver will get stuck on busy. Add a TERMINAL_STATUSES constant.",
+    "return_order_to_queue does not check that the order is in a returnable status — an already 'delivered' order with a driver_id would be moved back to 'pending', which is almost certainly a bug. Recommend restricting to RETURNABLE_STATUSES (already defined as ['accepted','assigned','preparing']).",
+    "PATCH /api/orders/{id}/status accepts ANY status string from the client — no enum validation. A typo like 'delivere' would silently update the order and skip the release_driver branch. Add a Pydantic Literal/Enum on OrderStatusUpdate.status.",
+    "GET /api/drivers/nearest uses {role:'driver', is_available:True} but does not exclude drivers whose current_location is None — relies on $geoNear silently filtering them out. Drivers without 'geo_location' field are excluded by $geoNear, but explicit filter would be more defensive.",
+    "The demo seed leaves driver.real@nubotest.com with whatever geo it last had (here it was at (10,-30) from a previous Playwright run with is_available=True). That created an off-coast 'phantom' available driver — my Arctic far-point sidesteps it, but the seed/cleanup should reset driver.real to offline on each backend boot."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_atomic_assignment.py"
+  ],
+  "success_rate": { "backend": "100% (19/19 across test_assign_nearest.py + test_atomic_assignment.py)", "frontend": "not tested (backend-only per request)" },
+  "test_credentials": {
+    "admin": "control@nuboexpress.com / Fn6FcMveVf%--1o- / secret NUBO-84D2-C159-E3CF (POST /api/admin-auth/login)",
+    "customer": "cliente@nubotest.com / Cliente123!",
+    "drivers": "bee.<city>@nuboexpress.com / Bee123! (madrid, barcelona, valencia, sevilla, algeciras, malaga)"
+  },
+  "seed_data_creation": "Test orders inserted directly into db.orders (customer_id='TEST_customer_atomic', business_id='TEST_business_atomic', payment_status='paid', status='pending', driver_id=None) and deleted in finally blocks. Autouse fixture resets all demo bees to is_available=True/status='available' and forces driver.real@nubotest.com to is_available=False/status='offline' before AND after every test so the suite is rerunnable.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New test file: /app/backend/tests/test_atomic_assignment.py (8 tests) verifying atomic driver claim, busy state, no-double-assignment, release on delivered/cancelled, return-to-queue, 400 on already-assigned, 404 when no drivers nearby. Run with: cd /app && set -a && source backend/.env && set +a && export REACT_APP_BACKEND_URL=<frontend/.env URL> && pytest backend/tests/test_atomic_assignment.py -v. Driver state IS mutated across tests (autouse fixture resets it) so do NOT run in xdist parallel mode. Use Arctic (85,0) for 'no drivers nearby' (not (10,-30) — Repartidor Real was stuck there). The driver.real@nubotest.com seed never resets on backend boot — keep that in mind if it ever pollutes another test.",
+  "rca of the issue": "N/A — atomic assignment + release flow works as specified. Two-step compare-and-swap (driver claim then order claim) prevents the documented race; max-3-retry loop with excluded-id set handles concurrent claims; release_driver is invoked from update_order_status (delivered/cancelled) and return_order_to_queue, both verified end-to-end."
+}

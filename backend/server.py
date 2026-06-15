@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
 import os
 import logging
 from pathlib import Path
@@ -67,6 +68,7 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Driver specific
     is_available: bool = False
+    status: str = "offline"  # available | busy | offline (estado operativo de la Abeja)
     vehicle_type: Optional[str] = None
     current_location: Optional[Dict[str, float]] = None
 
@@ -521,7 +523,11 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
     if status_update.status == 'delivered' and not order.get('delivered_at'):
         update_fields['delivered_at'] = datetime.now(timezone.utc).isoformat()
     await db.orders.update_one({'id': order_id}, {'$set': update_fields})
-    
+
+    # La Abeja vuelve a estar disponible al cerrar el pedido (entregado o cancelado)
+    if status_update.status in ('delivered', 'cancelled') and order.get('driver_id'):
+        await release_driver(order.get('driver_id'))
+
     return {'message': 'Order status updated', 'status': status_update.status}
 
 @api_router.post("/orders/{order_id}/assign-driver")
@@ -567,6 +573,16 @@ async def log_assignment(order_id, driver, action, actor, distance_km=None, reas
         'reason': reason,
         'created_at': datetime.now(timezone.utc).isoformat(),
     })
+
+async def release_driver(driver_id):
+    """Libera al repartidor (vuelve a 'available') tras entregar o devolver el pedido a la cola."""
+    if not driver_id:
+        return
+    await db.users.update_one(
+        {'id': driver_id, 'role': 'driver'},
+        {'$set': {'is_available': True, 'status': 'available',
+                  'updated_at': datetime.now(timezone.utc).isoformat()}}
+    )
 
 def _history_query(action=None, driver_id=None, date_from=None, date_to=None):
     """Construye el filtro de MongoDB para el historial de asignaciones."""
@@ -623,7 +639,8 @@ async def update_availability(is_available: bool, current_user: dict = Depends(g
 
     await db.users.update_one(
         {'id': current_user['id']},
-        {'$set': {'is_available': is_available}}
+        {'$set': {'is_available': is_available,
+                  'status': 'available' if is_available else 'offline'}}
     )
 
     returned = 0
@@ -1206,11 +1223,22 @@ class AssignNearestRequest(BaseModel):
     lng: float
     max_km: Optional[float] = None
 
+ASSIGN_MAX_ATTEMPTS = 3
+
 @api_router.post("/orders/{order_id}/assign-nearest")
 async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
                                 current_user: dict = Depends(get_current_user)):
-    """Auto-asigna el repartidor disponible más cercano al punto dado (recogida del pedido).
-    Solo admin o negocio. Marca el pedido como 'accepted' y guarda el driver_id."""
+    """Auto-asigna atómicamente el repartidor disponible más cercano al punto de recogida.
+    Solo admin o negocio.
+
+    Algoritmo (equivalente a SELECT ... FOR UPDATE de SQL, sobre MongoDB):
+    - Hasta ASSIGN_MAX_ATTEMPTS (3) intentos.
+    - En cada intento busca el más cercano disponible ($geoNear), excluyendo a los ya descartados.
+    - Reclama al candidato con find_one_and_update atómico (is_available True -> False, status 'busy').
+      Si otro proceso lo cogió primero, lo excluye y reintenta con el siguiente.
+    - Reclama el pedido también de forma atómica (driver_id None -> driver). Si ya tenía repartidor,
+      libera de nuevo a la Abeja y aborta.
+    """
     if current_user['role'] not in ('admin', 'business'):
         raise HTTPException(status_code=403, detail="Admin or business access required")
 
@@ -1220,34 +1248,64 @@ async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
     if order.get('driver_id'):
         raise HTTPException(status_code=400, detail="Order already has a driver assigned")
 
-    geo_near = {
-        'near': {'type': 'Point', 'coordinates': [req.lng, req.lat]},
-        'distanceField': 'distance_m',
-        'spherical': True,
-        'query': {'role': 'driver', 'is_available': True},
-    }
-    if req.max_km:
-        geo_near['maxDistance'] = req.max_km * 1000
-    pipeline = [{'$geoNear': geo_near}, {'$limit': 1}, {'$project': {'_id': 0, 'password_hash': 0}}]
-    nearest = await db.users.aggregate(pipeline).to_list(1)
-    if not nearest:
+    excluded_driver_ids: List[str] = []
+    chosen = None
+    for _ in range(ASSIGN_MAX_ATTEMPTS):
+        query = {'role': 'driver', 'is_available': True}
+        if excluded_driver_ids:
+            query['id'] = {'$nin': excluded_driver_ids}
+        geo_near = {
+            'near': {'type': 'Point', 'coordinates': [req.lng, req.lat]},
+            'distanceField': 'distance_m',
+            'spherical': True,
+            'query': query,
+        }
+        if req.max_km:
+            geo_near['maxDistance'] = req.max_km * 1000
+        pipeline = [{'$geoNear': geo_near}, {'$limit': 1}, {'$project': {'_id': 0, 'password_hash': 0}}]
+        nearest = await db.users.aggregate(pipeline).to_list(1)
+        if not nearest:
+            break  # no quedan candidatos disponibles
+        candidate = nearest[0]
+        # Reclamo atómico: solo tiene éxito si la Abeja sigue disponible (evita carreras)
+        claimed = await db.users.find_one_and_update(
+            {'id': candidate['id'], 'role': 'driver', 'is_available': True},
+            {'$set': {'is_available': False, 'status': 'busy',
+                      'updated_at': datetime.now(timezone.utc).isoformat()}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not claimed:
+            # Otro proceso la cogió primero -> excluir y reintentar
+            excluded_driver_ids.append(candidate['id'])
+            continue
+        chosen = candidate
+        break
+
+    if not chosen:
         raise HTTPException(status_code=404, detail="No available drivers nearby")
 
-    driver = nearest[0]
-    await db.orders.update_one(
-        {'id': order_id},
-        {'$set': {'driver_id': driver['id'], 'status': 'accepted',
-                  'updated_at': datetime.now(timezone.utc).isoformat()}}
+    # Reclamo atómico del pedido: solo si sigue sin repartidor
+    order_claim = await db.orders.find_one_and_update(
+        {'id': order_id, 'driver_id': None},
+        {'$set': {'driver_id': chosen['id'], 'status': 'accepted',
+                  'updated_at': datetime.now(timezone.utc).isoformat()}},
+        return_document=ReturnDocument.AFTER,
     )
-    distance_km = round(driver.get('distance_m', 0) / 1000, 2)
-    await log_assignment(order_id, driver, 'assigned', current_user, distance_km=distance_km)
+    if not order_claim:
+        # El pedido fue asignado por otro mientras tanto -> liberar a la Abeja reclamada
+        await release_driver(chosen['id'])
+        raise HTTPException(status_code=400, detail="Order already has a driver assigned")
+
+    distance_km = round(chosen.get('distance_m', 0) / 1000, 2)
+    await log_assignment(order_id, chosen, 'assigned', current_user, distance_km=distance_km)
     return {
         'message': 'Nearest driver assigned',
         'order_id': order_id,
+        'attempts_excluded': len(excluded_driver_ids),
         'driver': {
-            'id': driver['id'],
-            'name': driver.get('name', 'Abeja'),
-            'vehicle_type': driver.get('vehicle_type'),
+            'id': chosen['id'],
+            'name': chosen.get('name', 'Abeja'),
+            'vehicle_type': chosen.get('vehicle_type'),
             'distance_km': distance_km,
         }
     }
@@ -1269,6 +1327,8 @@ async def return_order_to_queue(order_id: str, current_user: dict = Depends(get_
         {'id': order_id},
         {'$set': {'driver_id': None, 'status': 'pending', 'updated_at': datetime.now(timezone.utc).isoformat()}}
     )
+    # La Abeja queda libre de nuevo para recibir otro pedido
+    await release_driver(prev_driver_id)
     await log_assignment(order_id, prev_driver, 'returned', current_user, reason='manual_return')
     return {'message': 'Order returned to queue', 'order_id': order_id}
 
