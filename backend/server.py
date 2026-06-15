@@ -178,6 +178,8 @@ class City(BaseModel):
 
 # Radio de zona de trabajo (km) para el geofencing de repartidores
 CITY_ZONE_RADIUS_KM = 10
+# Máx. intentos de la asignación atómica del repartidor (anti condición de carrera)
+ASSIGN_MAX_ATTEMPTS = 3
 
 def haversine_km(lat1, lng1, lat2, lng2):
     """Distancia en km entre dos puntos (lat/lng)."""
@@ -584,6 +586,84 @@ async def release_driver(driver_id):
                   'updated_at': datetime.now(timezone.utc).isoformat()}}
     )
 
+async def release_driver(driver_id):
+    """Libera al repartidor (vuelve a 'available') tras entregar o devolver el pedido a la cola."""
+    if not driver_id:
+        return
+    await db.users.update_one(
+        {'id': driver_id, 'role': 'driver'},
+        {'$set': {'is_available': True, 'status': 'available',
+                  'updated_at': datetime.now(timezone.utc).isoformat()}}
+    )
+
+async def _atomic_claim_nearest(order_id, lat, lng, max_km, actor, reason=None):
+    """Núcleo de la asignación atómica del repartidor más cercano (anti condición de carrera).
+    Hasta ASSIGN_MAX_ATTEMPTS intentos, excluyendo Abejas que otro proceso cogió primero.
+    Devuelve dict {driver, distance_km, excluded} si asignó, o None si no fue posible."""
+    excluded_driver_ids: List[str] = []
+    chosen = None
+    for _ in range(ASSIGN_MAX_ATTEMPTS):
+        query = {'role': 'driver', 'is_available': True}
+        if excluded_driver_ids:
+            query['id'] = {'$nin': excluded_driver_ids}
+        geo_near = {
+            'near': {'type': 'Point', 'coordinates': [lng, lat]},
+            'distanceField': 'distance_m',
+            'spherical': True,
+            'query': query,
+        }
+        if max_km:
+            geo_near['maxDistance'] = max_km * 1000
+        pipeline = [{'$geoNear': geo_near}, {'$limit': 1}, {'$project': {'_id': 0, 'password_hash': 0}}]
+        nearest = await db.users.aggregate(pipeline).to_list(1)
+        if not nearest:
+            break
+        candidate = nearest[0]
+        claimed = await db.users.find_one_and_update(
+            {'id': candidate['id'], 'role': 'driver', 'is_available': True},
+            {'$set': {'is_available': False, 'status': 'busy',
+                      'updated_at': datetime.now(timezone.utc).isoformat()}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not claimed:
+            excluded_driver_ids.append(candidate['id'])
+            continue
+        chosen = candidate
+        break
+    if not chosen:
+        return None
+    order_claim = await db.orders.find_one_and_update(
+        {'id': order_id, 'driver_id': None},
+        {'$set': {'driver_id': chosen['id'], 'status': 'accepted',
+                  'updated_at': datetime.now(timezone.utc).isoformat()}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not order_claim:
+        await release_driver(chosen['id'])
+        return None
+    distance_km = round(chosen.get('distance_m', 0) / 1000, 2)
+    await log_assignment(order_id, chosen, 'assigned', actor, distance_km=distance_km, reason=reason)
+    return {'driver': chosen, 'distance_km': distance_km, 'excluded': len(excluded_driver_ids)}
+
+async def auto_assign_order(order_id):
+    """Despacho automático: intenta asignar la Abeja más cercana en cuanto el pedido está pagado.
+    Usa el centro de la ciudad del pedido como punto de recogida y respeta el radio de zona.
+    Silencioso: si no hay ciudad o no hay Abejas libres, el pedido queda en la cola (pending)."""
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order or order.get('driver_id') or order.get('status') != 'pending':
+        return None
+    if order.get('payment_status') != 'paid':
+        return None
+    city_id = order.get('city_id')
+    if not city_id:
+        return None  # sin ciudad no podemos geolocalizar la recogida -> queda en la cola
+    city = await db.cities.find_one({'id': city_id}, {'_id': 0, 'lat': 1, 'lng': 1})
+    if not city:
+        return None
+    return await _atomic_claim_nearest(
+        order_id, city['lat'], city['lng'], CITY_ZONE_RADIUS_KM, actor=None, reason='auto_dispatch'
+    )
+
 def _history_query(action=None, driver_id=None, date_from=None, date_to=None):
     """Construye el filtro de MongoDB para el historial de asignaciones."""
     q = {}
@@ -787,6 +867,8 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
             {'id': transaction['order_id']},
             {'$set': {'payment_status': 'paid'}}
         )
+        # Despacho automático: asigna la Abeja más cercana al instante
+        await auto_assign_order(transaction['order_id'])
     
     return {
         'session_id': session_id,
@@ -821,6 +903,8 @@ async def stripe_webhook(request: Request):
                     {'id': transaction['order_id']},
                     {'$set': {'payment_status': 'paid'}}
                 )
+                # Despacho automático: asigna la Abeja más cercana al instante
+                await auto_assign_order(transaction['order_id'])
         
         return {'status': 'success'}
     except Exception as e:
@@ -1223,8 +1307,6 @@ class AssignNearestRequest(BaseModel):
     lng: float
     max_km: Optional[float] = None
 
-ASSIGN_MAX_ATTEMPTS = 3
-
 @api_router.post("/orders/{order_id}/assign-nearest")
 async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
                                 current_user: dict = Depends(get_current_user)):
@@ -1248,65 +1330,20 @@ async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
     if order.get('driver_id'):
         raise HTTPException(status_code=400, detail="Order already has a driver assigned")
 
-    excluded_driver_ids: List[str] = []
-    chosen = None
-    for _ in range(ASSIGN_MAX_ATTEMPTS):
-        query = {'role': 'driver', 'is_available': True}
-        if excluded_driver_ids:
-            query['id'] = {'$nin': excluded_driver_ids}
-        geo_near = {
-            'near': {'type': 'Point', 'coordinates': [req.lng, req.lat]},
-            'distanceField': 'distance_m',
-            'spherical': True,
-            'query': query,
-        }
-        if req.max_km:
-            geo_near['maxDistance'] = req.max_km * 1000
-        pipeline = [{'$geoNear': geo_near}, {'$limit': 1}, {'$project': {'_id': 0, 'password_hash': 0}}]
-        nearest = await db.users.aggregate(pipeline).to_list(1)
-        if not nearest:
-            break  # no quedan candidatos disponibles
-        candidate = nearest[0]
-        # Reclamo atómico: solo tiene éxito si la Abeja sigue disponible (evita carreras)
-        claimed = await db.users.find_one_and_update(
-            {'id': candidate['id'], 'role': 'driver', 'is_available': True},
-            {'$set': {'is_available': False, 'status': 'busy',
-                      'updated_at': datetime.now(timezone.utc).isoformat()}},
-            return_document=ReturnDocument.AFTER,
-        )
-        if not claimed:
-            # Otro proceso la cogió primero -> excluir y reintentar
-            excluded_driver_ids.append(candidate['id'])
-            continue
-        chosen = candidate
-        break
-
-    if not chosen:
+    result = await _atomic_claim_nearest(order_id, req.lat, req.lng, req.max_km, current_user)
+    if not result:
         raise HTTPException(status_code=404, detail="No available drivers nearby")
 
-    # Reclamo atómico del pedido: solo si sigue sin repartidor
-    order_claim = await db.orders.find_one_and_update(
-        {'id': order_id, 'driver_id': None},
-        {'$set': {'driver_id': chosen['id'], 'status': 'accepted',
-                  'updated_at': datetime.now(timezone.utc).isoformat()}},
-        return_document=ReturnDocument.AFTER,
-    )
-    if not order_claim:
-        # El pedido fue asignado por otro mientras tanto -> liberar a la Abeja reclamada
-        await release_driver(chosen['id'])
-        raise HTTPException(status_code=400, detail="Order already has a driver assigned")
-
-    distance_km = round(chosen.get('distance_m', 0) / 1000, 2)
-    await log_assignment(order_id, chosen, 'assigned', current_user, distance_km=distance_km)
+    chosen = result['driver']
     return {
         'message': 'Nearest driver assigned',
         'order_id': order_id,
-        'attempts_excluded': len(excluded_driver_ids),
+        'attempts_excluded': result['excluded'],
         'driver': {
             'id': chosen['id'],
             'name': chosen.get('name', 'Abeja'),
             'vehicle_type': chosen.get('vehicle_type'),
-            'distance_km': distance_km,
+            'distance_km': result['distance_km'],
         }
     }
 
