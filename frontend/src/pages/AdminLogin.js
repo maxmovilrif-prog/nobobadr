@@ -8,15 +8,18 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { ShieldCheck, Loader2, KeyRound, Lock } from 'lucide-react';
 
-// Adds a noindex/nofollow meta tag while this private page is mounted
+// Adds a noindex/nofollow meta tag + private title while this page is mounted
 function useNoIndex() {
   useEffect(() => {
+    const prevTitle = document.title;
+    document.title = 'Nuboexpress - Private Control';
     const meta = document.createElement('meta');
     meta.name = 'robots';
     meta.content = 'noindex, nofollow, noarchive';
     document.head.appendChild(meta);
     return () => {
       document.head.removeChild(meta);
+      document.title = prevTitle;
     };
   }, []);
 }

@@ -303,13 +303,15 @@ export default function AdminDashboard() {
     }
   };
 
-  // Privacy: keep the admin panel out of search engines while mounted
+  // Privacy: keep the admin panel out of search engines + private tab title while mounted
   useEffect(() => {
+    const prevTitle = document.title;
+    document.title = 'Nuboexpress - Private Control';
     const meta = document.createElement('meta');
     meta.name = 'robots';
     meta.content = 'noindex, nofollow, noarchive';
     document.head.appendChild(meta);
-    return () => { document.head.removeChild(meta); };
+    return () => { document.head.removeChild(meta); document.title = prevTitle; };
   }, []);
 
   // Initialize Leaflet map manually (StrictMode-safe with proper teardown)
