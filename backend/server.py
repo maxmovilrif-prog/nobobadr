@@ -643,6 +643,7 @@ async def _atomic_claim_nearest(order_id, lat, lng, max_km, actor, reason=None):
         return None
     distance_km = round(chosen.get('distance_m', 0) / 1000, 2)
     await log_assignment(order_id, chosen, 'assigned', actor, distance_km=distance_km, reason=reason)
+    await notify_driver_new_order(chosen['id'], order_claim)
     return {'driver': chosen, 'distance_km': distance_km, 'excluded': len(excluded_driver_ids)}
 
 async def auto_assign_order(order_id):
@@ -1679,6 +1680,66 @@ class ConnectionManager:
         return self.driver_locations.get(order_id)
 
 manager = ConnectionManager()
+
+class DriverNotifier:
+    """Canal WebSocket por repartidor para avisos en tiempo real (pedido auto-asignado, etc.)."""
+    def __init__(self):
+        self.connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, driver_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.setdefault(driver_id, []).append(websocket)
+        logger.info(f"Driver WS connected: {driver_id}")
+
+    def disconnect(self, driver_id: str, websocket: WebSocket):
+        conns = self.connections.get(driver_id)
+        if conns and websocket in conns:
+            conns.remove(websocket)
+            if not conns:
+                del self.connections[driver_id]
+        logger.info(f"Driver WS disconnected: {driver_id}")
+
+    async def notify(self, driver_id: str, message: dict):
+        for ws in list(self.connections.get(driver_id, [])):
+            try:
+                await ws.send_json(message)
+            except Exception as e:
+                logger.error(f"Error notifying driver {driver_id}: {e}")
+
+driver_notifier = DriverNotifier()
+
+async def notify_driver_new_order(driver_id: str, order: dict):
+    """Avisa a la Abeja de un pedido recién asignado (manual o automático)."""
+    if not driver_id or not order:
+        return
+    biz = await db.businesses.find_one(
+        {'id': order.get('business_id')}, {'_id': 0, 'name': 1, 'address': 1}
+    )
+    await driver_notifier.notify(driver_id, {
+        'type': 'new_order',
+        'order_id': order.get('id'),
+        'business_name': (biz or {}).get('name', 'Negocio'),
+        'pickup_address': (biz or {}).get('address'),
+        'delivery_address': order.get('delivery_address'),
+        'city_name': order.get('city_name'),
+        'total_amount': order.get('total_amount'),
+        'status': order.get('status'),
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+    })
+
+@app.websocket("/ws/driver/{driver_id}")
+async def websocket_driver_endpoint(websocket: WebSocket, driver_id: str):
+    """Canal persistente de avisos para una Abeja. Recibe {type:'new_order', ...} al asignarle pedidos."""
+    await driver_notifier.connect(driver_id, websocket)
+    try:
+        while True:
+            # Mantiene viva la conexión (ping/keepalive del cliente)
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        driver_notifier.disconnect(driver_id, websocket)
+    except Exception as e:
+        logger.error(f"Driver WS error: {e}")
+        driver_notifier.disconnect(driver_id, websocket)
 
 @app.websocket("/ws/tracking/{order_id}")
 async def websocket_tracking_endpoint(websocket: WebSocket, order_id: str):

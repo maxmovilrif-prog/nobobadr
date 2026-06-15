@@ -23,6 +23,55 @@ export default function DriverDashboard() {
   const wsConnections = useRef({});
   const geoWatchId = useRef(null);
   const adminLocIntervalRef = useRef(null);
+  const notifyWsRef = useRef(null);
+  const notifyPingRef = useRef(null);
+
+  // Canal de avisos en tiempo real: la Abeja recibe pedidos auto-asignados sin refrescar
+  useEffect(() => {
+    if (!user?.id) return;
+    const wsUrl = API.replace('https', 'wss').replace('http', 'ws');
+    let closedByUs = false;
+
+    const connect = () => {
+      const ws = new WebSocket(`${wsUrl}/ws/driver/${user.id}`);
+      notifyWsRef.current = ws;
+
+      ws.onopen = () => {
+        notifyPingRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) ws.send('ping');
+        }, 25000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_order') {
+            toast.success(`🐝 Nuevo pedido asignado · ${data.business_name || 'Negocio'}`, {
+              description: `${data.city_name ? data.city_name + ' · ' : ''}${Number(data.total_amount || 0).toFixed(2)} €`,
+              duration: 8000,
+            });
+            fetchMyOrders();
+            fetchAvailableOrders();
+          }
+        } catch (e) { /* noop */ }
+      };
+
+      ws.onclose = () => {
+        if (notifyPingRef.current) { clearInterval(notifyPingRef.current); notifyPingRef.current = null; }
+        if (!closedByUs) setTimeout(connect, 4000); // reconexión automática
+      };
+
+      ws.onerror = () => { ws.close(); };
+    };
+
+    connect();
+    return () => {
+      closedByUs = true;
+      if (notifyPingRef.current) clearInterval(notifyPingRef.current);
+      if (notifyWsRef.current) notifyWsRef.current.close();
+    };
+    // eslint-disable-next-line
+  }, [user?.id]);
 
   useEffect(() => {
     const loadCities = async () => {
