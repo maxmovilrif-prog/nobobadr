@@ -159,7 +159,7 @@ export default function CustomerDashboard() {
     if (!quotePrefill) return;
     setExpressLoading(true);
     try {
-      await axios.post(`${API}/orders/express`, {
+      const orderRes = await axios.post(`${API}/orders/express`, {
         origin_name: quotePrefill.originName,
         origin_lat: quotePrefill.originLat,
         origin_lng: quotePrefill.originLng,
@@ -175,12 +175,17 @@ export default function CustomerDashboard() {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success('¡Pedido exprés creado! Buscando una Abeja cercana...');
-      setQuotePrefill(null);
-      fetchOrders();
+      const orderId = orderRes.data.id;
+      // Crear sesión de pago Stripe y redirigir al checkout
+      const paymentResponse = await axios.post(
+        `${API}/payments/create-checkout?order_id=${orderId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}`, Origin: window.location.origin } }
+      );
+      localStorage.removeItem('nubo_quote_prefill');
+      window.location.href = paymentResponse.data.url;
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Error al crear el pedido exprés');
-    } finally {
       setExpressLoading(false);
     }
   };

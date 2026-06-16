@@ -108,6 +108,7 @@ class Business(BaseModel):
     rating: float = 0.0
     delivery_time: str
     is_open: bool = True
+    bank_account: Optional[str] = None  # IBAN / cuenta para el pago de comisiones
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class BusinessCreate(BaseModel):
@@ -118,6 +119,7 @@ class BusinessCreate(BaseModel):
     phone: str
     image_url: str
     delivery_time: str
+    bank_account: Optional[str] = None
 
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -203,6 +205,19 @@ class City(BaseModel):
     name: str
     lat: float
     lng: float
+    country: str = "ES"
+
+class CityCreate(BaseModel):
+    name: str
+    lat: float
+    lng: float
+    country: str = "ES"
+
+class CityUpdate(BaseModel):
+    name: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    country: Optional[str] = None
 
 # Radio de zona de trabajo (km) para el geofencing de repartidores
 CITY_ZONE_RADIUS_KM = 10
@@ -724,14 +739,19 @@ async def auto_assign_order(order_id):
         return None
     if order.get('payment_status') != 'paid':
         return None
-    city_id = order.get('city_id')
-    if not city_id:
-        return None  # sin ciudad no podemos geolocalizar la recogida -> queda en la cola
-    city = await db.cities.find_one({'id': city_id}, {'_id': 0, 'lat': 1, 'lng': 1})
-    if not city:
-        return None
+    # Punto de recogida: para exprés usamos el origen real (A); para marketplace, el centro de la ciudad.
+    if order.get('order_type') == 'express' and order.get('origin_lat') is not None and order.get('origin_lng') is not None:
+        pickup_lat, pickup_lng = order['origin_lat'], order['origin_lng']
+    else:
+        city_id = order.get('city_id')
+        if not city_id:
+            return None  # sin ciudad no podemos geolocalizar la recogida -> queda en la cola
+        city = await db.cities.find_one({'id': city_id}, {'_id': 0, 'lat': 1, 'lng': 1})
+        if not city:
+            return None
+        pickup_lat, pickup_lng = city['lat'], city['lng']
     return await _atomic_claim_nearest(
-        order_id, city['lat'], city['lng'], CITY_ZONE_RADIUS_KM, actor=None, reason='auto_dispatch'
+        order_id, pickup_lat, pickup_lng, CITY_ZONE_RADIUS_KM, actor=None, reason='auto_dispatch'
     )
 
 def _history_query(action=None, driver_id=None, date_from=None, date_to=None):
@@ -755,6 +775,53 @@ async def list_cities(current_user: dict = Depends(get_current_user)):
     """Lista de ciudades/zonas disponibles."""
     cities = await db.cities.find({}, {'_id': 0}).sort('name', 1).to_list(1000)
     return {'cities': cities}
+
+@api_router.post("/admin/cities", response_model=City)
+async def admin_create_city(data: CityCreate, current_user: dict = Depends(get_current_user)):
+    """Crea una ciudad/zona operativa (admin)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="El nombre es obligatorio")
+    if await db.cities.find_one({'name': name}):
+        raise HTTPException(status_code=400, detail="Ya existe una ciudad con ese nombre")
+    city = City(name=name, lat=data.lat, lng=data.lng, country=data.country)
+    await db.cities.insert_one(city.model_dump())
+    return city
+
+@api_router.patch("/admin/cities/{city_id}", response_model=City)
+async def admin_update_city(city_id: str, data: CityUpdate, current_user: dict = Depends(get_current_user)):
+    """Edita una ciudad/zona operativa (admin)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    city = await db.cities.find_one({'id': city_id}, {'_id': 0})
+    if not city:
+        raise HTTPException(status_code=404, detail="City not found")
+    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    if 'name' in updates:
+        updates['name'] = updates['name'].strip()
+        if updates['name'] != city.get('name') and await db.cities.find_one({'name': updates['name']}):
+            raise HTTPException(status_code=400, detail="Ya existe una ciudad con ese nombre")
+    if updates:
+        await db.cities.update_one({'id': city_id}, {'$set': updates})
+    return City(**{**city, **updates})
+
+@api_router.delete("/admin/cities/{city_id}")
+async def admin_delete_city(city_id: str, current_user: dict = Depends(get_current_user)):
+    """Elimina una ciudad/zona operativa (admin). Bloquea si hay pedidos activos en ella."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    city = await db.cities.find_one({'id': city_id}, {'_id': 0})
+    if not city:
+        raise HTTPException(status_code=404, detail="City not found")
+    active = await db.orders.count_documents(
+        {'city_id': city_id, 'status': {'$nin': ['delivered', 'cancelled']}}
+    )
+    if active > 0:
+        raise HTTPException(status_code=400, detail=f"No se puede eliminar: hay {active} pedido(s) activo(s) en esta ciudad")
+    await db.cities.delete_one({'id': city_id})
+    return {'message': 'City deleted', 'id': city_id}
 
 @api_router.get("/drivers/available-orders", response_model=List[Order])
 async def get_available_orders(current_user: dict = Depends(get_current_user)):
@@ -865,9 +932,12 @@ async def create_checkout_session(order_id: str, request: Request, current_user:
     success_url = f"{origin}/order-success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin}/orders"
     
+    # Moneda del pedido (exprés puede ser MAD; marketplace por defecto EUR)
+    currency = (order.get('currency') or 'eur').lower()
+
     checkout_request = CheckoutSessionRequest(
         amount=float(order['total_amount']),
-        currency="eur",
+        currency=currency,
         success_url=success_url,
         cancel_url=cancel_url,
         metadata={
@@ -884,7 +954,7 @@ async def create_checkout_session(order_id: str, request: Request, current_user:
         order_id=order_id,
         user_id=current_user['id'],
         amount=float(order['total_amount']),
-        currency="eur",
+        currency=currency,
         payment_status="pending",
         metadata={'order_id': order_id}
     )
