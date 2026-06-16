@@ -168,5 +168,30 @@
     "order_details": "Detalles del Pedido",
     "delivery_address": "Dirección de Entrega",
     "contact_driver": "Contactar Conductor"
+  },
+  "publicTracking": {
+    "title": "Seguimiento en vivo",
+    "subtitle": "Marruecos — España",
+    "searchLabel": "Buscar por número de pedido",
+    "searchPlaceholder": "Ej: ORD-4821",
+    "from": "Origen",
+    "to": "Destino",
+    "distance": "Distancia",
+    "duration": "Tiempo estimado",
+    "cost": "Coste",
+    "driver": "Conductor",
+    "lastUpdate": "Última actualización",
+    "noOrder": "Introduce un número de pedido",
+    "loading": "Cargando...",
+    "notFound": "Pedido no encontrado",
+    "search": "Buscar",
+    "back": "Volver",
+    "currency": "Divisa",
+    "statuses": {
+      "pending": "Pendiente",
+      "assigned": "Asignado",
+      "in_transit": "En tránsito",
+      "delivered": "Entregado"
+    }
   }
 }

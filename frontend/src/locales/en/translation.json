@@ -168,5 +168,30 @@
     "order_details": "Order Details",
     "delivery_address": "Delivery Address",
     "contact_driver": "Contact Driver"
+  },
+  "publicTracking": {
+    "title": "Live tracking",
+    "subtitle": "Morocco — Spain",
+    "searchLabel": "Search by order number",
+    "searchPlaceholder": "e.g. ORD-4821",
+    "from": "Origin",
+    "to": "Destination",
+    "distance": "Distance",
+    "duration": "Estimated time",
+    "cost": "Cost",
+    "driver": "Driver",
+    "lastUpdate": "Last update",
+    "noOrder": "Enter an order number",
+    "loading": "Loading...",
+    "notFound": "Order not found",
+    "search": "Search",
+    "back": "Back",
+    "currency": "Currency",
+    "statuses": {
+      "pending": "Pending",
+      "assigned": "Assigned",
+      "in_transit": "In transit",
+      "delivered": "Delivered"
+    }
   }
 }

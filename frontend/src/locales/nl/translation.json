@@ -168,5 +168,30 @@
     "order_details": "Bestelgegevens",
     "delivery_address": "Afleveradres",
     "contact_driver": "Contact chauffeur"
+  },
+  "publicTracking": {
+    "title": "Live volgen",
+    "subtitle": "Marokko — Spanje",
+    "searchLabel": "Zoeken op bestelnummer",
+    "searchPlaceholder": "Bijv. ORD-4821",
+    "from": "Herkomst",
+    "to": "Bestemming",
+    "distance": "Afstand",
+    "duration": "Geschatte tijd",
+    "cost": "Kosten",
+    "driver": "Chauffeur",
+    "lastUpdate": "Laatste update",
+    "noOrder": "Voer een bestelnummer in",
+    "loading": "Laden...",
+    "notFound": "Bestelling niet gevonden",
+    "search": "Zoeken",
+    "back": "Terug",
+    "currency": "Valuta",
+    "statuses": {
+      "pending": "In behandeling",
+      "assigned": "Toegewezen",
+      "in_transit": "Onderweg",
+      "delivered": "Geleverd"
+    }
   }
 }

@@ -168,5 +168,30 @@
     "order_details": "Bestelldetails",
     "delivery_address": "Lieferadresse",
     "contact_driver": "Fahrer kontaktieren"
+  },
+  "publicTracking": {
+    "title": "Live-Verfolgung",
+    "subtitle": "Marokko — Spanien",
+    "searchLabel": "Nach Bestellnummer suchen",
+    "searchPlaceholder": "z. B. ORD-4821",
+    "from": "Herkunft",
+    "to": "Ziel",
+    "distance": "Entfernung",
+    "duration": "Geschätzte Zeit",
+    "cost": "Kosten",
+    "driver": "Fahrer",
+    "lastUpdate": "Letzte Aktualisierung",
+    "noOrder": "Geben Sie eine Bestellnummer ein",
+    "loading": "Laden...",
+    "notFound": "Bestellung nicht gefunden",
+    "search": "Suchen",
+    "back": "Zurück",
+    "currency": "Währung",
+    "statuses": {
+      "pending": "Ausstehend",
+      "assigned": "Zugewiesen",
+      "in_transit": "Unterwegs",
+      "delivered": "Geliefert"
+    }
   }
 }

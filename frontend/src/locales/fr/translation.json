@@ -168,5 +168,30 @@
     "order_details": "Détails de la commande",
     "delivery_address": "Adresse de livraison",
     "contact_driver": "Contacter le conducteur"
+  },
+  "publicTracking": {
+    "title": "Suivi en direct",
+    "subtitle": "Maroc — Espagne",
+    "searchLabel": "Rechercher par numéro de commande",
+    "searchPlaceholder": "Ex : ORD-4821",
+    "from": "Origine",
+    "to": "Destination",
+    "distance": "Distance",
+    "duration": "Temps estimé",
+    "cost": "Coût",
+    "driver": "Conducteur",
+    "lastUpdate": "Dernière mise à jour",
+    "noOrder": "Saisissez un numéro de commande",
+    "loading": "Chargement...",
+    "notFound": "Commande introuvable",
+    "search": "Rechercher",
+    "back": "Retour",
+    "currency": "Devise",
+    "statuses": {
+      "pending": "En attente",
+      "assigned": "Assigné",
+      "in_transit": "En transit",
+      "delivered": "Livré"
+    }
   }
 }

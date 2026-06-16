@@ -168,5 +168,30 @@
     "order_details": "Detalhes da Encomenda",
     "delivery_address": "Endereço de Entrega",
     "contact_driver": "Contactar Motorista"
+  },
+  "publicTracking": {
+    "title": "Rastreamento ao vivo",
+    "subtitle": "Marrocos — Espanha",
+    "searchLabel": "Pesquisar por número do pedido",
+    "searchPlaceholder": "Ex: ORD-4821",
+    "from": "Origem",
+    "to": "Destino",
+    "distance": "Distância",
+    "duration": "Tempo estimado",
+    "cost": "Custo",
+    "driver": "Motorista",
+    "lastUpdate": "Última atualização",
+    "noOrder": "Insira um número de pedido",
+    "loading": "Carregando...",
+    "notFound": "Pedido não encontrado",
+    "search": "Pesquisar",
+    "back": "Voltar",
+    "currency": "Moeda",
+    "statuses": {
+      "pending": "Pendente",
+      "assigned": "Atribuído",
+      "in_transit": "Em trânsito",
+      "delivered": "Entregue"
+    }
   }
 }

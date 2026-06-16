@@ -168,5 +168,30 @@
     "order_details": "تفاصيل الطلب",
     "delivery_address": "عنوان التسليم",
     "contact_driver": "اتصل بالسائق"
+  },
+  "publicTracking": {
+    "title": "تتبع الشحنات الحية",
+    "subtitle": "المغرب — إسبانيا",
+    "searchLabel": "ابحث برقم الطلب",
+    "searchPlaceholder": "مثال: ORD-4821",
+    "from": "من",
+    "to": "إلى",
+    "distance": "المسافة",
+    "duration": "الوقت المقدر",
+    "cost": "التكلفة",
+    "driver": "السائق",
+    "lastUpdate": "آخر تحديث",
+    "noOrder": "أدخل رقم الطلب للبحث",
+    "loading": "جاري التحميل...",
+    "notFound": "الطلب غير موجود",
+    "search": "بحث",
+    "back": "رجوع",
+    "currency": "العملة",
+    "statuses": {
+      "pending": "قيد الانتظار",
+      "assigned": "مُعيَّن",
+      "in_transit": "في الطريق",
+      "delivered": "مُسلَّم"
+    }
   }
 }
