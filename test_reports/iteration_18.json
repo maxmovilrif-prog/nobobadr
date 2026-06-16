@@ -1,0 +1,31 @@
+{
+  "summary": "Validado end-to-end el nuevo POST /api/orders/express y el flujo del banner 'Pedir esta entrega' en CustomerDashboard. Backend: 7/7 pytest passed (auth obligatoria; driver y business reciben 403; customer crea correctamente con order_type='express', business_id=null, items=[], total_amount=fee, origin/destination lat-lng, vehicle_type, distance_km, eta_mins, currency, status='pending'; city_name resuelto desde origin_city_id válido; null cuando inválido o ausente; el pedido aparece en GET /api/orders del cliente). Frontend: login como cliente OK; inyección de nubo_quote_prefill con originLat/originLng/destLat/destLng provoca el banner quote-prefill-banner con texto exacto 'Solicitud de entrega: Tánger → Madrid · Moto · 620 km · 45 min · 12.5 EUR · Dirección de entrega precargada abajo.'; localStorage.nubo_quote_prefill se elimina tras consumo (one-shot); botón quote-prefill-order-btn está visible y habilitado; al pulsarlo se llama POST /api/orders/express, aparece toast verde '¡Pedido exprés creado! Buscando una Abeja cercana...', el banner desaparece (quotePrefill→null) y fetchOrders refresca la lista (express delta +1, de 4 a 5). Pedido creado en BD con todos los campos correctos: origin=Tánger, dest=Madrid, fee=12.5 EUR, vehicle=motorcycle, distance=620, eta=45, city_id=Tánger UUID, city_name='Tánger', business_id=null, items=[].",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_express_orders.py",
+    "/app/test_reports/pytest/express_orders_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "create_express_order valida correctamente el rol (403 para driver/business) y resuelve city_name desde origin_city_id via $project _id:0 — OK.",
+    "ExpressOrderCreate exige origin_name/lat/lng, destination_name/lat/lng, vehicle_type y fee; currency tiene default 'EUR'; distance_km/eta_mins son opcionales — buena validación con Pydantic.",
+    "CustomerDashboard.placeExpressOrder está guarded por if (!quotePrefill) y por disabled={!quotePrefill.originLat}, evitando POST con payload incompleto. Tras éxito: setQuotePrefill(null) + fetchOrders() — patrón correcto.",
+    "Observación: el botón quote-prefill-order-btn se deshabilita si !originLat pero no muestra mensaje al usuario explicando por qué — en el flujo real con /cotizar siempre debería venir originLat (porque DeliveryQuote.handleOrderThis guarda lat/lng desde Google Places). Si por algún motivo el origen fuera solo un texto sin lat/lng, el usuario vería el botón disabled sin pista. Sugerencia menor: tooltip o hint en ese caso.",
+    "Observación: no se valida que origin_city_id pertenezca al usuario ni que sea una ciudad activa; un UUID inexistente devuelve city_name=null silenciosamente (test cubierto). Aceptable para MVP, pero conviene loggear cuando una ciudad inválida llega.",
+    "Sin issues de _id de Mongo: el endpoint usa model_dump() del Order Pydantic y nunca toca el _id de inserción; respuesta limpia."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_express_orders.py (NUEVO — 7 tests pytest)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (banner + creación + cierre + refresh)"},
+  "test_credentials": "cliente@nubotest.com / Cliente123!  ·  bee.madrid@nuboexpress.com / Bee123!",
+  "seed_data_creation": "Se creó on-the-fly una cuenta business TEST_biz_express@nubotest.com / Business123! para validar el 403. Se crearon 4 pedidos exprés de prueba en BD del cliente cliente@nubotest.com (datos Tánger→Madrid, motorcycle, 12.5 EUR). Si se desea limpiar: borrar orders con order_type='express' y origin_name='Tánger' del customer_id correspondiente.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "El flujo Pedidos Exprés A→B está completamente operativo. POST /api/orders/express en server.py:500 y banner+placeExpressOrder en CustomerDashboard.js:158/391 funcionan tal como se especificó. Test suite pytest: /app/backend/tests/test_express_orders.py (reutilizable). El cálculo real desde /cotizar sigue dependiendo de Google Routes API habilitada en el proyecto — para validar el flujo natural (no por inyección de localStorage) hay que habilitar Routes API; la inyección de nubo_quote_prefill emula perfectamente el resultado."
+}

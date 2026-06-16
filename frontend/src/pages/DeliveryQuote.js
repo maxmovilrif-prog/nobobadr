@@ -72,7 +72,10 @@ export default function DeliveryQuote() {
     const origin = cities.find((c) => c.id === originId);
     const dest = cities.find((c) => c.id === destId);
     localStorage.setItem('nubo_quote_prefill', JSON.stringify({
-      originName: origin?.name, destName: dest?.name, destCityId: dest?.id,
+      originName: origin?.name, originCityId: origin?.id,
+      originLat: origin?.lat, originLng: origin?.lng,
+      destName: dest?.name, destCityId: dest?.id,
+      destLat: dest?.lat, destLng: dest?.lng,
       vehicle, fee: result.delivery_fee, currency: result.currency,
       distance: result.distance_km, eta: result.adjusted_eta_mins,
     }));

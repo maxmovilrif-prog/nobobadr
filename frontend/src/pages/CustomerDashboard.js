@@ -37,6 +37,7 @@ export default function CustomerDashboard() {
   });
   const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
   const [quotePrefill, setQuotePrefill] = useState(null);
+  const [expressLoading, setExpressLoading] = useState(false);
 
   // AI Smart Search
   const [aiQuery, setAiQuery] = useState('');
@@ -151,6 +152,36 @@ export default function CustomerDashboard() {
       ));
     } else {
       setCart(cart.filter(item => item.product_id !== productId));
+    }
+  };
+
+  const placeExpressOrder = async () => {
+    if (!quotePrefill) return;
+    setExpressLoading(true);
+    try {
+      await axios.post(`${API}/orders/express`, {
+        origin_name: quotePrefill.originName,
+        origin_lat: quotePrefill.originLat,
+        origin_lng: quotePrefill.originLng,
+        destination_name: quotePrefill.destName,
+        destination_lat: quotePrefill.destLat,
+        destination_lng: quotePrefill.destLng,
+        origin_city_id: quotePrefill.originCityId,
+        vehicle_type: quotePrefill.vehicle,
+        fee: quotePrefill.fee,
+        currency: quotePrefill.currency || 'EUR',
+        distance_km: quotePrefill.distance,
+        eta_mins: quotePrefill.eta,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('¡Pedido exprés creado! Buscando una Abeja cercana...');
+      setQuotePrefill(null);
+      fetchOrders();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Error al crear el pedido exprés');
+    } finally {
+      setExpressLoading(false);
     }
   };
 
@@ -374,9 +405,21 @@ export default function CustomerDashboard() {
                   </p>
                 </div>
               </div>
-              <Button data-testid="quote-prefill-dismiss" variant="ghost" size="sm" onClick={() => setQuotePrefill(null)}>
-                Cerrar
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  data-testid="quote-prefill-order-btn"
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+                  onClick={placeExpressOrder}
+                  disabled={expressLoading || !quotePrefill.originLat}
+                >
+                  {expressLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4" />}
+                  {expressLoading ? 'Creando...' : 'Pedir esta entrega'}
+                </Button>
+                <Button data-testid="quote-prefill-dismiss" variant="ghost" size="sm" onClick={() => setQuotePrefill(null)}>
+                  Cerrar
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

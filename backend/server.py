@@ -497,6 +497,47 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     await db.orders.insert_one(doc)
     return order
 
+@api_router.post("/orders/express", response_model=Order)
+async def create_express_order(order_data: ExpressOrderCreate, current_user: dict = Depends(get_current_user)):
+    """Crea un pedido exprés de mensajería punto a punto (A->B), sin negocio ni carrito."""
+    if current_user['role'] != 'customer':
+        raise HTTPException(status_code=403, detail="Only customers can create orders")
+
+    # Resolver la ciudad de origen (para el geofencing / auto-despacho)
+    city_name = None
+    city_id = order_data.origin_city_id
+    if city_id:
+        city = await db.cities.find_one({'id': city_id}, {'_id': 0, 'name': 1})
+        city_name = city['name'] if city else None
+
+    order = Order(
+        customer_id=current_user['id'],
+        business_id=None,
+        items=[],
+        total_amount=order_data.fee,
+        delivery_address=order_data.destination_name,
+        city_id=city_id,
+        city_name=city_name,
+        status='pending',
+        order_type='express',
+        vehicle_type=order_data.vehicle_type,
+        origin_name=order_data.origin_name,
+        origin_lat=order_data.origin_lat,
+        origin_lng=order_data.origin_lng,
+        destination_name=order_data.destination_name,
+        destination_lat=order_data.destination_lat,
+        destination_lng=order_data.destination_lng,
+        distance_km=order_data.distance_km,
+        eta_mins=order_data.eta_mins,
+        currency=order_data.currency,
+    )
+    doc = order.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+
+    await db.orders.insert_one(doc)
+    return order
+
 @api_router.get("/orders", response_model=List[Order])
 async def get_orders(current_user: dict = Depends(get_current_user)):
     query = {}
