@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Package, Truck, Store, Clock, Shield, MapPin } from 'lucide-react';
+import { Package, Truck, Store, Clock, Shield, MapPin, Calculator } from 'lucide-react';
 import Footer from '@/components/Footer';
 import LanguageSelector from '@/components/LanguageSelector';
 
@@ -71,6 +71,14 @@ export default function Landing() {
             </div>
             <div className="flex items-center gap-3">
               <LanguageSelector variant="outline" />
+              <Button
+                data-testid="nav-quote-btn"
+                variant="outline"
+                onClick={() => navigate('/cotizar')}
+                className="border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 gap-2 hidden sm:flex"
+              >
+                <Calculator className="w-4 h-4" /> {t('landing.cta_quote')}
+              </Button>
               <Button 
                 data-testid="nav-login-btn"
                 onClick={() => navigate('/auth')}
@@ -112,6 +120,14 @@ export default function Landing() {
                   {t('landing.cta_business')}
                 </Button>
               </div>
+              <button
+                data-testid="hero-quote-link"
+                onClick={() => navigate('/cotizar')}
+                className="mt-5 inline-flex items-center gap-2 text-emerald-700 font-medium hover:text-emerald-800 hover:gap-3 transition-all"
+              >
+                <Calculator className="w-5 h-5" /> {t('landing.cta_quote')}
+                <span aria-hidden>→</span>
+              </button>
             </div>
             <div className="animate-fade-in hidden lg:block">
               <div className="relative">

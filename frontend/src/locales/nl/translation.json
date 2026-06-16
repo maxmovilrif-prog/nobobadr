@@ -37,7 +37,8 @@
       "supermarkets": "Supermarkten",
       "courier": "Koerier"
     },
-    "coverage": "Spanje en Marokko"
+    "coverage": "Spanje en Marokko",
+    "cta_quote": "Tarief berekenen"
   },
   "auth": {
     "welcome": "Welkom bij",

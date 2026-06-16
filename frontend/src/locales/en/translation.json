@@ -37,7 +37,8 @@
       "supermarkets": "Supermarkets",
       "courier": "Courier"
     },
-    "coverage": "Spain and Morocco"
+    "coverage": "Spain and Morocco",
+    "cta_quote": "Calculate fare"
   },
   "auth": {
     "welcome": "Welcome to",

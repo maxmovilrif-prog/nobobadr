@@ -37,7 +37,8 @@
       "supermarkets": "Supermärkte",
       "courier": "Kurier"
     },
-    "coverage": "Spanien und Marokko"
+    "coverage": "Spanien und Marokko",
+    "cta_quote": "Tarif berechnen"
   },
   "auth": {
     "welcome": "Willkommen bei",

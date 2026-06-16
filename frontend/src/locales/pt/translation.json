@@ -37,7 +37,8 @@
       "supermarkets": "Supermercados",
       "courier": "Estafeta"
     },
-    "coverage": "Espanha"
+    "coverage": "Espanha",
+    "cta_quote": "Calcular tarifa"
   },
   "auth": {
     "welcome": "Bem-vindo a",

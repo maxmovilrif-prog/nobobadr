@@ -37,7 +37,8 @@
       "supermarkets": "Supermercados",
       "courier": "Paquetería"
     },
-    "coverage": "España y Marruecos"
+    "coverage": "España y Marruecos",
+    "cta_quote": "Calcular Tarifa"
   },
   "auth": {
     "welcome": "Bienvenido a",
