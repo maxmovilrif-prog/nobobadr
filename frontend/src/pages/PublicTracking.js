@@ -8,6 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import LanguageSelector from '@/components/LanguageSelector';
 import { toast } from 'sonner';
+import motoIconUrl from '@/assets/icons/moto-bee.png';
+import carIconUrl from '@/assets/icons/car-bee.png';
+import bikeIconUrl from '@/assets/icons/bike-bee.png';
+import truckIconUrl from '@/assets/icons/truck-bee.png';
 import { Search, MapPin, Flag, Truck, Clock, Route as RouteIcon, ArrowLeft, Loader2, Share2 } from 'lucide-react';
 
 // 1 MAD = 0.092 EUR (tasa de referencia; se podrá actualizar vía API)
@@ -60,19 +64,20 @@ const DEMO_ORDERS = {
   },
 };
 
-// Marcadores SVG según el tipo de vehículo (círculo verde + silueta blanca)
-function vehicleMarkerUrl(type) {
-  const glyphs = {
-    truck: `<g fill="#fff"><rect x="9" y="15" width="12" height="9" rx="1"/><path d="M21 17 h5 l4 4 v3 h-9 z"/><circle cx="14" cy="26" r="2.3"/><circle cx="26" cy="26" r="2.3"/></g>`,
-    car: `<g fill="#fff"><path d="M10 24 l2 -6 q0.6 -1.6 2.4 -1.6 h11.2 q1.8 0 2.4 1.6 l2 6 z"/><circle cx="15" cy="26" r="2.2"/><circle cx="25" cy="26" r="2.2"/></g>`,
-    motorcycle: `<g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="26" r="3.6"/><circle cx="27" cy="26" r="3.6"/><path d="M13 26 l5 -6 h5 M22 20 l5 6 M16 20 h4"/></g>`,
-    bicycle: `<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="26" r="4"/><circle cx="27" cy="26" r="4"/><path d="M13 26 l4 -7 h6 M17 19 l6 7 M20 15 h4 l-1 4 M13 26 l4 -7"/></g>`,
-  };
-  const glyph = glyphs[type] || glyphs.motorcycle;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="42" height="42">
-    <circle cx="20" cy="20" r="18" fill="#10B981" opacity="0.25"/>
-    <circle cx="20" cy="20" r="13" fill="#059669"/>${glyph}</svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+// Iconos PNG de marca (la Abeja sobre cada vehículo) según el tipo de vehículo.
+const VEHICLE_ICON_URL = {
+  motorcycle: motoIconUrl,
+  car: carIconUrl,
+  bicycle: bikeIconUrl,
+  truck: truckIconUrl,
+};
+
+// Devuelve el icono del marcador con guarda segura (no construye Size si Maps no cargó).
+function getVehicleIcon(vehicleType) {
+  if (!window.google?.maps?.Size) return undefined;
+  const url = VEHICLE_ICON_URL[vehicleType] || motoIconUrl;
+  const sizePx = vehicleType === 'car' || vehicleType === 'truck' ? 46 : 42;
+  return { url, scaledSize: new window.google.maps.Size(sizePx, sizePx), anchor: new window.google.maps.Point(sizePx / 2, sizePx / 2) };
 }
 
 const containerStyle = { width: '100%', height: '100%', minHeight: '480px' };
@@ -290,7 +295,7 @@ export default function PublicTracking() {
                           <Marker position={order.destination} label={{ text: 'B', color: '#fff', fontWeight: 'bold' }}
                             title={rtl ? order.destination.label_ar : order.destination.label_es} />
                           <Marker position={order.current} title={`${order.driver_name} · ${order.vehicle}`}
-                            icon={window.google?.maps?.Size ? { url: vehicleMarkerUrl(order.vehicle_type), scaledSize: new window.google.maps.Size(42, 42), anchor: new window.google.maps.Point(21, 21) } : undefined} />
+                            icon={getVehicleIcon(order.vehicle_type)} />
                         </>
                       )}
                     </GoogleMap>

@@ -20,6 +20,8 @@ import sys
 import hmac
 import csv
 import io
+import httpx
+from enum import Enum
 sys.path.append(str(Path(__file__).parent))
 
 ROOT_DIR = Path(__file__).parent
@@ -1605,6 +1607,83 @@ async def list_payouts(driver_id: Optional[str] = None, limit: int = 200,
     for p in payouts:
         p['driver_name'] = names.get(p['driver_id'], 'N/D')
     return {'count': len(payouts), 'payouts': payouts}
+
+# ============================================================
+# CÁLCULO DE ENTREGA (precio + ETA por tipo de vehículo)
+# Usa Google Distance Matrix para distancia/tiempo reales.
+# ============================================================
+GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
+
+class VehicleType(str, Enum):
+    motorcycle = "motorcycle"
+    car = "car"
+    bicycle = "bicycle"
+
+# Tarifas por tipo de vehículo (base + por km) y factor de velocidad sobre el ETA de Maps
+PRICING_CONFIG = {
+    VehicleType.bicycle:    {"base_fare": 1.5, "per_km_fare": 0.4, "speed_factor": 1.1},
+    VehicleType.motorcycle: {"base_fare": 2.0, "per_km_fare": 0.5, "speed_factor": 0.85},
+    VehicleType.car:        {"base_fare": 4.0, "per_km_fare": 1.0, "speed_factor": 1.0},
+}
+
+class DeliveryRequest(BaseModel):
+    origin_lat: float
+    origin_lng: float
+    destination_lat: float
+    destination_lng: float
+    vehicle_type: VehicleType
+    currency: str = "EUR"
+
+@api_router.post("/v1/calculate-delivery")
+async def calculate_delivery(req: DeliveryRequest):
+    """Calcula la tarifa de entrega y el ETA según la distancia/tiempo reales (Google
+    Routes API) y el tipo de vehículo. Endpoint público (presupuesto)."""
+    if not GOOGLE_MAPS_API_KEY:
+        raise HTTPException(status_code=503, detail="Google Maps API key no configurada en el servidor")
+
+    # Routes API (nueva, sustituye a Distance Matrix legacy). Bici -> BICYCLE, resto -> DRIVE.
+    travel_mode = "BICYCLE" if req.vehicle_type == VehicleType.bicycle else "DRIVE"
+    url = "https://routes.googleapis.com/directions/v2:computeRoutes"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
+    }
+    body = {
+        "origin": {"location": {"latLng": {"latitude": req.origin_lat, "longitude": req.origin_lng}}},
+        "destination": {"location": {"latLng": {"latitude": req.destination_lat, "longitude": req.destination_lng}}},
+        "travelMode": travel_mode,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(url, headers=headers, json=body)
+            data = resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error al contactar Google Maps: {str(e)}")
+
+    if resp.status_code != 200:
+        msg = (data.get("error") or {}).get("message") if isinstance(data, dict) else None
+        raise HTTPException(status_code=502, detail=f"Google Maps error: {msg or resp.text[:200]}")
+    routes = data.get("routes") or []
+    if not routes:
+        raise HTTPException(status_code=400, detail="No se pudo calcular la ruta entre los puntos indicados")
+
+    distance_km = routes[0].get("distanceMeters", 0) / 1000.0
+    duration_minutes = float(str(routes[0].get("duration", "0s")).rstrip("s") or 0) / 60.0
+
+    config = PRICING_CONFIG[req.vehicle_type]
+    total_price = round(config["base_fare"] + distance_km * config["per_km_fare"], 2)
+    estimated_eta = round(duration_minutes * config["speed_factor"])
+
+    return {
+        "status": "success",
+        "vehicle_used": req.vehicle_type.value,
+        "distance_km": round(distance_km, 2),
+        "original_duration_mins": round(duration_minutes),
+        "adjusted_eta_mins": estimated_eta,
+        "delivery_fee": total_price,
+        "currency": req.currency,
+    }
 
 @api_router.get("/admin/active-drivers")
 async def get_active_drivers(current_user: dict = Depends(get_current_user)):
