@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 19 validated 4 new features end-to-end: (1) Express order → Stripe checkout with order-currency support (EUR/MAD), (2) auto_assign_order using origin_lat/origin_lng for express orders, (3) Admin Cities CRUD with all guardrails (403 for non-admin, 400 on duplicate, 400 on delete-with-active-order, 200 on clean delete), (4) Business bank_account (IBAN) persistence on POST /api/businesses. Backend pytest 10/10 + 1 skipped (replaced by direct DB unit test that PASSED). Frontend CityManager CRUD works flawlessly; express banner click triggers POST /api/orders/express (200) → POST /api/payments/create-checkout (200) → real redirect to checkout.stripe.com showing €12.50 EUR; business-bank-input renders in BusinessDashboard dialog and IBAN reaches the backend (toast 'Negocio creado exitosamente' shown).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin panel CityManager dialogs", "issues": ["Radix DialogContent warning: 'Missing Description or aria-describedby' (accessibility, low priority)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_nubo_iter19.py",
+    "/app/backend/tests/test_auto_assign_express_direct.py",
+    "/app/test_reports/pytest/iter19_results.xml"
+  ],
+  "action_items": [
+    "Optional: add aria-describedby/DialogDescription inside CityManager edit dialog to remove Radix accessibility warning.",
+    "Optional: housekeeping — there are leftover TEST_Del_* cities in the production cities collection from the 'delete-with-active-order' test (the rule correctly blocked deletion). The active orders blocking them are TEST express orders with status=pending. Either cancel those orders or run a one-shot cleanup script if a clean DB is desired.",
+    "Optional: expose an admin endpoint (e.g. POST /api/admin/orders/{id}/mark-paid) to enable end-to-end paid-order tests without invoking real Stripe; today this had to be simulated via direct DB write."
+  ],
+  "critical_code_review_comments": [
+    "create_checkout_session line 936 correctly derives currency from order ('eur' default, lowercase) — verified by creating EUR and MAD express orders; both returned a Stripe session url.",
+    "auto_assign_order lines 743-744 use origin_lat/origin_lng for order_type=='express' and fall back to city centre otherwise — verified by direct DB test: a paid express order with city_id=null and origin at Madrid centre was auto-assigned to bee.madrid in <2s.",
+    "admin_create_city/admin_update_city/admin_delete_city all guard with role=='admin' (403 otherwise), reject duplicate names (400), and block deletion when active orders reference city_id (count of orders with status NOT IN delivered/cancelled). All four guardrails verified.",
+    "Business model + BusinessCreate include Optional[str] bank_account; create_business persists it as-is via model_dump(); GET /api/businesses returns it. No PII validation/masking — acceptable for MVP but consider IBAN format validation server-side.",
+    "CustomerDashboard.placeExpressOrder now: POST /api/orders/express → POST /api/payments/create-checkout?order_id=... → window.location.href = url. Verified with real network calls and real navigation to checkout.stripe.com — Stripe rendered the page with the correct €12.50 EUR amount.",
+    "CityManager.jsx: solid component — add/edit/delete buttons all use data-testid attributes correctly, city-count updates reactively, edit dialog and delete AlertDialog are properly scoped.",
+    "Minor: BusinessDashboard category Select uses Radix; works but adds accessibility warnings on the create dialog (missing DialogDescription).",
+    "Minor: no logging when a customer references a non-existent origin_city_id in create_express_order (city_name silently becomes null)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_nubo_iter19.py (NEW — 11 pytest tests, 10 pass + 1 skip)",
+    "/app/backend/tests/test_auto_assign_express_direct.py (NEW — direct asyncio DB test of auto_assign_order for express; PASS)"
+  ],
+  "success_rate": {"backend": "100% (10/10 pytest + 1/1 direct auto-assign test)", "frontend": "100% (CityManager CRUD + express→Stripe redirect + business bank input)"},
+  "test_credentials": "Admin control@nuboexpress.com / Fn6FcMveVf%--1o- / NUBO-84D2-C159-E3CF · Cliente cliente@nubotest.com / Cliente123! · Driver bee.madrid@nuboexpress.com / Bee123!",
+  "seed_data_creation": "Created throwaway business users TEST_biz_bank_*@nubotest.com and TEST_biz_ui_*@nubotest.com (with one TEST UI Pizza business and one TEST Pizza IBAN business). Several TEST_City_*/TEST_Dup_*/TEST_Upd_*/TEST_Clean_* cities were created and most were deleted by the test_zzz_cleanup; two TEST_Del_* cities remain because their tied active express orders still exist (which is the expected guardrail). Express orders Madrid→Barcelona / Madrid Sol→Atocha created by customer cliente@nubotest.com.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 4 features for iteration 19 are operational. Backend regression suites live at /app/backend/tests/ — run with: REACT_APP_BACKEND_URL=<url> pytest backend/tests/test_nubo_iter19.py -v. The direct auto-assign script (test_auto_assign_express_direct.py) needs MONGO_URL and DB_NAME from backend/.env. To test the full Stripe paid flow without webhooks, add an admin POST /api/admin/orders/{id}/mark-paid endpoint, then auto-assign will fire end-to-end via HTTP (currently we used direct DB simulation). Existing leftover TEST_Del_* cities can be cleaned up by cancelling their pending express orders first."
+}
