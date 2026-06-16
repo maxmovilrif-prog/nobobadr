@@ -194,6 +194,7 @@
       "delivered": "مُسلَّم"
     },
     "share": "مشاركة التتبع",
-    "shareMessage": "تتبع طلبك على Nubo Express:"
+    "shareMessage": "تتبع طلبك على Nubo Express:",
+    "mapUnavailable": "الخريطة غير متاحة حالياً. تظهر بقية معلومات الطلب أدناه."
   }
 }

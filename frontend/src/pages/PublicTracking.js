@@ -69,6 +69,18 @@ function vehicleMarkerUrl(type) {
 
 const containerStyle = { width: '100%', height: '100%', minHeight: '480px' };
 
+// Aísla los fallos de render del mapa de Google (p.ej. APIs no habilitadas) para que
+// NO tumben el resto de la página (datos del pedido, botón de compartir, etc.).
+class MapErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error) { console.error('Map render error (contenido):', error); }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
 export default function PublicTracking() {
   const navigate = useNavigate();
   const { isLoaded, loadError } = useJsApiLoader({
@@ -91,31 +103,38 @@ export default function PublicTracking() {
   const rtl = i18n.language === 'ar';
 
   const drawRoute = useCallback((orderData) => {
-    if (!isLoaded || !orderData) return;
-    const service = new window.google.maps.DirectionsService();
-    service.route(
-      {
-        origin: orderData.origin,
-        destination: orderData.destination,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === 'OK') {
-          setDirections(result);
-          const leg = result.routes[0].legs[0];
-          setRouteInfo({ distance: leg.distance.text, duration: leg.duration.text });
-        } else {
-          setDirections(null);
-          setRouteInfo(null);
+    if (!isLoaded || !orderData || !window.google?.maps?.DirectionsService) return;
+    try {
+      const service = new window.google.maps.DirectionsService();
+      service.route(
+        {
+          origin: orderData.origin,
+          destination: orderData.destination,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === 'OK') {
+            setDirections(result);
+            const leg = result.routes[0].legs[0];
+            setRouteInfo({ distance: leg.distance.text, duration: leg.duration.text });
+          } else {
+            setDirections(null);
+            setRouteInfo(null);
+          }
         }
-      }
-    );
-    if (mapRef.current) {
-      const bounds = new window.google.maps.LatLngBounds();
-      [orderData.origin, orderData.destination, orderData.current].forEach((p) =>
-        bounds.extend(new window.google.maps.LatLng(p.lat, p.lng))
       );
-      mapRef.current.fitBounds(bounds, 60);
+      if (mapRef.current) {
+        const bounds = new window.google.maps.LatLngBounds();
+        [orderData.origin, orderData.destination, orderData.current].forEach((p) =>
+          bounds.extend(new window.google.maps.LatLng(p.lat, p.lng))
+        );
+        mapRef.current.fitBounds(bounds, 60);
+      }
+    } catch (err) {
+      // El mapa no está totalmente disponible (APIs bloqueadas): seguimos sin ruta
+      console.error('drawRoute error:', err);
+      setDirections(null);
+      setRouteInfo(null);
     }
   }, [isLoaded]);
 
@@ -237,28 +256,37 @@ export default function PublicTracking() {
                     <p className="text-sm text-gray-500">{tr('loading')}</p>
                   </div>
                 ) : (
-                  <GoogleMap
-                    mapContainerStyle={containerStyle}
-                    center={{ lat: 35.9, lng: -5.6 }}
-                    zoom={6}
-                    onLoad={(m) => { mapRef.current = m; }}
-                    options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true, zoomControl: true }}
-                  >
-                    {directions && (
-                      <DirectionsRenderer directions={directions}
-                        options={{ suppressMarkers: true, polylineOptions: { strokeColor: '#10B981', strokeWeight: 4, strokeOpacity: 0.85 } }} />
-                    )}
-                    {order && (
-                      <>
-                        <Marker position={order.origin} label={{ text: 'A', color: '#fff', fontWeight: 'bold' }}
-                          title={rtl ? order.origin.label_ar : order.origin.label_es} />
-                        <Marker position={order.destination} label={{ text: 'B', color: '#fff', fontWeight: 'bold' }}
-                          title={rtl ? order.destination.label_ar : order.destination.label_es} />
-                        <Marker position={order.current} title={`${order.driver_name} · ${order.vehicle}`}
-                          icon={isLoaded ? { url: vehicleMarkerUrl(order.vehicle_type), scaledSize: new window.google.maps.Size(42, 42), anchor: new window.google.maps.Point(21, 21) } : undefined} />
-                      </>
-                    )}
-                  </GoogleMap>
+                  <MapErrorBoundary fallback={
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 text-center" data-testid="map-fallback">
+                      <div>
+                        <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 max-w-xs">{tr('mapUnavailable')}</p>
+                      </div>
+                    </div>
+                  }>
+                    <GoogleMap
+                      mapContainerStyle={containerStyle}
+                      center={{ lat: 35.9, lng: -5.6 }}
+                      zoom={6}
+                      onLoad={(m) => { mapRef.current = m; }}
+                      options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true, zoomControl: true }}
+                    >
+                      {directions && (
+                        <DirectionsRenderer directions={directions}
+                          options={{ suppressMarkers: true, polylineOptions: { strokeColor: '#10B981', strokeWeight: 4, strokeOpacity: 0.85 } }} />
+                      )}
+                      {order && (
+                        <>
+                          <Marker position={order.origin} label={{ text: 'A', color: '#fff', fontWeight: 'bold' }}
+                            title={rtl ? order.origin.label_ar : order.origin.label_es} />
+                          <Marker position={order.destination} label={{ text: 'B', color: '#fff', fontWeight: 'bold' }}
+                            title={rtl ? order.destination.label_ar : order.destination.label_es} />
+                          <Marker position={order.current} title={`${order.driver_name} · ${order.vehicle}`}
+                            icon={window.google?.maps?.Size ? { url: vehicleMarkerUrl(order.vehicle_type), scaledSize: new window.google.maps.Size(42, 42), anchor: new window.google.maps.Point(21, 21) } : undefined} />
+                        </>
+                      )}
+                    </GoogleMap>
+                  </MapErrorBoundary>
                 )}
               </CardContent>
             </Card>

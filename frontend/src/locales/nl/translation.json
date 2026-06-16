@@ -194,6 +194,7 @@
       "delivered": "Geleverd"
     },
     "share": "Tracking delen",
-    "shareMessage": "Volg je bestelling bij Nubo Express:"
+    "shareMessage": "Volg je bestelling bij Nubo Express:",
+    "mapUnavailable": "De kaart is momenteel niet beschikbaar. De rest van de bestelgegevens wordt hieronder getoond."
   }
 }

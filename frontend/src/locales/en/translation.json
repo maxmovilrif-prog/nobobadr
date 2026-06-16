@@ -194,6 +194,7 @@
       "delivered": "Delivered"
     },
     "share": "Share tracking",
-    "shareMessage": "Track your order on Nubo Express:"
+    "shareMessage": "Track your order on Nubo Express:",
+    "mapUnavailable": "The map is unavailable right now. The rest of the order information is shown below."
   }
 }

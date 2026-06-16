@@ -194,6 +194,7 @@
       "delivered": "Livré"
     },
     "share": "Partager le suivi",
-    "shareMessage": "Suivez votre commande sur Nubo Express :"
+    "shareMessage": "Suivez votre commande sur Nubo Express :",
+    "mapUnavailable": "La carte n'est pas disponible pour le moment. Le reste des informations de la commande s'affiche ci-dessous."
   }
 }

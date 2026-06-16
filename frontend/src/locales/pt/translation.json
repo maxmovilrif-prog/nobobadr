@@ -194,6 +194,7 @@
       "delivered": "Entregue"
     },
     "share": "Partilhar rastreamento",
-    "shareMessage": "Acompanhe o seu pedido na Nubo Express:"
+    "shareMessage": "Acompanhe o seu pedido na Nubo Express:",
+    "mapUnavailable": "O mapa não está disponível no momento. O restante das informações do pedido é mostrado abaixo."
   }
 }
