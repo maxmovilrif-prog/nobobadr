@@ -4,7 +4,7 @@ import axios from 'axios';
 import { AuthContext } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle, Loader2, XCircle, MapPin } from 'lucide-react';
 
 export default function OrderSuccess() {
   const navigate = useNavigate();
@@ -75,6 +75,15 @@ export default function OrderSuccess() {
                   <p className="text-sm text-gray-600 mb-1">Total pagado</p>
                   <p className="text-3xl font-bold text-emerald-600">€{orderDetails.amount.toFixed(2)}</p>
                 </div>
+              )}
+              {orderDetails?.order_type === 'express' && orderDetails?.order_id && (
+                <Button
+                  data-testid="track-express-btn"
+                  onClick={() => navigate(`/track?order=${orderDetails.order_id}`)}
+                  className="w-full mb-3 bg-emerald-600 hover:bg-emerald-700 gap-2"
+                >
+                  <MapPin className="w-4 h-4" /> Seguir mi pedido en vivo
+                </Button>
               )}
               <div className="flex gap-3">
                 <Button

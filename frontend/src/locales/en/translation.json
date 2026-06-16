@@ -185,6 +185,7 @@
     "noOrder": "Enter an order number",
     "loading": "Loading...",
     "notFound": "Order not found",
+    "searchingDriver": "🐝 Assigning courier…",
     "search": "Search",
     "back": "Back",
     "currency": "Currency",

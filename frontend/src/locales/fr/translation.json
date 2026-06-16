@@ -185,6 +185,7 @@
     "noOrder": "Saisissez un numéro de commande",
     "loading": "Chargement...",
     "notFound": "Commande introuvable",
+    "searchingDriver": "🐝 Attribution du coursier…",
     "search": "Rechercher",
     "back": "Retour",
     "currency": "Devise",

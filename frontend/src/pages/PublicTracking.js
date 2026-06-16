@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import axios from 'axios';
 import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from '@react-google-maps/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +17,17 @@ import { Search, MapPin, Flag, Truck, Clock, Route as RouteIcon, ArrowLeft, Load
 
 // 1 MAD = 0.092 EUR (tasa de referencia; se podrá actualizar vía API)
 const EXCHANGE_RATE_MAD_EUR = 0.092;
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Mapea el estado del backend a los estados visuales del seguimiento
+const mapTrackingStatus = (s) => {
+  if (s === 'in_transit') return 'in_transit';
+  if (s === 'delivered') return 'delivered';
+  if (['accepted', 'preparing', 'ready'].includes(s)) return 'assigned';
+  return 'pending';
+};
+const VEHICLE_LABEL = { motorcycle: 'Moto', car: 'Coche', bicycle: 'Bici', truck: 'Camión' };
+const vehicleLabel = (v) => VEHICLE_LABEL[v] || v || '—';
 
 function formatCurrency(amount, currency = 'MAD') {
   if (currency === 'EUR') {
@@ -108,6 +120,7 @@ export default function PublicTracking() {
   const [directions, setDirections] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [liveId, setLiveId] = useState(null); // id de pedido real para refresco en vivo
   const mapRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -151,26 +164,83 @@ export default function PublicTracking() {
     }
   }, [isLoaded]);
 
-  // Busca un pedido (datos demo por ahora). Devuelve true si lo encuentra.
+  // Busca un pedido: primero datos demo (ORD-XXXX), luego pedido real (exprés) por id.
   const lookupOrder = async (rawId) => {
-    const id = (rawId || '').trim().toUpperCase();
-    if (!id) return;
+    const raw = (rawId || '').trim();
+    if (!raw) return;
     setLoading(true);
     setError('');
     setRouteInfo(null);
     setDirections(null);
-    // Simula latencia de red (se reemplazará por la llamada real al backend)
-    await new Promise((r) => setTimeout(r, 500));
-    const found = DEMO_ORDERS[id];
-    if (!found) {
+    // 1) Pedidos demo (formato ORD-XXXX)
+    const demo = DEMO_ORDERS[raw.toUpperCase()];
+    if (demo) {
+      setLiveId(null);
+      setOrder(demo);
+      drawRoute(demo);
+      setLoading(false);
+      return;
+    }
+    // 2) Pedido real (exprés) por id vía backend público
+    try {
+      const res = await axios.get(`${API}/public/orders/${encodeURIComponent(raw)}/tracking`);
+      const d = res.data;
+      if (!d.origin || !d.destination) {
+        setError(tr('notFound'));
+        setOrder(null);
+        setLiveId(null);
+        setLoading(false);
+        return;
+      }
+      const priceMad = d.currency === 'EUR' ? (d.price || 0) / EXCHANGE_RATE_MAD_EUR : (d.price || 0);
+      const mapped = {
+        order_id: d.order_id,
+        client_name: '',
+        delivery_status: mapTrackingStatus(d.status),
+        driver_name: d.driver_name || tr('searchingDriver'),
+        vehicle: vehicleLabel(d.driver_vehicle_type),
+        vehicle_type: d.driver_vehicle_type || 'motorcycle',
+        price: priceMad,
+        origin: { lat: d.origin.lat, lng: d.origin.lng, label_es: d.origin.label, label_ar: d.origin.label },
+        destination: { lat: d.destination.lat, lng: d.destination.lng, label_es: d.destination.label, label_ar: d.destination.label },
+        current: d.driver_location || { lat: d.origin.lat, lng: d.origin.lng },
+        updated_at: d.updated_at || new Date().toISOString(),
+      };
+      setLiveId(d.order_id);
+      setOrder(mapped);
+      drawRoute(mapped);
+    } catch (e) {
       setError(tr('notFound'));
       setOrder(null);
-    } else {
-      setOrder(found);
-      drawRoute(found);
+      setLiveId(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+
+  // Refresco en vivo: actualiza ubicación del repartidor y estado sin recolocar el mapa
+  const refreshLive = useCallback(async (id) => {
+    try {
+      const res = await axios.get(`${API}/public/orders/${encodeURIComponent(id)}/tracking`);
+      const d = res.data;
+      setOrder((prev) => prev ? {
+        ...prev,
+        delivery_status: mapTrackingStatus(d.status),
+        driver_name: d.driver_name || prev.driver_name,
+        vehicle: d.driver_vehicle_type ? vehicleLabel(d.driver_vehicle_type) : prev.vehicle,
+        vehicle_type: d.driver_vehicle_type || prev.vehicle_type,
+        current: d.driver_location || prev.current,
+        updated_at: d.updated_at || prev.updated_at,
+      } : prev);
+    } catch (e) { /* noop */ }
+  }, []);
+
+  // Sondeo periódico (cada 15s) mientras se sigue un pedido real
+  useEffect(() => {
+    if (!liveId) return;
+    const t = setInterval(() => refreshLive(liveId), 15000);
+    return () => clearInterval(t);
+  }, [liveId, refreshLive]);
 
   // Auto-carga si llega ?order=ORD-XXXX (enlace compartido)
   useEffect(() => {
@@ -190,9 +260,10 @@ export default function PublicTracking() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (!search.trim()) return;
-    setSearchParams({ order: search.trim().toUpperCase() });
-    lookupOrder(search);
+    const q = search.trim();
+    if (!q) return;
+    setSearchParams({ order: q });
+    lookupOrder(q);
   };
 
   const handleShare = () => {

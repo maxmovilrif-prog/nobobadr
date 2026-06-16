@@ -982,7 +982,9 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
     
     # Check if already processed
     if transaction['payment_status'] == 'paid':
-        return transaction
+        order = await db.orders.find_one({'id': transaction['order_id']}, {'_id': 0, 'order_type': 1})
+        return {**transaction, 'order_id': transaction['order_id'],
+                'order_type': (order or {}).get('order_type', 'marketplace')}
     
     # Initialize Stripe
     host_url = str(request.base_url)
@@ -1002,6 +1004,7 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
     )
     
     # Update order if paid
+    order_type = 'marketplace'
     if status.payment_status == 'paid':
         await db.orders.update_one(
             {'id': transaction['order_id']},
@@ -1009,9 +1012,13 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
         )
         # Despacho automático: asigna la Abeja más cercana al instante
         await auto_assign_order(transaction['order_id'])
+        od = await db.orders.find_one({'id': transaction['order_id']}, {'_id': 0, 'order_type': 1})
+        order_type = (od or {}).get('order_type', 'marketplace')
     
     return {
         'session_id': session_id,
+        'order_id': transaction['order_id'],
+        'order_type': order_type,
         'payment_status': status.payment_status,
         'status': status.status,
         'amount': status.amount_total / 100,  # Convert from cents
@@ -1801,6 +1808,43 @@ async def list_public_cities():
     """Ciudades operativas (público) para la calculadora de tarifa: id, name, lat, lng, country."""
     cities = await db.cities.find({}, {'_id': 0, 'id': 1, 'name': 1, 'lat': 1, 'lng': 1, 'country': 1}).sort('name', 1).to_list(1000)
     return {'cities': cities}
+
+@api_router.get("/public/orders/{order_id}/tracking")
+async def public_order_tracking(order_id: str):
+    """Seguimiento público de un pedido (sin login). Devuelve origen/destino, estado,
+    repartidor y su ubicación en vivo. Pensado para pedidos exprés A->B."""
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    driver = None
+    if order.get('driver_id'):
+        driver = await db.users.find_one(
+            {'id': order['driver_id']},
+            {'_id': 0, 'name': 1, 'vehicle_type': 1, 'current_location': 1}
+        )
+    origin = None
+    if order.get('origin_lat') is not None and order.get('origin_lng') is not None:
+        origin = {'lat': order['origin_lat'], 'lng': order['origin_lng'], 'label': order.get('origin_name')}
+    destination = None
+    if order.get('destination_lat') is not None and order.get('destination_lng') is not None:
+        destination = {'lat': order['destination_lat'], 'lng': order['destination_lng'], 'label': order.get('destination_name')}
+    cur = (driver or {}).get('current_location') if driver else None
+    driver_location = {'lat': cur['lat'], 'lng': cur['lng']} if (cur and cur.get('lat') is not None) else None
+    return {
+        'order_id': order['id'],
+        'order_type': order.get('order_type', 'marketplace'),
+        'status': order.get('status', 'pending'),
+        'origin': origin,
+        'destination': destination,
+        'driver_name': (driver or {}).get('name') if driver else None,
+        'driver_vehicle_type': (driver or {}).get('vehicle_type') if driver else order.get('vehicle_type'),
+        'driver_location': driver_location,
+        'price': order.get('total_amount'),
+        'currency': order.get('currency') or 'EUR',
+        'distance_km': order.get('distance_km'),
+        'eta_mins': order.get('eta_mins'),
+        'updated_at': order.get('updated_at'),
+    }
 
 # Tasa de referencia: 1 MAD = 0.092 EUR -> 1 EUR = ~10.87 MAD
 MAD_PER_EUR = round(1 / 0.092, 4)

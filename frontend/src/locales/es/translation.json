@@ -185,6 +185,7 @@
     "noOrder": "Introduce un número de pedido",
     "loading": "Cargando...",
     "notFound": "Pedido no encontrado",
+    "searchingDriver": "🐝 Asignando repartidor…",
     "search": "Buscar",
     "back": "Volver",
     "currency": "Divisa",
