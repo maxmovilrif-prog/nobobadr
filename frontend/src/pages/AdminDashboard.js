@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft, Download, Filter, Wallet } from 'lucide-react';
+import CityManager from '@/components/CityManager';
 
 const SPAIN_CENTER = [37.5, -4.8];
 
@@ -764,6 +765,9 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Gestor de zonas operativas (ciudades) */}
+        <CityManager API={API} token={token} onChanged={fetchCitiesList} />
 
         {/* Todos los pedidos */}
         <Card className="border-0 shadow-xl mt-8" data-testid="all-orders-card">

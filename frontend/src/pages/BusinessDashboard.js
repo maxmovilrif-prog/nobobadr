@@ -31,7 +31,8 @@ export default function BusinessDashboard() {
     address: '',
     phone: '',
     image_url: '',
-    delivery_time: '30-45 min'
+    delivery_time: '30-45 min',
+    bank_account: ''
   });
 
   const [productForm, setProductForm] = useState({
@@ -102,7 +103,8 @@ export default function BusinessDashboard() {
         address: '',
         phone: '',
         image_url: '',
-        delivery_time: '30-45 min'
+        delivery_time: '30-45 min',
+        bank_account: ''
       });
     } catch (error) {
       toast.error('Error al crear negocio');
@@ -261,6 +263,15 @@ export default function BusinessDashboard() {
                       onChange={(e) => setBusinessForm({ ...businessForm, image_url: e.target.value })}
                       placeholder="https://..."
                       required
+                    />
+                  </div>
+                  <div>
+                    <Label>Cuenta bancaria (IBAN) — para el pago de comisiones</Label>
+                    <Input
+                      data-testid="business-bank-input"
+                      value={businessForm.bank_account}
+                      onChange={(e) => setBusinessForm({ ...businessForm, bank_account: e.target.value })}
+                      placeholder="ES00 0000 0000 0000 0000 0000"
                     />
                   </div>
                   <Button data-testid="submit-business-btn" type="submit" className="w-full bg-emerald-600">Crear Negocio</Button>
