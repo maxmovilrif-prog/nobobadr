@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import DeliveryMap from '@/components/DeliveryMap';
 import { toast } from 'sonner';
-import { ArrowLeft, Package, MapPin, Clock, MessageCircle, Send, Navigation } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Clock, MessageCircle, Send, Navigation, Share2 } from 'lucide-react';
 
 export default function OrderTracking() {
   const { orderId } = useParams();
@@ -100,6 +100,12 @@ export default function OrderTracking() {
     }
   };
 
+  const handleShare = () => {
+    const url = `${window.location.origin}/track?order=${orderId}`;
+    const text = `Sigue tu pedido en Nubo Express: ${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
@@ -151,7 +157,10 @@ export default function OrderTracking() {
             Volver
           </Button>
           <h1 className="text-xl font-bold">Seguimiento de Pedido</h1>
-          <div className="w-20"></div>
+          <Button data-testid="share-tracking-btn" onClick={handleShare} size="sm"
+            className="bg-[#25D366] hover:bg-[#1ebe5b] text-white gap-2">
+            <Share2 className="w-4 h-4" /> Compartir
+          </Button>
         </div>
       </header>
 
