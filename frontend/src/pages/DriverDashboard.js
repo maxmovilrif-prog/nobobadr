@@ -25,6 +25,39 @@ export default function DriverDashboard() {
   const adminLocIntervalRef = useRef(null);
   const notifyWsRef = useRef(null);
   const notifyPingRef = useRef(null);
+  const audioCtxRef = useRef(null);
+
+  // Sonido (Web Audio API, sin archivos) + vibración al recibir un pedido nuevo
+  const playNewOrderAlert = () => {
+    // Vibración (móviles compatibles)
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 300]);
+    }
+    // Doble "beep" tipo notificación
+    try {
+      if (!audioCtxRef.current) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) audioCtxRef.current = new Ctx();
+      }
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const beep = (startAt, freq) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + startAt);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime + startAt);
+        gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + startAt + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startAt + 0.28);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime + startAt);
+        osc.stop(ctx.currentTime + startAt + 0.3);
+      };
+      beep(0, 880);
+      beep(0.32, 1175);
+    } catch (e) { /* noop */ }
+  };
 
   // Canal de avisos en tiempo real: la Abeja recibe pedidos auto-asignados sin refrescar
   useEffect(() => {
@@ -46,6 +79,7 @@ export default function DriverDashboard() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'new_order') {
+            playNewOrderAlert();
             toast.success(`🐝 Nuevo pedido asignado · ${data.business_name || 'Negocio'}`, {
               description: `${data.city_name ? data.city_name + ' · ' : ''}${Number(data.total_amount || 0).toFixed(2)} €`,
               duration: 8000,
