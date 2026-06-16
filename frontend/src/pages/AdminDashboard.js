@@ -72,6 +72,7 @@ export default function AdminDashboard() {
   const [financeLoading, setFinanceLoading] = useState(false);
   const [financeExporting, setFinanceExporting] = useState(false);
   const [markingDriverId, setMarkingDriverId] = useState(null);
+  const [payouts, setPayouts] = useState([]);
   // Todos los pedidos
   const [allOrders, setAllOrders] = useState([]);
   const [ordersFilters, setOrdersFilters] = useState({ status: '', city_id: '' });
@@ -213,10 +214,22 @@ export default function AdminDashboard() {
         ? `Pago registrado para 🐝 ${row.driver_name} (€${Number(row.total_earnings).toFixed(2)})`
         : `🐝 ${row.driver_name} marcado como Pendiente`);
       fetchFinance();
+      fetchPayouts();
     } catch (e) {
       toast.error('No se pudo actualizar el estado de pago');
     } finally {
       setMarkingDriverId(null);
+    }
+  };
+
+  const fetchPayouts = async () => {
+    try {
+      const res = await axios.get(`${API}/admin/finances/payouts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPayouts(res.data.payouts || []);
+    } catch (e) {
+      // noop
     }
   };
 
@@ -379,6 +392,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData();
     fetchFinance();
+    fetchPayouts();
     fetchCitiesList();
     fetchAllOrders();
     const interval = setInterval(fetchData, 10000);
@@ -696,6 +710,56 @@ export default function AdminDashboard() {
                     </tr>
                   </tfoot>
                 )}
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Historial de pagos (registro contable) */}
+        <Card className="border-0 shadow-xl mt-8" data-testid="payouts-card">
+          <CardContent className="p-0">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <History className="w-5 h-5 text-emerald-600" /> Historial de pagos
+              </h2>
+              <span data-testid="payouts-count" className="text-sm font-medium text-gray-500">
+                {payouts.length} {payouts.length === 1 ? 'pago' : 'pagos'}
+              </span>
+            </div>
+            <div className="overflow-x-auto" data-testid="payouts-table">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-left">
+                  <tr>
+                    <th className="px-6 py-3 font-medium">Repartidor</th>
+                    <th className="px-6 py-3 font-medium">Periodo</th>
+                    <th className="px-6 py-3 font-medium text-right">Entregas</th>
+                    <th className="px-6 py-3 font-medium text-right">Importe</th>
+                    <th className="px-6 py-3 font-medium text-right">Tasa</th>
+                    <th className="px-6 py-3 font-medium">Pagado el</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {payouts.length === 0 ? (
+                    <tr><td colSpan="6" className="px-6 py-10 text-center text-gray-500">
+                      Aún no hay pagos registrados.
+                    </td></tr>
+                  ) : (
+                    payouts.map((p) => (
+                      <tr key={p.id} data-testid={`payout-row-${p.id}`}>
+                        <td className="px-6 py-3 text-gray-900">🐝 {p.driver_name}</td>
+                        <td className="px-6 py-3 text-gray-700">
+                          {(p.period_start || 'inicio')} → {(p.period_end || 'hoy')}
+                        </td>
+                        <td className="px-6 py-3 text-right text-gray-700">{p.deliveries}</td>
+                        <td className="px-6 py-3 text-right font-semibold text-emerald-700">€{Number(p.amount).toFixed(2)}</td>
+                        <td className="px-6 py-3 text-right text-gray-500">{Math.round((p.rate || 0) * 100)}%</td>
+                        <td className="px-6 py-3 text-gray-600">
+                          {p.paid_at ? new Date(p.paid_at).toLocaleString('es-ES') : '—'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
               </table>
             </div>
           </CardContent>

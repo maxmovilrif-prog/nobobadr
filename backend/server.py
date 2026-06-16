@@ -1596,6 +1596,14 @@ async def list_payouts(driver_id: Optional[str] = None, limit: int = 200,
     if driver_id:
         q['driver_id'] = driver_id
     payouts = await db.driver_payouts.find(q, {'_id': 0}).sort('paid_at', -1).to_list(max(1, min(limit, 1000)))
+    # Resuelve el nombre actual del repartidor para mostrarlo en el historial
+    ids = list({p['driver_id'] for p in payouts})
+    names = {}
+    if ids:
+        async for u in db.users.find({'id': {'$in': ids}}, {'_id': 0, 'id': 1, 'name': 1}):
+            names[u['id']] = u.get('name')
+    for p in payouts:
+        p['driver_name'] = names.get(p['driver_id'], 'N/D')
     return {'count': len(payouts), 'payouts': payouts}
 
 @api_router.get("/admin/active-drivers")
