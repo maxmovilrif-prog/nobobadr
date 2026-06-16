@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend E2E de la nueva página pública /track (PublicTracking.js) — bilingüe Marruecos↔España con i18next (7 idiomas), selector de divisa MAD/EUR y datos DEMO (ORD-4821, ORD-4822). Todos los flujos críticos solicitados pasan: render con header/controles, búsqueda de pedidos DEMO, error en pedido inexistente, toggle de divisa MAD↔EUR y cambio de idioma (ES/EN/AR con RTL).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_14.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PublicTracking.js — Línea de conversión aproximada (≈) muestra el monto en la otra divisa correctamente (verificado: 850 MAD ≈ 78,20 €).",
+    "Aviso de Google Maps (no bloqueante): aparece warning de consola sobre deprecación de google.maps.DirectionsService a partir de febrero 2026. Funciona ahora, pero conviene migrar a google.maps.routes.Route.computeRoutes en el futuro.",
+    "Error 'ApiTargetBlockedMapError' del mapa es por restricciones de la API key del usuario en Google Cloud Console (esperado, fuera de alcance). El resto de la página funciona correctamente sin el mapa.",
+    "El idioma persiste en localStorage (i18next LanguageDetector). Útil para UX pero a tener en cuenta en tests automatizados — resetear con localStorage.setItem('i18nextLng', 'es') si se quiere estado limpio."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (skipped por instrucción)", "frontend": "100%" },
+  "test_credentials": "Ninguna — página pública.",
+  "seed_data_creation": "Ninguna — usa DEMO_ORDERS hardcoded (ORD-4821, ORD-4822).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "La página /track usa datos DEMO hardcoded en PublicTracking.js (DEMO_ORDERS). Cuando se conecte al backend real, habrá que cambiar handleSearch() para llamar a un endpoint /api/tracking/{order_id} y manejar los estados loading/error. El LanguageSelector global es un menú con [role='menuitem'] que ofrece 7 idiomas; el idioma persiste en localStorage('i18nextLng'). RTL se activa solo para 'ar'. Los testids estables son: public-tracking-page, currency-switch, currency-MAD, currency-EUR, tracking-search-input, tracking-search-btn, tracking-error, tracking-order-id, tracking-status, tracking-cost-main, tracking-route-info, tracking-sidebar, tracking-map, tracking-back-btn.",
+  "test_results_detail": {
+    "render_page": "PASS — public-tracking-page con header, h1 traducido, LanguageSelector, currency-switch (MAD/EUR), input + botón Buscar visibles.",
+    "search_ORD-4821": "PASS — sidebar muestra tracking-order-id='ORD-4821', tracking-status='In transit'/'En tránsito'/'في الطريق' según idioma, tracking-cost-main='850,00 د.م.' (MAD).",
+    "search_ORD-4822": "PASS — tracking-order-id='ORD-4822', status traducido a 'Assigned'/'Asignado' según idioma.",
+    "search_not_found_ORD-9999": "PASS — tracking-error visible con texto traducido ('Pedido no encontrado'/'Order not found').",
+    "currency_toggle": "PASS — default MAD muestra '850,00 د.م.', tras click currency-EUR cambia a '78,20 €' (850 × 0.092), click currency-MAD vuelve a '850,00 د.م.'. La línea '≈' muestra la conversión en la divisa opuesta.",
+    "i18n_spanish": "PASS — title='Seguimiento en vivo', botón='Buscar', Origen/Destino, dir='ltr'.",
+    "i18n_english": "PASS — title='Live tracking', botón='Search', Origin/Destination, dir='ltr'.",
+    "i18n_arabic_rtl": "PASS — title='تتبع الشحنات الحية', botón='بحث', status='في الطريق', dir='rtl' aplicado al contenedor.",
+    "i18n_dutch_extra": "PASS — title='Live volgen', botón='Zoeken', status='Onderweg' (verificado como bonus).",
+    "google_maps": "EXPECTED FAIL — 'ApiTargetBlockedMapError' por restricción de la API key del usuario (fuera de alcance, confirmado en review_request).",
+    "no_runtime_errors": "PASS — sin errores de página (pageerror). Solo warnings esperados de deprecación de DirectionsService y el error de Maps mencionado."
+  },
+  "rca of the issue": "N/A — no se encontraron bugs. La feature funciona según especificación."
+}
