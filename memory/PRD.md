@@ -53,6 +53,9 @@ Marketplace multiservicio tipo Glovo para España ("Nubo Express"): delivery de 
 ## Credenciales de prueba
 Ver /app/memory/test_credentials.md
 
+## Herramientas internas (admin)
+- `POST /api/admin/orders/{order_id}/mark-paid` (solo admin): marca un pedido como pagado SIN Stripe y dispara el auto-despacho. Útil para probar el flujo courier completo end-to-end. Verificado: pedido exprés Madrid→Atocha → auto-asignado a "Abeja Madrid" a 0.0 km. (403 para no-admin; 400 si ya está pagado.)
+
 ## Backlog / Próximas tareas
 - P1: Campo de cuenta bancaria en BusinessDashboard para seguimiento de comisiones (acordado, pendiente).
 - P2: Guía publicación Google Play / App Store (PWA → TWA/Capacitor).

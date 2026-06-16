@@ -1050,6 +1050,31 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@api_router.post("/admin/orders/{order_id}/mark-paid")
+async def admin_mark_order_paid(order_id: str, current_user: dict = Depends(get_current_user)):
+    """Marca un pedido como pagado SIN pasar por Stripe y dispara el auto-despacho.
+    Herramienta interna (solo admin) para pruebas/operación manual del flujo completo."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.get('payment_status') == 'paid':
+        raise HTTPException(status_code=400, detail="Order is already paid")
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$set': {'payment_status': 'paid', 'updated_at': datetime.now(timezone.utc).isoformat()}}
+    )
+    # Despacho automático: asigna la Abeja más cercana (origen real en exprés, centro de ciudad en marketplace)
+    result = await auto_assign_order(order_id)
+    assigned = None
+    if result:
+        chosen = result['driver']
+        assigned = {'id': chosen['id'], 'name': chosen.get('name', 'Abeja'),
+                    'distance_km': result['distance_km']}
+    return {'message': 'Order marked as paid', 'order_id': order_id,
+            'payment_status': 'paid', 'auto_assigned': assigned}
+
 # =========================
 # DROPSHIPPING MODELS & ROUTES
 # =========================
