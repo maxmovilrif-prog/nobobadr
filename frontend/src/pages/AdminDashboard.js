@@ -71,6 +71,7 @@ export default function AdminDashboard() {
   const [financeFilters, setFinanceFilters] = useState({ start_date: '', end_date: '', rate_pct: 10 });
   const [financeLoading, setFinanceLoading] = useState(false);
   const [financeExporting, setFinanceExporting] = useState(false);
+  const [markingDriverId, setMarkingDriverId] = useState(null);
   // Todos los pedidos
   const [allOrders, setAllOrders] = useState([]);
   const [ordersFilters, setOrdersFilters] = useState({ status: '', city_id: '' });
@@ -191,6 +192,31 @@ export default function AdminDashboard() {
       toast.error('No se pudo exportar el CSV');
     } finally {
       setFinanceExporting(false);
+    }
+  };
+
+  const toggleDriverPayment = async (row) => {
+    const markPaid = row.payment_status !== 'paid';
+    setMarkingDriverId(row.driver_id);
+    try {
+      const f = financeFilters;
+      const body = {
+        driver_id: row.driver_id,
+        rate: (Number(f.rate_pct) || 0) / 100,
+      };
+      if (f.start_date) body.start_date = f.start_date;
+      if (f.end_date) body.end_date = f.end_date;
+      await axios.post(`${API}/admin/finances/${markPaid ? 'mark-paid' : 'mark-pending'}`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(markPaid
+        ? `Pago registrado para 🐝 ${row.driver_name} (€${Number(row.total_earnings).toFixed(2)})`
+        : `🐝 ${row.driver_name} marcado como Pendiente`);
+      fetchFinance();
+    } catch (e) {
+      toast.error('No se pudo actualizar el estado de pago');
+    } finally {
+      setMarkingDriverId(null);
     }
   };
 
@@ -611,22 +637,48 @@ export default function AdminDashboard() {
                     <th className="px-6 py-3 font-medium text-right">Entregas</th>
                     <th className="px-6 py-3 font-medium text-right">Ingresos</th>
                     <th className="px-6 py-3 font-medium text-right">Comisión</th>
+                    <th className="px-6 py-3 font-medium text-center">Estado</th>
+                    <th className="px-6 py-3 font-medium text-right">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {finance.rows.length === 0 ? (
-                    <tr><td colSpan="4" className="px-6 py-10 text-center text-gray-500">
+                    <tr><td colSpan="6" className="px-6 py-10 text-center text-gray-500">
                       No hay entregas en este periodo.
                     </td></tr>
                   ) : (
-                    finance.rows.map((r) => (
+                    finance.rows.map((r) => {
+                      const isPaid = r.payment_status === 'paid';
+                      return (
                       <tr key={r.driver_id} data-testid={`finance-row-${r.driver_id}`}>
                         <td className="px-6 py-3 text-gray-900">🐝 {r.driver_name}</td>
                         <td className="px-6 py-3 text-right text-gray-700">{r.total_deliveries}</td>
                         <td className="px-6 py-3 text-right text-gray-700">€{Number(r.total_revenue).toFixed(2)}</td>
                         <td className="px-6 py-3 text-right font-semibold text-emerald-700">€{Number(r.total_earnings).toFixed(2)}</td>
+                        <td className="px-6 py-3 text-center">
+                          <span
+                            data-testid={`finance-status-${r.driver_id}`}
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                              isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                            {isPaid ? 'Pagado' : 'Pendiente'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3 text-right">
+                          <Button
+                            data-testid={`finance-toggle-${r.driver_id}`}
+                            onClick={() => toggleDriverPayment(r)}
+                            disabled={markingDriverId === r.driver_id}
+                            size="sm"
+                            variant={isPaid ? 'outline' : 'default'}
+                            className={isPaid ? '' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}>
+                            {markingDriverId === r.driver_id
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : (isPaid ? 'Marcar pendiente' : 'Marcar pagado')}
+                          </Button>
+                        </td>
                       </tr>
-                    ))
+                    );})
                   )}
                 </tbody>
                 {finance.rows.length > 0 && (
@@ -636,6 +688,11 @@ export default function AdminDashboard() {
                       <td className="px-6 py-3 text-right">{finance.totals.deliveries}</td>
                       <td className="px-6 py-3 text-right">€{Number(finance.totals.revenue).toFixed(2)}</td>
                       <td className="px-6 py-3 text-right text-emerald-700">€{Number(finance.totals.earnings).toFixed(2)}</td>
+                      <td className="px-6 py-3 text-center text-xs font-normal text-gray-500" colSpan="2">
+                        <span className="text-emerald-700" data-testid="finance-total-paid">Pagado €{Number(finance.totals.paid_earnings || 0).toFixed(2)}</span>
+                        {' · '}
+                        <span className="text-amber-700" data-testid="finance-total-pending">Pendiente €{Number(finance.totals.pending_earnings || 0).toFixed(2)}</span>
+                      </td>
                     </tr>
                   </tfoot>
                 )}

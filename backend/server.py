@@ -1431,6 +1431,16 @@ async def export_assignment_history(
 
 DEFAULT_COMMISSION_RATE = 0.10  # 10% del importe del pedido por defecto
 
+class MarkPaidRequest(BaseModel):
+    driver_id: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    rate: float = DEFAULT_COMMISSION_RATE
+
+def _payout_key(driver_id, start_date, end_date):
+    """Clave única de un ciclo de pago: repartidor + periodo."""
+    return {'driver_id': driver_id, 'period_start': start_date or '', 'period_end': end_date or ''}
+
 def _order_eff_date(o):
     """Fecha efectiva de entrega para los reportes (delivered_at > updated_at > created_at)."""
     return (o.get('delivered_at') or o.get('updated_at') or o.get('created_at') or '')[:10]
@@ -1481,10 +1491,22 @@ async def finances_summary(start_date: Optional[str] = None, end_date: Optional[
             'total_earnings': round(v['revenue'] * rate, 2),
         })
     rows.sort(key=lambda r: -r['total_earnings'])
+    # Anota el estado de pago (Pagado/Pendiente) de este periodo para cada repartidor
+    paid_map = {}
+    async for p in db.driver_payouts.find(
+        {'period_start': start_date or '', 'period_end': end_date or '', 'status': 'paid'}, {'_id': 0}
+    ):
+        paid_map[p['driver_id']] = p
+    for r in rows:
+        p = paid_map.get(r['driver_id'])
+        r['payment_status'] = 'paid' if p else 'pending'
+        r['paid_at'] = p.get('paid_at') if p else None
     totals = {
         'deliveries': sum(r['total_deliveries'] for r in rows),
         'revenue': round(sum(r['total_revenue'] for r in rows), 2),
         'earnings': round(sum(r['total_earnings'] for r in rows), 2),
+        'paid_earnings': round(sum(r['total_earnings'] for r in rows if r['payment_status'] == 'paid'), 2),
+        'pending_earnings': round(sum(r['total_earnings'] for r in rows if r['payment_status'] == 'pending'), 2),
     }
     return {
         'period': f"{start_date or 'inicio'} → {end_date or 'hoy'}",
@@ -1521,16 +1543,60 @@ async def finances_export(start_date: Optional[str] = None, end_date: Optional[s
     summary = await finances_summary(start_date, end_date, rate, current_user)
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(['repartidor', 'repartidor_id', 'entregas', 'ingresos_eur', 'comision_eur', 'tasa'])
+    writer.writerow(['repartidor', 'repartidor_id', 'entregas', 'ingresos_eur', 'comision_eur', 'tasa', 'estado_pago'])
     for r in summary['rows']:
         writer.writerow([r['driver_name'], r['driver_id'], r['total_deliveries'],
-                         r['total_revenue'], r['total_earnings'], rate])
+                         r['total_revenue'], r['total_earnings'], rate,
+                         'Pagado' if r.get('payment_status') == 'paid' else 'Pendiente'])
     t = summary['totals']
     writer.writerow([])
     writer.writerow(['TOTAL', '', t['deliveries'], t['revenue'], t['earnings'], rate])
     filename = f"pagos_repartidores_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.csv"
     return Response(content=buf.getvalue(), media_type='text/csv',
                     headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
+@api_router.post("/admin/finances/mark-paid")
+async def mark_driver_paid(req: MarkPaidRequest, current_user: dict = Depends(get_current_user)):
+    """Marca como PAGADO el ciclo de comisiones de un repartidor en el periodo indicado.
+    Recalcula el importe en servidor (no confía en el cliente) y guarda una instantánea."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    per = await _compute_earnings({'status': 'delivered', 'driver_id': req.driver_id},
+                                  req.start_date, req.end_date, req.rate)
+    v = per.get(req.driver_id, {'deliveries': 0, 'revenue': 0.0})
+    key = _payout_key(req.driver_id, req.start_date, req.end_date)
+    now = datetime.now(timezone.utc).isoformat()
+    snapshot = {
+        **key, 'status': 'paid', 'rate': req.rate,
+        'deliveries': v['deliveries'], 'revenue': round(v['revenue'], 2),
+        'amount': round(v['revenue'] * req.rate, 2),
+        'paid_at': now, 'marked_by': current_user.get('id'),
+        'marked_by_name': current_user.get('name'), 'updated_at': now,
+    }
+    await db.driver_payouts.update_one(
+        key, {'$set': snapshot, '$setOnInsert': {'id': str(uuid.uuid4()), 'created_at': now}}, upsert=True
+    )
+    return {'message': 'Pago registrado', **snapshot}
+
+@api_router.post("/admin/finances/mark-pending")
+async def mark_driver_pending(req: MarkPaidRequest, current_user: dict = Depends(get_current_user)):
+    """Revierte el pago: el ciclo de comisiones vuelve a PENDIENTE (elimina el registro de pago)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    await db.driver_payouts.delete_one(_payout_key(req.driver_id, req.start_date, req.end_date))
+    return {'message': 'Marcado como pendiente', 'driver_id': req.driver_id, 'status': 'pending'}
+
+@api_router.get("/admin/finances/payouts")
+async def list_payouts(driver_id: Optional[str] = None, limit: int = 200,
+                       current_user: dict = Depends(get_current_user)):
+    """Historial de pagos registrados (instantáneas de ciclos cerrados)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    q = {'status': 'paid'}
+    if driver_id:
+        q['driver_id'] = driver_id
+    payouts = await db.driver_payouts.find(q, {'_id': 0}).sort('paid_at', -1).to_list(max(1, min(limit, 1000)))
+    return {'count': len(payouts), 'payouts': payouts}
 
 @api_router.get("/admin/active-drivers")
 async def get_active_drivers(current_user: dict = Depends(get_current_user)):
@@ -1870,7 +1936,7 @@ async def init_collections_and_indexes():
         existing = await db.list_collection_names()
         for coll in ['users', 'orders', 'businesses', 'products', 'messages',
                      'payment_transactions', 'affiliate_links', 'admin_login_attempts',
-                     'assignment_history', 'cities']:
+                     'assignment_history', 'cities', 'driver_payouts']:
             if coll not in existing:
                 await db.create_collection(coll)
 
@@ -1910,6 +1976,12 @@ async def init_collections_and_indexes():
         # Historial de asignaciones (trazabilidad)
         await db.assignment_history.create_index('created_at')
         await db.assignment_history.create_index('order_id')
+
+        # Pagos de comisiones por repartidor (ciclos cerrados Pagado/Pendiente)
+        await db.driver_payouts.create_index(
+            [('driver_id', 1), ('period_start', 1), ('period_end', 1)], unique=True
+        )
+        await db.driver_payouts.create_index('paid_at')
 
         # Ciudades / zonas + seed inicial (con coordenadas del centro)
         await db.cities.create_index('name', unique=True)
