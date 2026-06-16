@@ -196,5 +196,29 @@
     "share": "Partager le suivi",
     "shareMessage": "Suivez votre commande sur Nubo Express :",
     "mapUnavailable": "La carte n'est pas disponible pour le moment. Le reste des informations de la commande s'affiche ci-dessous."
+  },
+  "deliveryQuote": {
+    "title": "Calculez votre tarif",
+    "subtitle": "Prix et temps estimé entre le Maroc et l'Espagne",
+    "origin": "Origine",
+    "destination": "Destination",
+    "vehicle": "Véhicule",
+    "motorcycle": "Moto",
+    "car": "Voiture",
+    "bicycle": "Vélo",
+    "calculate": "Calculer le tarif",
+    "calculating": "Calcul en cours...",
+    "distance": "Distance",
+    "eta": "Temps estimé",
+    "fee": "Tarif",
+    "minutes": "min",
+    "selectOrigin": "Choisir l'origine",
+    "selectDestination": "Choisir la destination",
+    "sameError": "L'origine et la destination ne peuvent pas être identiques",
+    "genericError": "Impossible de calculer le tarif. Réessayez.",
+    "spain": "Espagne",
+    "morocco": "Maroc",
+    "back": "Retour",
+    "result": "Résultat du devis"
   }
 }

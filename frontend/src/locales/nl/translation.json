@@ -196,5 +196,29 @@
     "share": "Tracking delen",
     "shareMessage": "Volg je bestelling bij Nubo Express:",
     "mapUnavailable": "De kaart is momenteel niet beschikbaar. De rest van de bestelgegevens wordt hieronder getoond."
+  },
+  "deliveryQuote": {
+    "title": "Bereken je tarief",
+    "subtitle": "Prijs en geschatte tijd tussen Marokko en Spanje",
+    "origin": "Herkomst",
+    "destination": "Bestemming",
+    "vehicle": "Voertuig",
+    "motorcycle": "Motor",
+    "car": "Auto",
+    "bicycle": "Fiets",
+    "calculate": "Tarief berekenen",
+    "calculating": "Berekenen...",
+    "distance": "Afstand",
+    "eta": "Geschatte tijd",
+    "fee": "Tarief",
+    "minutes": "min",
+    "selectOrigin": "Kies herkomst",
+    "selectDestination": "Kies bestemming",
+    "sameError": "Herkomst en bestemming mogen niet hetzelfde zijn",
+    "genericError": "Kon het tarief niet berekenen. Probeer opnieuw.",
+    "spain": "Spanje",
+    "morocco": "Marokko",
+    "back": "Terug",
+    "result": "Offerteresultaat"
   }
 }

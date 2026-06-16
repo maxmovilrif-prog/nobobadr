@@ -11,6 +11,7 @@ import AdminDashboard from '@/pages/AdminDashboard';
 import AdminLogin from '@/pages/AdminLogin';
 import OrderTracking from '@/pages/OrderTracking';
 import PublicTracking from '@/pages/PublicTracking';
+import DeliveryQuote from '@/pages/DeliveryQuote';
 import OrderSuccess from '@/pages/OrderSuccess';
 import DropshippingPanel from '@/pages/DropshippingPanel';
 import TravelBooking from '@/pages/TravelBooking';
@@ -106,6 +107,7 @@ function App() {
           <Route path="/orders" element={user ? <CustomerDashboard /> : <Navigate to="/auth" />} />
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/track" element={<PublicTracking />} />
+          <Route path="/cotizar" element={<DeliveryQuote />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />
           <Route path="/dropshipping-panel" element={user && user.role === 'business' ? <DropshippingPanel /> : <Navigate to="/auth" />} />
           <Route path="/travel" element={<TravelBooking />} />

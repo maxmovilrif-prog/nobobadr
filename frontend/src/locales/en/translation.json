@@ -196,5 +196,29 @@
     "share": "Share tracking",
     "shareMessage": "Track your order on Nubo Express:",
     "mapUnavailable": "The map is unavailable right now. The rest of the order information is shown below."
+  },
+  "deliveryQuote": {
+    "title": "Calculate your fare",
+    "subtitle": "Price and estimated time between Morocco and Spain",
+    "origin": "Origin",
+    "destination": "Destination",
+    "vehicle": "Vehicle",
+    "motorcycle": "Motorcycle",
+    "car": "Car",
+    "bicycle": "Bicycle",
+    "calculate": "Calculate fare",
+    "calculating": "Calculating...",
+    "distance": "Distance",
+    "eta": "Estimated time",
+    "fee": "Fare",
+    "minutes": "min",
+    "selectOrigin": "Choose origin",
+    "selectDestination": "Choose destination",
+    "sameError": "Origin and destination can't be the same",
+    "genericError": "Could not calculate the fare. Please try again.",
+    "spain": "Spain",
+    "morocco": "Morocco",
+    "back": "Back",
+    "result": "Quote result"
   }
 }

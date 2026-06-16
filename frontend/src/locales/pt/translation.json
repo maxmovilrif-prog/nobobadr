@@ -196,5 +196,29 @@
     "share": "Partilhar rastreamento",
     "shareMessage": "Acompanhe o seu pedido na Nubo Express:",
     "mapUnavailable": "O mapa não está disponível no momento. O restante das informações do pedido é mostrado abaixo."
+  },
+  "deliveryQuote": {
+    "title": "Calcule a sua tarifa",
+    "subtitle": "Preço e tempo estimado entre Marrocos e Espanha",
+    "origin": "Origem",
+    "destination": "Destino",
+    "vehicle": "Veículo",
+    "motorcycle": "Mota",
+    "car": "Carro",
+    "bicycle": "Bicicleta",
+    "calculate": "Calcular tarifa",
+    "calculating": "A calcular...",
+    "distance": "Distância",
+    "eta": "Tempo estimado",
+    "fee": "Tarifa",
+    "minutes": "min",
+    "selectOrigin": "Escolher origem",
+    "selectDestination": "Escolher destino",
+    "sameError": "Origem e destino não podem ser iguais",
+    "genericError": "Não foi possível calcular a tarifa. Tente novamente.",
+    "spain": "Espanha",
+    "morocco": "Marrocos",
+    "back": "Voltar",
+    "result": "Resultado do orçamento"
   }
 }

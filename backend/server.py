@@ -1634,6 +1634,15 @@ class DeliveryRequest(BaseModel):
     vehicle_type: VehicleType
     currency: str = "EUR"
 
+@api_router.get("/public/cities")
+async def list_public_cities():
+    """Ciudades operativas (público) para la calculadora de tarifa: id, name, lat, lng, country."""
+    cities = await db.cities.find({}, {'_id': 0, 'id': 1, 'name': 1, 'lat': 1, 'lng': 1, 'country': 1}).sort('name', 1).to_list(1000)
+    return {'cities': cities}
+
+# Tasa de referencia: 1 MAD = 0.092 EUR -> 1 EUR = ~10.87 MAD
+MAD_PER_EUR = round(1 / 0.092, 4)
+
 @api_router.post("/v1/calculate-delivery")
 async def calculate_delivery(req: DeliveryRequest):
     """Calcula la tarifa de entrega y el ETA según la distancia/tiempo reales (Google
@@ -1672,8 +1681,12 @@ async def calculate_delivery(req: DeliveryRequest):
     duration_minutes = float(str(routes[0].get("duration", "0s")).rstrip("s") or 0) / 60.0
 
     config = PRICING_CONFIG[req.vehicle_type]
-    total_price = round(config["base_fare"] + distance_km * config["per_km_fare"], 2)
+    total_price = config["base_fare"] + distance_km * config["per_km_fare"]  # en EUR
     estimated_eta = round(duration_minutes * config["speed_factor"])
+    # Convierte a la divisa solicitada (las tarifas base están en EUR)
+    if req.currency.upper() == "MAD":
+        total_price *= MAD_PER_EUR
+    total_price = round(total_price, 2)
 
     return {
         "status": "success",
@@ -1682,7 +1695,7 @@ async def calculate_delivery(req: DeliveryRequest):
         "original_duration_mins": round(duration_minutes),
         "adjusted_eta_mins": estimated_eta,
         "delivery_fee": total_price,
-        "currency": req.currency,
+        "currency": req.currency.upper(),
     }
 
 @api_router.get("/admin/active-drivers")
@@ -2074,20 +2087,22 @@ async def init_collections_and_indexes():
         await db.cities.create_index('name', unique=True)
         seed_cities = [
             # Marruecos
-            {'name': 'Tánger', 'lat': 35.7595, 'lng': -5.8340},
-            {'name': 'Casablanca', 'lat': 33.5731, 'lng': -7.5898},
-            {'name': 'Meknes', 'lat': 33.8935, 'lng': -5.5473},
-            {'name': 'Nador', 'lat': 35.1681, 'lng': -2.9335},
+            {'name': 'Tánger', 'lat': 35.7595, 'lng': -5.8340, 'country': 'MA'},
+            {'name': 'Casablanca', 'lat': 33.5731, 'lng': -7.5898, 'country': 'MA'},
+            {'name': 'Meknes', 'lat': 33.8935, 'lng': -5.5473, 'country': 'MA'},
+            {'name': 'Nador', 'lat': 35.1681, 'lng': -2.9335, 'country': 'MA'},
             # España
-            {'name': 'Algeciras', 'lat': 36.1408, 'lng': -5.4562},
-            {'name': 'Madrid', 'lat': 40.4168, 'lng': -3.7038},
-            {'name': 'Barcelona', 'lat': 41.3874, 'lng': 2.1686},
-            {'name': 'Málaga', 'lat': 36.7213, 'lng': -4.4214},
+            {'name': 'Algeciras', 'lat': 36.1408, 'lng': -5.4562, 'country': 'ES'},
+            {'name': 'Madrid', 'lat': 40.4168, 'lng': -3.7038, 'country': 'ES'},
+            {'name': 'Barcelona', 'lat': 41.3874, 'lng': 2.1686, 'country': 'ES'},
+            {'name': 'Málaga', 'lat': 36.7213, 'lng': -4.4214, 'country': 'ES'},
         ]
         for c in seed_cities:
             existing_city = await db.cities.find_one({'name': c['name']})
             if not existing_city:
                 await db.cities.insert_one({'id': str(uuid.uuid4()), **c})
+            elif not existing_city.get('country'):
+                await db.cities.update_one({'name': c['name']}, {'$set': {'country': c['country']}})
         logger.info("Seeded/verified cities (ES + MA)")
 
         logger.info("DB collections & indexes initialized")
