@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -183,7 +183,10 @@ export const CityManager = ({ API, token, onChanged }) => {
       {/* Dialogo de edición */}
       <Dialog open={!!editCity} onOpenChange={(o) => { if (!o) setEditCity(null); }}>
         <DialogContent data-testid="city-edit-dialog">
-          <DialogHeader><DialogTitle>Editar ciudad</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Editar ciudad</DialogTitle>
+            <DialogDescription>Actualiza el nombre, país y coordenadas de la zona operativa.</DialogDescription>
+          </DialogHeader>
           {editCity && (
             <div className="space-y-3">
               <div>
