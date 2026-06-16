@@ -51,6 +51,13 @@ const DEMO_ORDERS = {
     destination: { lat: 36.0143, lng: -5.6044, label_ar: 'طريفة، إسبانيا', label_es: 'Tarifa, España' },
     current: { lat: 35.9, lng: -5.5 }, updated_at: '2026-06-15T15:10:00Z',
   },
+  'ORD-4824': {
+    order_id: 'ORD-4824', client_name: 'سلمى بناني / Salma Bennani', delivery_status: 'assigned',
+    driver_name: 'Omar Fassi', vehicle: 'Bicicleta urbana • Repartidor', vehicle_type: 'bicycle', price: 90,
+    origin: { lat: 35.7595, lng: -5.8340, label_ar: 'طنجة، المغرب', label_es: 'Tánger, Marruecos' },
+    destination: { lat: 35.7806, lng: -5.8136, label_ar: 'وسط طنجة، المغرب', label_es: 'Centro de Tánger, Marruecos' },
+    current: { lat: 35.77, lng: -5.82 }, updated_at: '2026-06-15T15:30:00Z',
+  },
 };
 
 // Marcadores SVG según el tipo de vehículo (círculo verde + silueta blanca)
@@ -58,9 +65,10 @@ function vehicleMarkerUrl(type) {
   const glyphs = {
     truck: `<g fill="#fff"><rect x="9" y="15" width="12" height="9" rx="1"/><path d="M21 17 h5 l4 4 v3 h-9 z"/><circle cx="14" cy="26" r="2.3"/><circle cx="26" cy="26" r="2.3"/></g>`,
     car: `<g fill="#fff"><path d="M10 24 l2 -6 q0.6 -1.6 2.4 -1.6 h11.2 q1.8 0 2.4 1.6 l2 6 z"/><circle cx="15" cy="26" r="2.2"/><circle cx="25" cy="26" r="2.2"/></g>`,
-    motorcycle: `<g fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="26" r="3.6"/><circle cx="27" cy="26" r="3.6"/><path d="M13 26 l5 -6 h5 M22 20 l5 6 M16 20 h4"/></g>`,
+    motorcycle: `<g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="26" r="3.6"/><circle cx="27" cy="26" r="3.6"/><path d="M13 26 l5 -6 h5 M22 20 l5 6 M16 20 h4"/></g>`,
+    bicycle: `<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="26" r="4"/><circle cx="27" cy="26" r="4"/><path d="M13 26 l4 -7 h6 M17 19 l6 7 M20 15 h4 l-1 4 M13 26 l4 -7"/></g>`,
   };
-  const glyph = glyphs[type] || glyphs.truck;
+  const glyph = glyphs[type] || glyphs.motorcycle;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="42" height="42">
     <circle cx="20" cy="20" r="18" fill="#10B981" opacity="0.25"/>
     <circle cx="20" cy="20" r="13" fill="#059669"/>${glyph}</svg>`;
