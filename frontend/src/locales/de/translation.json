@@ -192,6 +192,8 @@
       "assigned": "Zugewiesen",
       "in_transit": "Unterwegs",
       "delivered": "Geliefert"
-    }
+    },
+    "share": "Tracking teilen",
+    "shareMessage": "Verfolge deine Bestellung bei Nubo Express:"
   }
 }

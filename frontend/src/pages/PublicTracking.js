@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from '@react-google-maps/api';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import LanguageSelector from '@/components/LanguageSelector';
-import { Search, MapPin, Flag, Truck, Clock, Route as RouteIcon, ArrowLeft, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Search, MapPin, Flag, Truck, Clock, Route as RouteIcon, ArrowLeft, Loader2, Share2 } from 'lucide-react';
 
 // 1 MAD = 0.092 EUR (tasa de referencia; se podrá actualizar vía API)
 const EXCHANGE_RATE_MAD_EUR = 0.092;
@@ -31,28 +32,40 @@ const STATUS_CLASS = {
 const DEMO_ORDERS = {
   'ORD-4821': {
     order_id: 'ORD-4821', client_name: 'أحمد الراشدي / Ahmed Rachidi', delivery_status: 'in_transit',
-    driver_name: 'Said Mzian', vehicle: 'Mercedes Sprinter • MA-4821-B', price: 850,
+    driver_name: 'Said Mzian', vehicle: 'Mercedes Sprinter • MA-4821-B', vehicle_type: 'truck', price: 850,
     origin: { lat: 35.7595, lng: -5.8340, label_ar: 'طنجة ميد، المغرب', label_es: 'Tánger Med, Marruecos' },
     destination: { lat: 36.5271, lng: -6.2886, label_ar: 'خيريز دي لا فرونتيرا، إسبانيا', label_es: 'Jerez de la Frontera, España' },
     current: { lat: 36.1408, lng: -5.4536 }, updated_at: '2026-06-15T14:22:00Z',
   },
   'ORD-4822': {
     order_id: 'ORD-4822', client_name: 'فاطمة الزهراء / Fátima Zahara', delivery_status: 'assigned',
-    driver_name: 'Reda Amine', vehicle: 'Renault Master • MA-7734-C', price: 450,
+    driver_name: 'Reda Amine', vehicle: 'Peugeot 208 • MA-7734-C', vehicle_type: 'car', price: 450,
     origin: { lat: 33.5731, lng: -7.5898, label_ar: 'الدار البيضاء، المغرب', label_es: 'Casablanca, Marruecos' },
     destination: { lat: 40.4168, lng: -3.7038, label_ar: 'مدريد، إسبانيا', label_es: 'Madrid, España' },
     current: { lat: 35.7595, lng: -5.8340 }, updated_at: '2026-06-15T13:45:00Z',
   },
+  'ORD-4823': {
+    order_id: 'ORD-4823', client_name: 'يوسف العلمي / Youssef Alami', delivery_status: 'in_transit',
+    driver_name: 'Karim Bennani', vehicle: 'Yamaha NMAX • MA-2231-D', vehicle_type: 'motorcycle', price: 180,
+    origin: { lat: 35.5889, lng: -5.3626, label_ar: 'تطوان، المغرب', label_es: 'Tetuán, Marruecos' },
+    destination: { lat: 36.0143, lng: -5.6044, label_ar: 'طريفة، إسبانيا', label_es: 'Tarifa, España' },
+    current: { lat: 35.9, lng: -5.5 }, updated_at: '2026-06-15T15:10:00Z',
+  },
 };
 
-const BEE_MARKER_SVG = encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
-    <circle cx="20" cy="20" r="18" fill="#10B981" opacity="0.2"/>
-    <circle cx="20" cy="20" r="11" fill="#059669"/>
-    <circle cx="20" cy="20" r="4" fill="#ffffff"/>
-  </svg>`
-);
-const BEE_MARKER_URL = `data:image/svg+xml;charset=UTF-8,${BEE_MARKER_SVG}`;
+// Marcadores SVG según el tipo de vehículo (círculo verde + silueta blanca)
+function vehicleMarkerUrl(type) {
+  const glyphs = {
+    truck: `<g fill="#fff"><rect x="9" y="15" width="12" height="9" rx="1"/><path d="M21 17 h5 l4 4 v3 h-9 z"/><circle cx="14" cy="26" r="2.3"/><circle cx="26" cy="26" r="2.3"/></g>`,
+    car: `<g fill="#fff"><path d="M10 24 l2 -6 q0.6 -1.6 2.4 -1.6 h11.2 q1.8 0 2.4 1.6 l2 6 z"/><circle cx="15" cy="26" r="2.2"/><circle cx="25" cy="26" r="2.2"/></g>`,
+    motorcycle: `<g fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="26" r="3.6"/><circle cx="27" cy="26" r="3.6"/><path d="M13 26 l5 -6 h5 M22 20 l5 6 M16 20 h4"/></g>`,
+  };
+  const glyph = glyphs[type] || glyphs.truck;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="42" height="42">
+    <circle cx="20" cy="20" r="18" fill="#10B981" opacity="0.25"/>
+    <circle cx="20" cy="20" r="13" fill="#059669"/>${glyph}</svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
 
 const containerStyle = { width: '100%', height: '100%', minHeight: '480px' };
 
@@ -71,6 +84,7 @@ export default function PublicTracking() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const mapRef = useRef(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { t, i18n } = useTranslation();
   const tr = (k) => t(`publicTracking.${k}`);
@@ -105,22 +119,17 @@ export default function PublicTracking() {
     }
   }, [isLoaded]);
 
-  // Redibuja la ruta cuando cambia el idioma o se carga el mapa con un pedido activo
-  useEffect(() => {
-    if (order && isLoaded) drawRoute(order);
-    // eslint-disable-next-line
-  }, [isLoaded]);
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!search.trim()) return;
+  // Busca un pedido (datos demo por ahora). Devuelve true si lo encuentra.
+  const lookupOrder = async (rawId) => {
+    const id = (rawId || '').trim().toUpperCase();
+    if (!id) return;
     setLoading(true);
     setError('');
     setRouteInfo(null);
     setDirections(null);
     // Simula latencia de red (se reemplazará por la llamada real al backend)
-    await new Promise((r) => setTimeout(r, 600));
-    const found = DEMO_ORDERS[search.trim().toUpperCase()];
+    await new Promise((r) => setTimeout(r, 500));
+    const found = DEMO_ORDERS[id];
     if (!found) {
       setError(tr('notFound'));
       setOrder(null);
@@ -129,6 +138,36 @@ export default function PublicTracking() {
       drawRoute(found);
     }
     setLoading(false);
+  };
+
+  // Auto-carga si llega ?order=ORD-XXXX (enlace compartido)
+  useEffect(() => {
+    const qp = searchParams.get('order');
+    if (qp) {
+      setSearch(qp);
+      lookupOrder(qp);
+    }
+    // eslint-disable-next-line
+  }, []);
+
+  // Redibuja la ruta cuando se carga el mapa con un pedido activo
+  useEffect(() => {
+    if (order && isLoaded) drawRoute(order);
+    // eslint-disable-next-line
+  }, [isLoaded]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (!search.trim()) return;
+    setSearchParams({ order: search.trim().toUpperCase() });
+    lookupOrder(search);
+  };
+
+  const handleShare = () => {
+    if (!order) return;
+    const url = `${window.location.origin}/track?order=${order.order_id}`;
+    const text = `${tr('shareMessage')} ${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const statusClass = order ? (STATUS_CLASS[order.delivery_status] || STATUS_CLASS.pending) : '';
@@ -215,8 +254,8 @@ export default function PublicTracking() {
                           title={rtl ? order.origin.label_ar : order.origin.label_es} />
                         <Marker position={order.destination} label={{ text: 'B', color: '#fff', fontWeight: 'bold' }}
                           title={rtl ? order.destination.label_ar : order.destination.label_es} />
-                        <Marker position={order.current} title={order.driver_name}
-                          icon={isLoaded ? { url: BEE_MARKER_URL, scaledSize: new window.google.maps.Size(40, 40), anchor: new window.google.maps.Point(20, 20) } : undefined} />
+                        <Marker position={order.current} title={`${order.driver_name} · ${order.vehicle}`}
+                          icon={isLoaded ? { url: vehicleMarkerUrl(order.vehicle_type), scaledSize: new window.google.maps.Size(42, 42), anchor: new window.google.maps.Point(21, 21) } : undefined} />
                       </>
                     )}
                   </GoogleMap>
@@ -245,6 +284,11 @@ export default function PublicTracking() {
                     <p className="text-sm text-gray-600 mt-2">{order.client_name}</p>
                   </CardContent>
                 </Card>
+
+                <Button data-testid="tracking-share-btn" onClick={handleShare}
+                  className="w-full bg-[#25D366] hover:bg-[#1ebe5b] text-white gap-2">
+                  <Share2 className="w-4 h-4" /> {tr('share')}
+                </Button>
 
                 <Card className="border-0 shadow-lg">
                   <CardContent className="p-4 space-y-3">

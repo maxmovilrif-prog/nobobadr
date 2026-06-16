@@ -192,6 +192,8 @@
       "assigned": "مُعيَّن",
       "in_transit": "في الطريق",
       "delivered": "مُسلَّم"
-    }
+    },
+    "share": "مشاركة التتبع",
+    "shareMessage": "تتبع طلبك على Nubo Express:"
   }
 }

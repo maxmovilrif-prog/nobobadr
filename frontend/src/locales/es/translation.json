@@ -192,6 +192,8 @@
       "assigned": "Asignado",
       "in_transit": "En tránsito",
       "delivered": "Entregado"
-    }
+    },
+    "share": "Compartir seguimiento",
+    "shareMessage": "Sigue tu pedido en Nubo Express:"
   }
 }

@@ -1,0 +1,45 @@
+{
+  "summary": "Frontend-only testing of /track public page focused on new features: Share button (WhatsApp), auto-load via ?order= query param, vehicle-type dynamic marker, URL sync on search, currency toggle, i18n (Español/English/Français/Arabic+RTL), and error state. ALL flows passed. Map shows ApiTargetBlockedMapError (Google Cloud API restriction) — reported but NOT counted as bug per main agent note; vehicle marker SVG generator code reviewed and looks correct but cannot be visually validated until Maps JS API is enabled.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/track map area", "issues": ["Google Maps shows 'Oops! Something went wrong.' due to ApiTargetBlockedMapError. Maps JavaScript API / Directions API need to be enabled in Google Cloud Console for the configured key. Not a code bug."]}
+    ]
+  },
+  "test_results": {
+    "search_ORD-4821": "PASS — tracking-order-id=ORD-4821, status='In transit', cost='850,00 د.م.' (MAD), share-btn visible",
+    "url_sync_after_search": "PASS — URL becomes /track?order=ORD-4821",
+    "auto_load_query_param_ORD-4822": "PASS — auto-loaded id=ORD-4822, status='Assigned', input prefilled",
+    "auto_load_query_param_ORD-4823": "PASS — auto-loaded id=ORD-4823 (motorcycle/in_transit/180 MAD)",
+    "share_button_click": "PASS — opens new tab https://api.whatsapp.com/send/?text=Track+your+order+on+Nubo+Express%3A+https%3A%2F%2F...%2Ftrack%3Forder%3DORD-4821",
+    "currency_toggle": "PASS — MAD '850,00 د.م.' ↔ EUR '78,20 €' for ORD-4821; ORD-4823 EUR '16,56 €' (consistent with 0.092 rate)",
+    "language_switch_FR": "PASS — share btn shows 'Partager le suivi'",
+    "language_switch_EN": "PASS — share btn shows 'Share tracking'",
+    "language_switch_AR_rtl": "PASS — dir='rtl' on root, share btn shows 'مشاركة التتبع'",
+    "non_existent_order_error": "PASS — ORD-9999 shows tracking-error: 'Order not found'",
+    "vehicle_marker_dynamic_icon": "NOT VISUALLY VERIFIABLE — map blocked by ApiTargetBlockedMapError. Code review: vehicleMarkerUrl(type) generates distinct SVGs for truck/car/motorcycle and is correctly passed to <Marker icon={url: vehicleMarkerUrl(order.vehicle_type)...}>. Implementation looks correct."
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Inform user/customer to enable 'Maps JavaScript API' and 'Directions API' in Google Cloud Console for the REACT_APP_GOOGLE_MAPS_API_KEY (ApiTargetBlockedMapError). Not a code fix.",
+    "Optional: address Google deprecation warning — google.maps.DirectionsService is deprecated since Feb 25, 2026, recommended migration to google.maps.routes.Route.computeRoutes (12+ months notice; no rush)."
+  ],
+  "critical_code_review_comments": [
+    "PublicTracking.js (368 lines): clean, single responsibility, all interactive elements have data-testid. Good.",
+    "lookupOrder uses tr('notFound') inside a sync setError — works because t() is sync; OK.",
+    "Share button uses window.open(wa.me) which is correctly newtab; URL is built from window.location.origin + /track?order=ID — verified.",
+    "useEffect on mount uses eslint-disable for missing deps (lookupOrder/searchParams) — acceptable for mount-only behaviour.",
+    "vehicleMarkerUrl falls back to 'truck' for unknown types — safe default.",
+    "EXCHANGE_RATE_MAD_EUR hardcoded constant (0.092) — fine for demo; consider API in production (already noted in comment)."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (skipped)", "frontend": "100% (10/10 frontend flows verified; marker icon code-review only due to map block)" },
+  "test_credentials": "N/A — public page",
+  "seed_data_creation": "None — DEMO_ORDERS hardcoded (ORD-4821 truck, ORD-4822 car, ORD-4823 motorcycle).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All /track features (search, ?order= auto-load, URL sync, share via wa.me, currency MAD/EUR, i18n 7 langs with RTL for Arabic, error state) verified. Only blocker is Google Maps API restriction (ApiTargetBlockedMapError) — outside code scope. Vehicle marker dynamic icon could not be visually validated until Maps loads; code is correct.",
+  "rca of the issue": "ApiTargetBlockedMapError originates from Google Cloud Console settings on the API key (Maps JavaScript API and Directions API not enabled / restricted by HTTP referrer). Mitigation: enable both APIs and whitelist preview.emergentagent.com referrer."
+}
