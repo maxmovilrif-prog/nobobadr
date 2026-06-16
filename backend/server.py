@@ -149,9 +149,9 @@ class Order(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     customer_id: str
-    business_id: str
+    business_id: Optional[str] = None
     driver_id: Optional[str] = None
-    items: List[OrderItem]
+    items: List[OrderItem] = []
     total_amount: float
     delivery_address: str
     city_id: Optional[str] = None
@@ -159,6 +159,18 @@ class Order(BaseModel):
     status: str  # pending, accepted, preparing, ready, in_transit, delivered, cancelled
     payment_status: str = "pending"  # pending, paid, failed
     payment_session_id: Optional[str] = None
+    # Pedido exprés (mensajería punto a punto A->B)
+    order_type: str = "marketplace"  # marketplace | express
+    vehicle_type: Optional[str] = None
+    origin_name: Optional[str] = None
+    origin_lat: Optional[float] = None
+    origin_lng: Optional[float] = None
+    destination_name: Optional[str] = None
+    destination_lat: Optional[float] = None
+    destination_lng: Optional[float] = None
+    distance_km: Optional[float] = None
+    eta_mins: Optional[int] = None
+    currency: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -167,6 +179,20 @@ class OrderCreate(BaseModel):
     items: List[OrderItem]
     delivery_address: str
     city_id: Optional[str] = None
+
+class ExpressOrderCreate(BaseModel):
+    origin_name: str
+    origin_lat: float
+    origin_lng: float
+    destination_name: str
+    destination_lat: float
+    destination_lng: float
+    origin_city_id: Optional[str] = None
+    vehicle_type: str
+    fee: float
+    currency: str = "EUR"
+    distance_km: Optional[float] = None
+    eta_mins: Optional[int] = None
 
 class OrderStatusUpdate(BaseModel):
     status: str
