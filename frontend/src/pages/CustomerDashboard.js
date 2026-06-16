@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car, Sparkles, Search, Loader2 } from 'lucide-react';
+import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car, Sparkles, Search, Loader2, PackageCheck } from 'lucide-react';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleFilters from '@/components/VehicleFilters';
 import RideBooking from '@/components/RideBooking';
@@ -36,6 +36,7 @@ export default function CustomerDashboard() {
     sortBy: 'name'
   });
   const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
+  const [quotePrefill, setQuotePrefill] = useState(null);
 
   // AI Smart Search
   const [aiQuery, setAiQuery] = useState('');
@@ -64,6 +65,20 @@ export default function CustomerDashboard() {
     fetchBusinesses();
     fetchOrders();
     fetchCities();
+  }, []);
+
+  // Precarga del presupuesto generado en /cotizar (origen, destino y vehículo)
+  useEffect(() => {
+    const raw = localStorage.getItem('nubo_quote_prefill');
+    if (raw) {
+      try {
+        const q = JSON.parse(raw);
+        setQuotePrefill(q);
+        if (q.destName) setDeliveryAddress(q.destName);
+        if (q.destCityId) setSelectedCityId(q.destCityId);
+      } catch (e) { /* noop */ }
+      localStorage.removeItem('nubo_quote_prefill');
+    }
   }, []);
 
   const fetchCities = async () => {
@@ -340,6 +355,32 @@ export default function CustomerDashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Banner de presupuesto precargado desde /cotizar */}
+        {quotePrefill && (
+          <Card className="mb-6 border-emerald-200 bg-emerald-50" data-testid="quote-prefill-banner">
+            <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <PackageCheck className="w-6 h-6 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    Solicitud de entrega: {quotePrefill.originName} → {quotePrefill.destName}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {{ motorcycle: 'Moto', car: 'Coche', bicycle: 'Bici', truck: 'Camión' }[quotePrefill.vehicle] || quotePrefill.vehicle}
+                    {quotePrefill.distance ? ` · ${quotePrefill.distance} km` : ''}
+                    {quotePrefill.eta ? ` · ${quotePrefill.eta} min` : ''}
+                    {quotePrefill.fee != null ? ` · ${quotePrefill.fee} ${quotePrefill.currency || ''}` : ''}
+                    {' · '}Dirección de entrega precargada abajo.
+                  </p>
+                </div>
+              </div>
+              <Button data-testid="quote-prefill-dismiss" variant="ghost" size="sm" onClick={() => setQuotePrefill(null)}>
+                Cerrar
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Travel Banner */}
         <Card className="mb-8 bg-gradient-to-r from-blue-500 via-teal-500 to-emerald-500 text-white border-0 overflow-hidden relative">
           <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>

@@ -1,0 +1,30 @@
+{
+  "summary": "Validado flujo 'Pedir esta entrega' end-to-end. Botones de landing (nav-quote-btn y hero-quote-link) navegan a /cotizar. La página /cotizar carga (delivery-quote-page) con selects agrupados por país (optgroup 'Morocco': Casablanca/Meknes/Nador/Tánger; optgroup 'Spain': Algeciras/Barcelona/Madrid/Málaga) y los tres botones de vehículo (motorcycle/car/bicycle). El cálculo devuelve error controlado en quote-error ('The origin web server returned an invalid or incomplete response to Cloudflare') porque Routes API no está habilitada — esperado, página NO en blanco. Flujo de precarga validado inyectando nubo_quote_prefill en localStorage + login cliente: tras /dashboard aparece quote-prefill-banner con texto exacto 'Solicitud de entrega: Tánger → Madrid' y subtítulo 'Moto · 20 km · 35 min · 12.5 EUR · Dirección de entrega precargada abajo.'. localStorage.nubo_quote_prefill se elimina tras consumirse. El botón quote-prefill-dismiss oculta el banner. Tras abrir un negocio y añadir un producto al carrito, delivery-address-input='Madrid' y city-select tiene el cityId real de Madrid (6b3a3874-...). Todo funcionando.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/cotizar (quote-error)", "issues": ["El mensaje de error procede directamente del HTML 502 de Cloudflare ('The origin web server returned an invalid or incomplete response...') porque el backend cae cuando Routes API no está habilitada. Aunque se muestra en rojo dentro de quote-error (no es pantalla en blanco), el texto es técnico y poco amigable para el usuario final en español. Sugerencia: capturar el 502/error genérico y mostrar un mensaje localizado tipo 'No pudimos calcular tu tarifa en este momento. Inténtalo más tarde.'"]},
+      {"screen": "Dashboard cart modal", "issues": ["Warning de a11y de Radix Dialog: 'Missing Description or aria-describedby for DialogContent'. Añadir <DialogDescription> o aria-describedby."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Mejorar el manejo del error 502 / Routes API deshabilitada en /cotizar: mostrar mensaje en español más amigable en lugar del HTML crudo de Cloudflare (en cuanto se habilite Routes API esto deja de ocurrir, pero conviene tener fallback).",
+    "(Opcional) Añadir DialogDescription en el modal del negocio en CustomerDashboard para eliminar warning de accesibilidad."
+  ],
+  "critical_code_review_comments": [
+    "DeliveryQuote.handleOrderThis() construye correctamente el payload (originName, destName, destCityId, vehicle, fee, currency, distance, eta) y decide /dashboard vs /auth en base a token de localStorage — OK.",
+    "CustomerDashboard useEffect lee nubo_quote_prefill, llama setDeliveryAddress(destName)+setSelectedCityId(destCityId) y luego localStorage.removeItem — patrón de un solo uso correcto, evita banners persistentes en sesiones futuras.",
+    "El banner usa data-testid quote-prefill-banner y dismiss con data-testid quote-prefill-dismiss; mapping de vehículo (motorcycle->Moto, car->Coche, bicycle->Bici, truck->Camión) está correcto.",
+    "Detalle menor: en DeliveryQuote setError usa e?.response?.data?.detail; cuando la respuesta es 502 desde Cloudflare el cuerpo es HTML, no JSON, por lo que `detail` puede no existir y entonces se usa tr('genericError'). Verificar que tr('genericError') esté localizado en es/ar/fr; actualmente parece estar mostrándose el HTML porque axios sí parsea texto a string en data."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100% para el flujo 'Pedir esta entrega'"},
+  "test_credentials": "cliente@nubotest.com / Cliente123!",
+  "seed_data_creation": "Ninguno. Se obtuvo destCityId real de Madrid (6b3a3874-b058-45ba-918e-24ccf33576ee... -> exacto: 6b3a3874-4168-4b1b-b6cd-0ed99f9018f9) vía GET /api/public/cities. Se inyectó nubo_quote_prefill en localStorage para emular el resultado /cotizar.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "El flujo 'Pedir esta entrega' (iteration_17) está validado salvo el cálculo real en /cotizar que requiere Routes API habilitada. Para volver a probar end-to-end basta con habilitar Routes API en el proyecto Google y comprobar quote-result/quote-fee/quote-distance/quote-eta + quote-order-btn. El consumo de nubo_quote_prefill en CustomerDashboard funciona perfecto: banner correcto, dismiss correcto, input delivery-address-input precargado con 'Madrid', city-select precargado con el cityId correspondiente."
+}

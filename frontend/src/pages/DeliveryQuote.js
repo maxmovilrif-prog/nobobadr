@@ -9,7 +9,7 @@ import LanguageSelector from '@/components/LanguageSelector';
 import motoIconUrl from '@/assets/icons/moto-bee.png';
 import carIconUrl from '@/assets/icons/car-bee.png';
 import bikeIconUrl from '@/assets/icons/bike-bee.png';
-import { ArrowLeft, MapPin, Flag, Clock, Route as RouteIcon, Calculator, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Flag, Clock, Route as RouteIcon, Calculator, Loader2, PackageCheck } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -65,6 +65,19 @@ export default function DeliveryQuote() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOrderThis = () => {
+    if (!result) return;
+    const origin = cities.find((c) => c.id === originId);
+    const dest = cities.find((c) => c.id === destId);
+    localStorage.setItem('nubo_quote_prefill', JSON.stringify({
+      originName: origin?.name, destName: dest?.name, destCityId: dest?.id,
+      vehicle, fee: result.delivery_fee, currency: result.currency,
+      distance: result.distance_km, eta: result.adjusted_eta_mins,
+    }));
+    const token = localStorage.getItem('token');
+    navigate(token ? '/dashboard' : '/auth');
   };
 
   const feeText = result
@@ -192,6 +205,10 @@ export default function DeliveryQuote() {
                     <p className="text-lg font-semibold text-gray-800" data-testid="quote-eta">{result.adjusted_eta_mins} {tr('minutes')}</p>
                   </div>
                 </div>
+                <Button data-testid="quote-order-btn" onClick={handleOrderThis}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2">
+                  <PackageCheck className="w-4 h-4" /> {tr('orderThis')}
+                </Button>
               </div>
             )}
           </CardContent>
