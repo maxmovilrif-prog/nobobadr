@@ -635,6 +635,10 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
         update_fields['delivered_at'] = datetime.now(timezone.utc).isoformat()
     await db.orders.update_one({'id': order_id}, {'$set': update_fields})
 
+    # Contabilidad: registrar el ingreso del pedido automáticamente al entregarse (interno, idempotente)
+    if status_update.status == 'delivered':
+        await _acct_record_order_income({**order, **update_fields})
+
     # La Abeja vuelve a estar disponible al cerrar el pedido (entregado o cancelado)
     if status_update.status in ('delivered', 'cancelled') and order.get('driver_id'):
         await release_driver(order.get('driver_id'))
@@ -1901,6 +1905,42 @@ async def _acct_create_txn(current_user: dict, *, type_: str, amount: float, cur
                       {'type': type_, 'amount': doc['amount'], 'currency': currency, 'description': description})
     doc.pop('_id', None)
     return doc
+
+async def _acct_record_order_income(order: dict) -> bool:
+    """Registra automáticamente un ingreso en el libro contable al completarse un pedido.
+    100% interno e idempotente: si ya existe un ingreso con ese reference_id, no duplica.
+    Devuelve True si crea la transacción."""
+    if not order:
+        return False
+    order_id = order.get('id')
+    try:
+        exists = await db.transactions.find_one(
+            {'reference_id': order_id, 'type': 'income'}, {'_id': 0, 'id': 1}
+        )
+        if exists:
+            return False
+        amount = float(order.get('total_amount') or 0)
+        if amount <= 0:
+            return False
+        currency = order.get('currency') or 'EUR'
+        if currency not in ACCT_CURRENCIES:
+            currency = 'EUR'
+        is_express = order.get('order_type') == 'express'
+        label = 'Pedido exprés' if is_express else 'Pedido'
+        desc = f"{label} #{str(order_id)[:8]}"
+        if order.get('city_name'):
+            desc += f" · {order['city_name']}"
+        # actor del sistema (el pedido pudo cerrarlo un repartidor; el ingreso es de la empresa)
+        system_actor = {'id': 'system', 'name': 'Sistema (auto)', 'email': None}
+        await _acct_create_txn(
+            system_actor, type_='income', amount=amount, currency=currency,
+            method='stripe', description=desc, reference_id=order_id,
+            customer_id=order.get('customer_id'), action='AUTO_INCOME_ORDER',
+        )
+        return True
+    except Exception:
+        return False  # nunca bloquear el cierre del pedido por la contabilidad
+
 
 @api_router.get("/accounting/transactions")
 async def acct_list_transactions(
