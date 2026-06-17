@@ -33,6 +33,7 @@ export const SidebarAdmin = ({
   user = {},
   onLogout = () => {},
   items = NAV_ITEMS,
+  badges = {},
 }) => {
   const [collapsed, setCollapsed] = useState(false); // colapsado en escritorio
   const [mobileOpen, setMobileOpen] = useState(false); // drawer en móvil
@@ -48,6 +49,8 @@ export const SidebarAdmin = ({
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" data-testid="admin-sidebar-nav">
       {items.map(({ id, label, icon: Icon, badge }) => {
         const isActive = active === id;
+        const count = badge ?? badges[id]; // badge explícito o inyectado por `badges`
+        const showBadge = typeof count === 'number' && count > 0;
         return (
           <button
             key={id}
@@ -78,10 +81,20 @@ export const SidebarAdmin = ({
               ].join(' ')}
             />
             {!collapsed && <span className="truncate">{label}</span>}
-            {!collapsed && badge != null && (
-              <span className="ml-auto rounded-full bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
-                {badge}
+            {!collapsed && showBadge && (
+              <span
+                data-testid={`admin-nav-badge-${id}`}
+                className="ml-auto min-w-[20px] rounded-full bg-emerald-500/20 px-2 py-0.5 text-center text-[11px] font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-500/30"
+              >
+                {count}
               </span>
+            )}
+            {/* Colapsado: punto indicador del badge */}
+            {collapsed && showBadge && (
+              <span
+                data-testid={`admin-nav-dot-${id}`}
+                className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-900"
+              />
             )}
           </button>
         );

@@ -405,6 +405,7 @@ export default function AdminDashboard() {
       onNavigate={setSection}
       user={user}
       onLogout={logout}
+      badges={{ orders: pendingOrders.length }}
       actions={
         <Button data-testid="refresh-btn" onClick={fetchData} variant="outline" size="sm" className="gap-2">
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Actualizar

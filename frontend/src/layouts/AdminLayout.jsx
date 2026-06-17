@@ -36,6 +36,7 @@ export const AdminLayout = ({
   subtitle,
   actions = null,
   items,
+  badges = {},
   children,
 }) => {
   const headingTitle = title || SECTION_TITLES[active] || 'Panel de control';
@@ -48,6 +49,7 @@ export const AdminLayout = ({
         user={user}
         onLogout={onLogout}
         items={items}
+        badges={badges}
       />
 
       {/* Columna principal */}
