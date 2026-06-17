@@ -106,15 +106,14 @@ export const ContabilidadSection = () => {
   };
 
   const exportCsv = () => {
-    window.open(`${API}/accounting/export/transactions?token=${token}`, '_blank');
-    // Fallback con fetch+blob para respetar el header Authorization
     axios.get(`${API}/accounting/export/transactions`, { ...auth, responseType: 'blob' })
       .then((res) => {
         const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
         const a = document.createElement('a');
         a.href = url; a.download = 'transacciones.csv'; a.click();
         URL.revokeObjectURL(url);
-      }).catch(() => {});
+      })
+      .catch(() => toast.error('No se pudo exportar el CSV'));
   };
 
   const fmtDate = (d) => d ? new Date(d).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
