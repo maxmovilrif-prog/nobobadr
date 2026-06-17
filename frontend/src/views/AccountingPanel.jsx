@@ -427,7 +427,7 @@ function TransactionsTable({ transactions, loading }) {
                     <tr key={tx._id} data-testid={`acct-txn-${tx._id}`} className="hover:bg-slate-800/30 transition-colors group">
                       <td className="pl-5 pr-3 py-3.5"><TxBadge type={tx.type} /></td>
                       <td className="px-3 py-3.5 text-sm text-slate-300 max-w-[220px]"><span className="truncate block">{tx.description}</span></td>
-                      <td className={`px-3 py-3.5 text-sm font-semibold tabular-nums whitespace-nowrap ${isPos ? "text-emerald-400" : "text-slate-300"}`}>{cfg.sign}{fmt(tx.amount)} {tx.currency}</td>
+                      <td className={`px-3 py-3.5 text-sm font-semibold tabular-nums whitespace-nowrap ${isPos ? "text-emerald-400" : "text-slate-300"}`}>{cfg.sign}{fmt(tx.amount, tx.currency === "EUR" ? 2 : 0)} {tx.currency}</td>
                       <td className="px-3 py-3.5 text-xs text-slate-500 whitespace-nowrap">{METHOD_LABELS[tx.payment_method] ?? tx.payment_method}</td>
                       <td className="px-3 py-3.5 text-xs text-slate-500 whitespace-nowrap">{timeAgo(tx.created_at)}</td>
                     </tr>
@@ -680,9 +680,10 @@ export default function AccountingPanel() {
   const exportPayroll = ({ format, date_from, date_to }) => runExport(async () => {
     const r = await axios.get(`${API}/accounting/payroll`, { params: { start_date: date_from || undefined, end_date: date_to || undefined }, ...auth });
     if (format === "csv") {
+      const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
       const rows = [["courier", "entregas", "comision_eur", "comision_mad", "estado"]];
       (r.data.entries || []).forEach((e) => rows.push([e.courier_name, e.total_deliveries, e.net_amount_eur, e.net_amount_mad, e.is_paid ? "Pagado" : "Pendiente"]));
-      download(rows.map((row) => row.join(",")).join("\n"), "nominas.csv", "text/csv");
+      download(rows.map((row) => row.map(esc).join(",")).join("\n"), "nominas.csv", "text/csv");
     } else {
       download(JSON.stringify(r.data, null, 2), "nominas.json", "application/json");
     }
