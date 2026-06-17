@@ -73,7 +73,7 @@ export const OverviewSection = ({ onNavigate = () => {} }) => {
     } finally {
       setLoading(false);
     }
-  }, [API, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [API, token]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 

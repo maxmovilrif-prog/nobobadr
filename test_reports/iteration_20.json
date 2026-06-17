@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 20 validated the Admin Panel UI refactor (AdminLayout + SidebarAdmin + OverviewSection + sectioned panel). All target data-testids render, sidebar navigation switches sections via `hidden` (no unmount), Leaflet map re-shows correctly when re-entering 'Mapa en vivo' (invalidateSize fires — 18 tiles loaded, container 1280x560, no grey box), KPIs/banner/recent-orders all populate from /admin/stats + /admin/pending-orders + /admin/orders, and topbar title updates per section. Preserved functionality verified: CityManager add+delete (TEST_RefactorCity created id=f08d730c… then deleted cleanly, 0 leftover), finance-toggle marks paid↔pendiente with toast and successfully reverted to original state, finance-calc-btn runs without error, history filters + export-csv-btn present. Mobile hamburger opens drawer (translate-x-0 confirmed at 390x844). Login flow with email+password+secret-code redirects to /panel and shows 'Acceso concedido' toast.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin login", "issues": ["Secret code input has no name attribute or data-testid — tests must rely on placeholder='NUBO-XXXX-XXXX-XXXX'. Recommend adding data-testid='admin-secret-code-input' for robustness."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_20.json"
+  ],
+  "action_items": [
+    "Optional: add data-testid='admin-secret-code-input' to the código-secreto input on the admin login page (currently only identifiable by placeholder).",
+    "Note: 'assign-nearest-<id>' flow could NOT be exercised end-to-end because pending-orders count is 0 in this preview env. The pending list correctly renders 'No hay pedidos pendientes de asignar.' and the helper banner 'Centra el mapa sobre la zona de recogida y pulsa Asignar más cercano'. Main agent may want a seeded pending order to fully exercise the assign dialog in future iterations."
+  ],
+  "critical_code_review_comments": [
+    "AdminLayout.jsx: clean structure, sticky header with backdrop-blur looks good; admin-layout-title computed from SECTION_TITLES map — verified the title updates Resumen→Mapa en vivo→Pedidos→Finanzas→Zonas operativas→Historial on each sidebar click.",
+    "SidebarAdmin.jsx: NAV_ITEMS list matches the 6 required sections; all 6 admin-nav-<id> data-testids present and clickable. handleNavigate auto-closes mobile drawer (setMobileOpen(false)) after selection — verified visually.",
+    "OverviewSection.jsx: fetches /admin/stats, /admin/pending-orders, /admin/orders?limit=6 in Promise.all — verified all 4 KPIs render (15/8/15/16), pending banner shows 0, recent-orders table shows 6 rows with status badges, amounts (€), and formatted dates. overview-refresh-btn re-runs fetchAll and disables during loading via Loader2.",
+    "AdminDashboard.js: sections wrapped with `hidden` attribute keep the Leaflet map mounted — confirmed by tile count (18) preserved on return to 'Mapa en vivo'. invalidateSize effect works (no grey square).",
+    "Map size on return: 1280x560 px — correct, OpenStreetMap tiles fully loaded, 6 bee markers visible across Spain/Morocco.",
+    "Mobile responsive: admin-sidebar-mobile-toggle visible at 390x844, drawer animates in (translate-x-0). admin-sidebar-mobile-close and admin-sidebar-overlay both present.",
+    "CityManager: add+delete CRUD works end-to-end (created/deleted TEST_RefactorCity 1 round-trip, ~2.5s each).",
+    "Finance toggle: finance-toggle-<driver_id> flips label between 'Marcar pagado' ↔ 'Marcar pendiente' and the toast appears. finance-total-earnings reads €9.75 throughout.",
+    "Minor: in mobile drawer, clicking deep nav items can occasionally trip Playwright 'element outside viewport' due to sidebar's internal overflow-y-auto + position calculations — affects only automated tests, not real users; no fix needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% on tested flows (login, sidebar nav x6, overview KPIs, map preservation, city CRUD, finance toggle, mobile drawer open). Assign-nearest dialog not exercised — 0 pending orders in env."},
+  "test_credentials": "Admin control@nuboexpress.com / Fn6FcMveVf%--1o- / NUBO-84D2-C159-E3CF",
+  "seed_data_creation": "Created TEST_RefactorCity (id f08d730c-d42d-42eb-91cc-9937798094ea) and immediately deleted it — no residual data. Toggled finance for driver 9f3d098a-2dd7-42b4-b740-b6372ab9c518 paid→pending→paid (restored to original 'Marcar pagado' state).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The admin panel refactor is solid. All section switching uses `hidden` so the Leaflet map keeps state. If you need to test assign-nearest end-to-end, first create a pending order via cliente@nubotest.com (POST /api/orders or /api/orders/express + simulate paid) so that pending-orders-list is non-empty. The secret-code login input lacks a data-testid; for now use input[placeholder*='NUBO'] or name='secret_code'. Mobile drawer open is verified; if Playwright complains 'element outside viewport' inside the drawer, wait_for_timeout(800) then call locator.scroll_into_view_if_needed() or use page.evaluate to click directly."
+}

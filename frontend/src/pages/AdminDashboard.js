@@ -10,8 +10,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { LogOut, Bike, Store, Package, Users, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft, Download, Filter, Wallet } from 'lucide-react';
+import { Package, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft, Download, Filter, Wallet } from 'lucide-react';
 import CityManager from '@/components/CityManager';
+import AdminLayout from '@/layouts/AdminLayout';
+import OverviewSection from '@/pages/admin/OverviewSection';
 
 const SPAIN_CENTER = [37.5, -4.8];
 
@@ -43,20 +45,6 @@ const beeIconHighlight = L.divIcon({
   popupAnchor: [0, -24],
 });
 
-const StatCard = ({ icon: Icon, label, value, testid }) => (
-  <Card data-testid={testid} className="border-0 shadow-lg">
-    <CardContent className="p-5 flex items-center gap-4">
-      <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-        <Icon className="w-6 h-6 text-emerald-600" />
-      </div>
-      <div>
-        <p className="text-sm text-gray-500">{label}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-      </div>
-    </CardContent>
-  </Card>
-);
-
 export default function AdminDashboard() {
   const { user, token, logout, API } = useContext(AuthContext);
   const [drivers, setDrivers] = useState([]);
@@ -83,6 +71,7 @@ export default function AdminDashboard() {
   const [confirmData, setConfirmData] = useState(null); // { order, driver }
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [highlightId, setHighlightId] = useState(null);
+  const [section, setSection] = useState('overview'); // sección activa del sidebar
 
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
@@ -401,38 +390,34 @@ export default function AdminDashboard() {
     // eslint-disable-next-line
   }, []);
 
+  // El mapa Leaflet vive oculto (display:none) cuando no es la sección activa;
+  // al volver a "Mapa en vivo" recalculamos su tamaño para que renderice bien.
+  useEffect(() => {
+    if (section === 'map' && mapRef.current) {
+      const id = setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 120);
+      return () => clearTimeout(id);
+    }
+  }, [section]);
+
   return (
-    <div className="min-h-screen bg-gray-50" data-testid="admin-dashboard">
-      <header className="bg-gray-900 sticky top-0 z-[1000] shadow-md">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-xl">🐝</div>
-            <div>
-              <h1 className="text-xl font-bold text-white">Nubo Express · Admin</h1>
-              <p className="text-sm text-gray-400">Mapa de Abejas en vivo · {user?.name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button data-testid="refresh-btn" onClick={fetchData} variant="outline" size="sm" className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700">
-              <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Actualizar
-            </Button>
-            <Button data-testid="admin-logout-btn" onClick={logout} variant="outline" size="sm" className="bg-gray-800 text-white border-gray-700 hover:bg-gray-700">
-              <LogOut className="w-4 h-4 mr-2" />
-              Salir
-            </Button>
-          </div>
-        </div>
-      </header>
+    <AdminLayout
+      active={section}
+      onNavigate={setSection}
+      user={user}
+      onLogout={logout}
+      actions={
+        <Button data-testid="refresh-btn" onClick={fetchData} variant="outline" size="sm" className="gap-2">
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Actualizar
+        </Button>
+      }
+    >
+      {/* RESUMEN */}
+      <div hidden={section !== 'overview'} data-testid="section-overview">
+        <OverviewSection onNavigate={setSection} />
+      </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard testid="stat-active-drivers" icon={Bike} label="Abejas activas" value={stats.active_drivers} />
-          <StatCard testid="stat-total-drivers" icon={Users} label="Total repartidores" value={stats.total_drivers} />
-          <StatCard testid="stat-businesses" icon={Store} label="Negocios" value={stats.total_businesses} />
-          <StatCard testid="stat-orders" icon={Package} label="Pedidos" value={stats.total_orders} />
-        </div>
-
+      {/* MAPA EN VIVO */}
+      <div hidden={section !== 'map'} data-testid="section-map" className="space-y-8">
         <Card className="border-0 shadow-xl overflow-hidden">
           <CardContent className="p-0">
             <div className="px-6 py-4 border-b flex items-center justify-between">
@@ -495,9 +480,12 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
 
+      {/* HISTORIAL */}
+      <div hidden={section !== 'history'} data-testid="section-history">
         {/* Historial de asignaciones — trazabilidad */}
-        <Card className="border-0 shadow-xl mt-8" data-testid="assignment-history-card">
+        <Card className="border-0 shadow-xl" data-testid="assignment-history-card">
           <CardContent className="p-0">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -601,9 +589,12 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
 
+      {/* FINANZAS */}
+      <div hidden={section !== 'finances'} data-testid="section-finances" className="space-y-8">
         {/* Pagos por repartidor (comisiones) */}
-        <Card className="border-0 shadow-xl mt-8" data-testid="finance-card">
+        <Card className="border-0 shadow-xl" data-testid="finance-card">
           <CardContent className="p-0">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -765,12 +756,18 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
 
+      {/* ZONAS OPERATIVAS */}
+      <div hidden={section !== 'cities'} data-testid="section-cities">
         {/* Gestor de zonas operativas (ciudades) */}
         <CityManager API={API} token={token} onChanged={fetchCitiesList} />
+      </div>
 
+      {/* PEDIDOS */}
+      <div hidden={section !== 'orders'} data-testid="section-orders">
         {/* Todos los pedidos */}
-        <Card className="border-0 shadow-xl mt-8" data-testid="all-orders-card">
+        <Card className="border-0 shadow-xl" data-testid="all-orders-card">
           <CardContent className="p-0">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -869,6 +866,6 @@ export default function AdminDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AdminLayout>
   );
 }
