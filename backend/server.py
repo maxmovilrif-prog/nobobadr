@@ -2198,6 +2198,162 @@ async def acct_export_transactions(date_from: Optional[str] = None, date_to: Opt
     return Response(content=buf.getvalue(), media_type='text/csv',
                     headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
+# ─── Cierre de caja diario (arqueo MAD/EUR) ───────────────────────
+
+async def _acct_compute_daily_closing(date_str: str) -> dict:
+    """Calcula el arqueo de caja de un día: saldo inicial, movimientos (entradas/salidas)
+    por moneda, saldo final esperado, e ingresos/gastos del día. Fechas ISO en string."""
+    cash_methods = ['cash_mad', 'cash_eur']
+    day_gte = date_str
+    day_lte = date_str + '\uffff'
+    # Saldo inicial = movimientos de efectivo ANTES del día
+    opening = {'cash_mad': 0.0, 'cash_eur': 0.0}
+    async for t in db.transactions.find(
+        {'payment_method': {'$in': cash_methods}, 'created_at': {'$lt': day_gte}},
+        {'_id': 0, 'payment_method': 1, 'type': 1, 'amount': 1}
+    ):
+        pm = t['payment_method']
+        sign = 1 if t.get('type') in ACCT_INCOME_TYPES else -1
+        opening[pm] = round(opening[pm] + sign * float(t.get('amount') or 0), 2)
+    # Movimientos del día
+    day = await db.transactions.find(
+        {'created_at': {'$gte': day_gte, '$lte': day_lte}}, {'_id': 0}
+    ).to_list(50000)
+    mov = {'cash_mad': {'in': 0.0, 'out': 0.0}, 'cash_eur': {'in': 0.0, 'out': 0.0}}
+    inc = {'MAD': 0.0, 'EUR': 0.0}
+    exp = {'MAD': 0.0, 'EUR': 0.0}
+    for t in day:
+        amt = float(t.get('amount') or 0)
+        tt = t.get('type')
+        pm = t.get('payment_method')
+        cur = t.get('currency', 'EUR')
+        if tt in ACCT_INCOME_TYPES:
+            inc[cur] = round(inc.get(cur, 0) + amt, 2)
+        elif tt in ACCT_EXPENSE_TYPES:
+            exp[cur] = round(exp.get(cur, 0) + amt, 2)
+        if pm in mov:
+            if tt in ACCT_INCOME_TYPES:
+                mov[pm]['in'] = round(mov[pm]['in'] + amt, 2)
+            else:
+                mov[pm]['out'] = round(mov[pm]['out'] + amt, 2)
+    closing = {
+        'cash_mad': round(opening['cash_mad'] + mov['cash_mad']['in'] - mov['cash_mad']['out'], 2),
+        'cash_eur': round(opening['cash_eur'] + mov['cash_eur']['in'] - mov['cash_eur']['out'], 2),
+    }
+    return {
+        'date': date_str,
+        'opening': opening,
+        'movements': mov,
+        'closing': closing,
+        'income': inc,
+        'expenses': exp,
+        'net': {'MAD': round(inc['MAD'] - exp['MAD'], 2), 'EUR': round(inc['EUR'] - exp['EUR'], 2)},
+        'transactions_count': len(day),
+        'generated_at': datetime.now(timezone.utc).isoformat(),
+    }
+
+def _acct_today() -> str:
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+@api_router.get("/accounting/cash/daily-closing")
+async def acct_daily_closing(date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Arqueo de caja del día indicado (por defecto hoy). Saldo inicial, movimientos y cierre esperado."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    date_str = date or _acct_today()
+    try:
+        return await _acct_compute_daily_closing(date_str)
+    except Exception as e:
+        raise db_error("GET /accounting/cash/daily-closing", e)
+
+@api_router.get("/accounting/cash/closing/export")
+async def acct_daily_closing_export(date: Optional[str] = None, format: str = 'pdf',
+                                    current_user: dict = Depends(get_current_user)):
+    """Exporta el arqueo de caja del día a CSV o PDF (admin)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    date_str = date or _acct_today()
+    try:
+        data = await _acct_compute_daily_closing(date_str)
+    except Exception as e:
+        raise db_error("GET /accounting/cash/closing/export", e)
+
+    if format == 'csv':
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['Arqueo de caja Nubo Express', date_str])
+        w.writerow([])
+        w.writerow(['Concepto', 'MAD', 'EUR'])
+        w.writerow(['Saldo inicial efectivo', data['opening']['cash_mad'], data['opening']['cash_eur']])
+        w.writerow(['Entradas de caja', data['movements']['cash_mad']['in'], data['movements']['cash_eur']['in']])
+        w.writerow(['Salidas de caja', data['movements']['cash_mad']['out'], data['movements']['cash_eur']['out']])
+        w.writerow(['Saldo final esperado', data['closing']['cash_mad'], data['closing']['cash_eur']])
+        w.writerow([])
+        w.writerow(['Ingresos del día', data['income']['MAD'], data['income']['EUR']])
+        w.writerow(['Gastos del día', data['expenses']['MAD'], data['expenses']['EUR']])
+        w.writerow(['Balance neto del día', data['net']['MAD'], data['net']['EUR']])
+        w.writerow([])
+        w.writerow(['Nº de transacciones', data['transactions_count']])
+        w.writerow(['Generado', data['generated_at']])
+        return Response(content=buf.getvalue(), media_type='text/csv',
+                        headers={'Content-Disposition': f'attachment; filename="arqueo_{date_str}.csv"'})
+
+    # PDF (fpdf2) — informe con identidad Nubo Express
+    from fpdf import FPDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_fill_color(16, 122, 87)   # emerald
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.cell(0, 14, 'Nubo Express - Arqueo de caja', new_x='LMARGIN', new_y='NEXT', fill=True)
+    pdf.set_text_color(80, 80, 80)
+    pdf.set_font('Helvetica', '', 11)
+    pdf.cell(0, 8, f"Fecha: {date_str}", new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(3)
+
+    def section(title):
+        pdf.set_text_color(16, 122, 87)
+        pdf.set_font('Helvetica', 'B', 12)
+        pdf.cell(0, 9, title, new_x='LMARGIN', new_y='NEXT')
+        pdf.set_text_color(40, 40, 40)
+        pdf.set_font('Helvetica', '', 11)
+
+    def row(label, mad, eur, bold=False):
+        pdf.set_font('Helvetica', 'B' if bold else '', 11)
+        pdf.cell(95, 8, str(label), border='B')
+        pdf.cell(45, 8, f"{mad:,.2f} MAD", border='B', align='R')
+        pdf.cell(45, 8, f"{eur:,.2f} EUR", border='B', align='R', new_x='LMARGIN', new_y='NEXT')
+
+    section('Efectivo en caja')
+    pdf.set_font('Helvetica', 'B', 10)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(95, 7, 'Concepto', border='B')
+    pdf.cell(45, 7, 'MAD', border='B', align='R')
+    pdf.cell(45, 7, 'EUR', border='B', align='R', new_x='LMARGIN', new_y='NEXT')
+    pdf.set_text_color(40, 40, 40)
+    row('Saldo inicial', data['opening']['cash_mad'], data['opening']['cash_eur'])
+    row('(+) Entradas de caja', data['movements']['cash_mad']['in'], data['movements']['cash_eur']['in'])
+    row('(-) Salidas de caja', data['movements']['cash_mad']['out'], data['movements']['cash_eur']['out'])
+    row('Saldo final esperado', data['closing']['cash_mad'], data['closing']['cash_eur'], bold=True)
+    pdf.ln(5)
+
+    section('Resultado del dia')
+    row('Ingresos del dia', data['income']['MAD'], data['income']['EUR'])
+    row('Gastos del dia', data['expenses']['MAD'], data['expenses']['EUR'])
+    row('Balance neto del dia', data['net']['MAD'], data['net']['EUR'], bold=True)
+    pdf.ln(6)
+
+    pdf.set_text_color(120, 120, 120)
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(0, 6, f"Transacciones del dia: {data['transactions_count']}", new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 6, f"Generado: {data['generated_at']}  |  Por: {current_user.get('name', 'Admin')}", new_x='LMARGIN', new_y='NEXT')
+
+    out = pdf.output()
+    pdf_bytes = bytes(out)
+    return Response(content=pdf_bytes, media_type='application/pdf',
+                    headers={'Content-Disposition': f'attachment; filename="arqueo_{date_str}.pdf"'})
+
+
 
 # ============================================================
 # CÁLCULO DE ENTREGA (precio + ETA por tipo de vehículo)
