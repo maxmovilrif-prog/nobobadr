@@ -220,6 +220,98 @@ class TestPayroll:
         assert r.status_code == 403
 
 
+# -------------------- Module: Payroll PAY (interno, sin Stripe) --------------------
+
+# State shared across the ordered TestPayrollPay flow
+_pay_state = {}
+
+
+class TestPayrollPay:
+    """POST /api/accounting/payroll/pay — pago 100% interno (no Stripe).
+
+    Flujo: courier con entregas pendiente -> pay -> driver_payouts paid + tx payout EUR
+    bank_transfer 'Nómina <nombre>'. Re-pay del mismo periodo -> 400. Courier sin
+    comisiones -> 400. Cliente -> 403. Caja (MAD/EUR) NO cambia (es transferencia).
+    """
+
+    def test_aa_find_pending_courier(self, admin_headers):
+        r = requests.get(f"{API}/accounting/payroll", headers=admin_headers, timeout=15)
+        assert r.status_code == 200, r.text
+        entries = r.json().get("entries") or []
+        pending = [e for e in entries if not e.get("is_paid") and (e.get("net_amount_eur") or 0) > 0]
+        if not pending:
+            pytest.skip("No pending payroll entries to pay")
+        _pay_state["courier"] = pending[0]
+        _pay_state["expected_eur"] = pending[0]["net_amount_eur"]
+
+    def test_ab_pay_forbidden_for_client(self, client_headers):
+        r = requests.post(f"{API}/accounting/payroll/pay", headers=client_headers,
+                          json={"courier_id": "any"}, timeout=10)
+        assert r.status_code == 403
+
+    def test_ac_pay_courier_without_earnings_returns_400(self, admin_headers):
+        # Use a bogus courier id with no delivered orders
+        r = requests.post(f"{API}/accounting/payroll/pay", headers=admin_headers,
+                          json={"courier_id": "no-such-courier-id-xyz-0000"}, timeout=15)
+        assert r.status_code == 400, f"Expected 400, got {r.status_code}: {r.text[:200]}"
+        body = r.json()
+        assert "comision" in (body.get("detail") or "").lower() or "no hay" in (body.get("detail") or "").lower()
+
+    def test_ad_pay_success_creates_payout_txn_and_does_not_touch_cash(self, admin_headers):
+        courier = _pay_state.get("courier")
+        if not courier:
+            pytest.skip("No courier from previous step")
+        cid = courier["courier_id"]
+        expected_eur = _pay_state["expected_eur"]
+
+        # Snapshot cash balance BEFORE
+        cash_before = requests.get(f"{API}/accounting/cash/balance", headers=admin_headers, timeout=10).json()
+        mad_before = cash_before["cash_mad"]["balance"]
+        eur_before = cash_before["cash_eur"]["balance"]
+
+        r = requests.post(f"{API}/accounting/payroll/pay", headers=admin_headers,
+                          json={"courier_id": cid}, timeout=15)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d.get("courier_id") == cid
+        assert abs(d.get("amount_eur", 0) - expected_eur) < 0.01
+
+        # Payroll list now marks this entry as paid
+        pr = requests.get(f"{API}/accounting/payroll", headers=admin_headers, timeout=15).json()
+        row = next((e for e in pr["entries"] if e["courier_id"] == cid), None)
+        assert row is not None and row["is_paid"] is True, f"Courier {cid} should be paid now"
+
+        # A 'payout' EUR/bank_transfer transaction with description 'Nómina ...' was created
+        tx = requests.get(f"{API}/accounting/transactions", headers=admin_headers,
+                         params={"type": "payout", "per_page": 50, "page": 1}, timeout=10).json()
+        match = [t for t in tx["data"]
+                 if t.get("type") == "payout"
+                 and t.get("currency") == "EUR"
+                 and t.get("payment_method") == "bank_transfer"
+                 and (t.get("description") or "").startswith("Nómina")
+                 and (t.get("courier_id") == cid or t.get("reference_id") == cid)]
+        assert match, f"Expected a payout txn for courier {cid}; got: {[t.get('description') for t in tx['data'][:5]]}"
+        assert abs(match[0]["amount"] - expected_eur) < 0.01
+        _pay_state["payout_tx_id"] = match[0].get("id")
+
+        # Cash balance must NOT change (bank transfer is not cash)
+        cash_after = requests.get(f"{API}/accounting/cash/balance", headers=admin_headers, timeout=10).json()
+        assert cash_after["cash_mad"]["balance"] == mad_before, \
+            f"MAD cash changed: {mad_before} -> {cash_after['cash_mad']['balance']}"
+        assert cash_after["cash_eur"]["balance"] == eur_before, \
+            f"EUR cash changed: {eur_before} -> {cash_after['cash_eur']['balance']}"
+
+    def test_ae_repay_same_period_returns_400(self, admin_headers):
+        courier = _pay_state.get("courier")
+        if not courier:
+            pytest.skip("No courier from previous step")
+        r = requests.post(f"{API}/accounting/payroll/pay", headers=admin_headers,
+                          json={"courier_id": courier["courier_id"]}, timeout=15)
+        assert r.status_code == 400, f"Expected 400, got {r.status_code}: {r.text[:200]}"
+        body = r.json()
+        assert "pagada" in (body.get("detail") or "").lower()
+
+
 # -------------------- Module: CSV Export --------------------
 
 class TestExport:

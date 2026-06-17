@@ -2089,6 +2089,53 @@ async def acct_payroll(start_date: Optional[str] = None, end_date: Optional[str]
         'pending_net_eur': round(sum(e['net_amount_eur'] for e in entries if not e['is_paid']), 2),
     }
 
+class AcctPayrollPay(BaseModel):
+    courier_id: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    rate: float = DEFAULT_COMMISSION_RATE
+
+@api_router.post("/accounting/payroll/pay")
+async def acct_payroll_pay(req: AcctPayrollPay, current_user: dict = Depends(get_current_user)):
+    """Marca como pagada la nómina de un courier (Abeja) en el periodo y registra el pago
+    como transacción 'payout' (EUR, transferencia) en el libro contable. Pago 100% interno."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        per = await _compute_earnings({'status': 'delivered', 'driver_id': req.courier_id},
+                                      req.start_date, req.end_date, req.rate)
+        v = per.get(req.courier_id, {'deliveries': 0, 'revenue': 0.0})
+        earnings_eur = round(v['revenue'] * req.rate, 2)
+        if earnings_eur <= 0:
+            raise HTTPException(status_code=400, detail="No hay comisiones que pagar en el periodo")
+        key = {'driver_id': req.courier_id, 'period_start': req.start_date or '', 'period_end': req.end_date or ''}
+        existing = await db.driver_payouts.find_one(key, {'_id': 0, 'status': 1})
+        if existing and existing.get('status') == 'paid':
+            raise HTTPException(status_code=400, detail="Esta nómina ya está pagada")
+        now = datetime.now(timezone.utc).isoformat()
+        await db.driver_payouts.update_one(
+            key,
+            {'$set': {**key, 'status': 'paid', 'rate': req.rate, 'deliveries': v['deliveries'],
+                      'revenue': round(v['revenue'], 2), 'amount': earnings_eur, 'paid_at': now,
+                      'marked_by': current_user.get('id'), 'marked_by_name': current_user.get('name'),
+                      'updated_at': now},
+             '$setOnInsert': {'id': str(uuid.uuid4()), 'created_at': now}},
+            upsert=True,
+        )
+        driver = await db.users.find_one({'id': req.courier_id}, {'_id': 0, 'name': 1})
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise db_error("POST /accounting/payroll/pay", e)
+    # Registrar el pago en el libro contable (EUR, transferencia: no afecta a la caja en efectivo)
+    await _acct_create_txn(
+        current_user, type_='payout', amount=earnings_eur, currency='EUR',
+        method='bank_transfer', description=f"Nómina {driver.get('name') if driver else req.courier_id}",
+        reference_id=req.courier_id, courier_id=req.courier_id, action='PAY_PAYROLL',
+    )
+    return {'message': 'Nómina pagada', 'courier_id': req.courier_id, 'amount_eur': earnings_eur}
+
+
 @api_router.get("/accounting/export/transactions")
 async def acct_export_transactions(date_from: Optional[str] = None, date_to: Optional[str] = None,
                                    current_user: dict = Depends(get_current_user)):

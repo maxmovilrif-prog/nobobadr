@@ -1,0 +1,37 @@
+{
+  "summary": "Validated Contabilidad module after migration to AccountingPanel.jsx + new POST /api/accounting/payroll/pay. Backend: 23/23 pytest tests pass in /app/backend/tests/test_accounting.py (extended with 5 new TestPayrollPay tests). Frontend E2E (admin login -> /nubo-private-control-badr/panel -> sidebar 'admin-nav-accounting'): accounting-panel renders with dark premium design; all 11 expected data-testids visible (acct-cash-mad, acct-cash-eur, acct-summary, acct-search, acct-filter-type, acct-filter-method, acct-filter-currency, acct-export-tx-csv, acct-export-pr-json, acct-export-from, acct-export-to). Payroll pay E2E: 'acct-pay-<courier_id>' click -> toast 'Nómina marcada como pagada' -> badge flips to 'Pagado' -> payout txn 'Nómina Test Driver' (EUR, Transferencia, -9.75 EUR) appears in transactions table. Filter type='payout' and search 'Nómina' both correctly filter. CSV export (acct-export-tx-csv) downloads transacciones.csv; JSON payroll export (acct-export-pr-json) downloads nominas.json; date filter (acct-export-from/to) does NOT break export. Backend-verified invariants: cash MAD/EUR balance unchanged after payroll pay (bank_transfer, not cash); re-pay same period returns 400 ('ya está pagada'); courier without earnings returns 400; cliente@nubotest.com -> 403 on pay endpoint.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Contabilidad transactions table", "issues": ["Payout amount displayed as '−10 EUR' (Intl.NumberFormat with 0 decimals) while the underlying value is 9.75 EUR. The 'Balance neto' card correctly shows -9.75 EUR (2 decimals). Recommend using 2 decimals for EUR amounts in the transactions table for consistency (fmt(tx.amount, 2) for EUR)."]},
+      {"screen": "AdminLayout topbar", "issues": ["The dark-premium AccountingPanel renders inside the light AdminLayout (white topbar + sidebar). Visual contrast is intentional and acceptable, but the light topbar over a dark panel can feel disjoint. Optional: add subtle separator/shadow when AccountingPanel is active. Non-blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_accounting.py",
+    "/app/test_reports/pytest/accounting_results.xml"
+  ],
+  "action_items": [
+    "Optional: fmt EUR amounts with 2 decimals in TransactionsTable (currently 0 decimals -> '10 EUR' instead of '9.75 EUR'). Backend payload is correct; only UI rounding."
+  ],
+  "critical_code_review_comments": [
+    "server.py /api/accounting/payroll/pay: clean implementation. Reuses _compute_earnings + _acct_create_txn. Uses upsert with key {driver_id, period_start, period_end} so the same period cannot be paid twice (idempotency by 'paid' status check). Records audit via _acct_create_txn(action='PAY_PAYROLL').",
+    "Race condition: between the find_one(existing) check and the update_one(upsert), a concurrent identical request could create two payout transactions. The driver_payouts itself is protected by the unique-key index (per index at line 2674-2676), but _acct_create_txn would still register two payout transactions. For real load consider wrapping in a session/transaction or using a Mongo unique index on transactions {courier_id, type, paid_period_key}. Non-blocking for preview.",
+    "AccountingPanel.jsx: clean adaptation. Uses AuthContext (API + token) and sonner toast. Maps payroll entries with _id=courier_id for the React key, which is fine because courier appears once per period. mongoDB _id excluded everywhere via backend projections.",
+    "AccountingPanel.jsx fmt() helper defaults to 0 decimals; in TransactionsTable for EUR amounts this loses precision (the small payroll payouts like 9.75 EUR show as '10 EUR'). Should use 2 decimals when currency==='EUR'.",
+    "exportPayroll CSV builder uses a naive csv: rows.map(row => row.join(',')) — if any courier_name contains a comma it will corrupt the CSV. Same for description in exportTx JSON-stringify is safe; CSV path goes through the backend so it's safe. Recommend quoting fields in the frontend CSV builder for nominas.csv. Non-blocking until names contain commas.",
+    "AccountingPanel useCallback deps disable eslint via // eslint-disable-line — 'auth' object is recreated each render so the disable is reasonable; however a stable axios instance with default Authorization header would be cleaner."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_accounting.py (added TestPayrollPay class with 5 tests)"
+  ],
+  "success_rate": {"backend": "100% (23/23)", "frontend": "100% on tested flows (login, sidebar nav, balance cards, summary, pay nómina, payout txn appears, filter type+search, CSV+JSON export, date-filter export)"},
+  "test_credentials": "Admin: control@nuboexpress.com / Fn6FcMveVf%--1o- / NUBO-84D2-C159-E3CF | Cliente: cliente@nubotest.com / Cliente123!",
+  "seed_data_creation": "During testing: 3 TEST_ACCT_ transactions (income/cash_in/cash_out), 1 paid payroll for driver 9f3d098a-2dd7-42b4-b740-b6372ab9c518, and 1 'Nómina Test Driver' payout txn (EUR 9.75, bank_transfer). ALL CLEANED: db.driver_payouts.delete_many({period_start:'',period_end:''}) -> 1 removed; db.transactions.delete_many({description:/^TEST_ACCT_|^Nómina /}) -> 1 remaining payout removed; db.audit_logs.delete_many({action:'PAY_PAYROLL' or after.description:/^TEST_ACCT_|^Nómina /}) -> 1 removed. Verified 0 residue.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Accounting module is fully verified after the AccountingPanel.jsx migration and the new /api/accounting/payroll/pay endpoint. Backend tests cover all 6 cash/tx/payroll/export paths + the new pay flow (success, repay-400, no-earnings-400, RBAC, cash-untouched invariant). Frontend covers panel render + pay E2E + filters + CSV/JSON export with and without date filter. Only minor UI rounding suggestion (fmt EUR to 2 decimals in TransactionsTable). If the courier 9f3d098a-...c518 needs to be re-payable, just delete its driver_payouts doc with period_start=''/period_end=''. To re-run, ensure there is at least 1 delivered order with a driver_id (currently: 4 delivered orders for that courier).",
+  "rca of the issue": "N/A — no bugs. The new POST /api/accounting/payroll/pay works per spec: marks driver_payouts.status='paid' for the requested period (key=driver_id+period_start+period_end), creates a 'payout' EUR bank_transfer transaction with description 'Nómina <name>', refuses re-payment with 400 ('Esta nómina ya está pagada'), refuses couriers without earnings with 400 ('No hay comisiones que pagar en el periodo'), and is admin-only (403 for client). Cash balance (MAD/EUR) is verified unchanged before/after pay because bank_transfer is not a cash method."
+}
