@@ -1806,6 +1806,313 @@ async def list_payouts(driver_id: Optional[str] = None, limit: int = 200,
     return {'count': len(payouts), 'payouts': payouts}
 
 # ============================================================
+# MÓDULO DE CONTABILIDAD — /api/accounting/*
+# Caja MAD/EUR, libro de transacciones, nóminas y exportación.
+# Adaptado al stack: Pydantic v2 + UUID + auth admin + datetime UTC ISO.
+# ============================================================
+
+ACCT_MAD_TO_EUR = 0.092  # 1 MAD = 0.092 EUR (tipo de cambio de referencia)
+ACCT_TXN_TYPES = {'income', 'payout', 'refund', 'adjustment', 'cash_in', 'cash_out'}
+ACCT_INCOME_TYPES = {'income', 'cash_in'}
+ACCT_EXPENSE_TYPES = {'payout', 'refund', 'cash_out'}
+ACCT_CURRENCIES = {'MAD', 'EUR'}
+ACCT_METHODS = {'stripe', 'cash_mad', 'cash_eur', 'bank_transfer'}
+
+class AcctTxnCreate(BaseModel):
+    type: str
+    amount: float = Field(gt=0)
+    currency: str
+    payment_method: str
+    description: str = Field(min_length=2)
+    reference_id: Optional[str] = None
+    courier_id: Optional[str] = None
+    customer_id: Optional[str] = None
+
+class AcctCashMovement(BaseModel):
+    amount: float = Field(gt=0)
+    currency: str  # 'MAD' | 'EUR'
+    description: str = Field(min_length=2)
+
+def _acct_amount_eur(amount: float, currency: str) -> float:
+    """Equivalente en EUR de cualquier importe (almacenamos siempre la conversión)."""
+    return round(amount * ACCT_MAD_TO_EUR, 4) if currency == 'MAD' else round(amount, 2)
+
+def _acct_validate(type_: str, currency: str, method: str):
+    if type_ not in ACCT_TXN_TYPES:
+        raise HTTPException(status_code=400, detail=f"Tipo inválido. Usa uno de: {sorted(ACCT_TXN_TYPES)}")
+    if currency not in ACCT_CURRENCIES:
+        raise HTTPException(status_code=400, detail="Moneda inválida (MAD o EUR)")
+    if method not in ACCT_METHODS:
+        raise HTTPException(status_code=400, detail=f"Método inválido. Usa uno de: {sorted(ACCT_METHODS)}")
+
+async def _acct_audit(current_user: dict, action: str, resource_id: str, after: dict):
+    """Registro de auditoría ligero de acciones contables."""
+    try:
+        await db.audit_logs.insert_one({
+            'id': str(uuid.uuid4()),
+            'actor_id': current_user.get('id'),
+            'actor_email': current_user.get('email'),
+            'actor_name': current_user.get('name'),
+            'action': action,
+            'resource': 'transactions',
+            'resource_id': resource_id,
+            'after': after,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'success': True,
+        })
+    except Exception:
+        pass  # la auditoría no debe bloquear la operación principal
+
+def _acct_date_query(date_from: Optional[str], date_to: Optional[str]) -> dict:
+    """Filtro de rango sobre created_at (ISO string) por fecha YYYY-MM-DD."""
+    q = {}
+    if date_from:
+        q['$gte'] = date_from
+    if date_to:
+        q['$lte'] = date_to + '\uffff'  # incluye todo el día indicado
+    return {'created_at': q} if q else {}
+
+async def _acct_create_txn(current_user: dict, *, type_: str, amount: float, currency: str,
+                           method: str, description: str, reference_id=None,
+                           courier_id=None, customer_id=None, action: str) -> dict:
+    _acct_validate(type_, currency, method)
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        'id': str(uuid.uuid4()),
+        'type': type_,
+        'amount': round(float(amount), 2),
+        'currency': currency,
+        'amount_eur': _acct_amount_eur(amount, currency),
+        'payment_method': method,
+        'reference_id': reference_id,
+        'description': description,
+        'courier_id': courier_id,
+        'customer_id': customer_id,
+        'created_by': current_user.get('id'),
+        'created_by_name': current_user.get('name'),
+        'created_at': now,
+        'is_reconciled': False,
+    }
+    try:
+        await db.transactions.insert_one({**doc})
+    except Exception as e:
+        raise db_error("POST /accounting (transacción)", e)
+    await _acct_audit(current_user, action, doc['id'],
+                      {'type': type_, 'amount': doc['amount'], 'currency': currency, 'description': description})
+    doc.pop('_id', None)
+    return doc
+
+@api_router.get("/accounting/transactions")
+async def acct_list_transactions(
+    page: int = 1, per_page: int = 30,
+    type: Optional[str] = None, currency: Optional[str] = None,
+    payment_method: Optional[str] = None, courier_id: Optional[str] = None,
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Libro de transacciones con filtros (tipo, moneda, método, courier, rango de fechas) y paginación."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    page = max(1, page)
+    per_page = max(1, min(per_page, 200))
+    q = _acct_date_query(date_from, date_to)
+    if type:
+        q['type'] = type
+    if currency:
+        q['currency'] = currency
+    if payment_method:
+        q['payment_method'] = payment_method
+    if courier_id:
+        q['courier_id'] = courier_id
+    try:
+        total = await db.transactions.count_documents(q)
+        rows = await db.transactions.find(q, {'_id': 0}).sort('created_at', -1) \
+            .skip((page - 1) * per_page).limit(per_page).to_list(per_page)
+    except Exception as e:
+        raise db_error("GET /accounting/transactions", e)
+    import math as _math
+    return {'total': total, 'page': page, 'per_page': per_page,
+            'pages': _math.ceil(total / per_page) if total else 0, 'data': rows}
+
+@api_router.post("/accounting/transactions")
+async def acct_create_transaction(payload: AcctTxnCreate, current_user: dict = Depends(get_current_user)):
+    """Registra una transacción contable manual (ingreso, ajuste, pago, devolución…)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return await _acct_create_txn(
+        current_user, type_=payload.type, amount=payload.amount, currency=payload.currency,
+        method=payload.payment_method, description=payload.description,
+        reference_id=payload.reference_id, courier_id=payload.courier_id,
+        customer_id=payload.customer_id, action='CREATE_TRANSACTION',
+    )
+
+@api_router.get("/accounting/transactions/summary")
+async def acct_transactions_summary(date_from: Optional[str] = None, date_to: Optional[str] = None,
+                                    current_user: dict = Depends(get_current_user)):
+    """Resumen contable del periodo: ingresos, gastos y balance neto por moneda + desglose por tipo/método."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    q = _acct_date_query(date_from, date_to)
+    try:
+        txns = await db.transactions.find(q, {'_id': 0}).to_list(50000)
+    except Exception as e:
+        raise db_error("GET /accounting/transactions/summary", e)
+    inc = {'MAD': 0.0, 'EUR': 0.0}
+    exp = {'MAD': 0.0, 'EUR': 0.0}
+    by_type, by_method = {}, {}
+    for t in txns:
+        cur = t.get('currency', 'EUR')
+        amt = float(t.get('amount') or 0)
+        tt = t.get('type')
+        pm = t.get('payment_method', 'otro')
+        by_type[tt] = round(by_type.get(tt, 0) + amt, 2)
+        by_method[pm] = round(by_method.get(pm, 0) + amt, 2)
+        if tt in ACCT_INCOME_TYPES:
+            inc[cur] = round(inc.get(cur, 0) + amt, 2)
+        elif tt in ACCT_EXPENSE_TYPES:
+            exp[cur] = round(exp.get(cur, 0) + amt, 2)
+    return {
+        'period': {'from': date_from, 'to': date_to},
+        'count': len(txns),
+        'total_income': inc,
+        'total_expenses': exp,
+        'net_balance': {'MAD': round(inc['MAD'] - exp['MAD'], 2), 'EUR': round(inc['EUR'] - exp['EUR'], 2)},
+        'breakdown_by_type': by_type,
+        'breakdown_by_method': by_method,
+    }
+
+@api_router.get("/accounting/cash/balance")
+async def acct_cash_balance(current_user: dict = Depends(get_current_user)):
+    """Saldo de caja en efectivo (MAD y EUR) calculado a partir de los movimientos cash_in/cash_out."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        txns = await db.transactions.find(
+            {'payment_method': {'$in': ['cash_mad', 'cash_eur']}}, {'_id': 0}
+        ).to_list(50000)
+    except Exception as e:
+        raise db_error("GET /accounting/cash/balance", e)
+    bal = {'cash_mad': 0.0, 'cash_eur': 0.0}
+    last = {'cash_mad': None, 'cash_eur': None}
+    for t in txns:
+        pm = t.get('payment_method')
+        if pm not in bal:
+            continue
+        amt = float(t.get('amount') or 0)
+        sign = 1 if t.get('type') in ACCT_INCOME_TYPES else -1
+        bal[pm] = round(bal[pm] + sign * amt, 2)
+        ca = t.get('created_at')
+        if ca and (last[pm] is None or ca > last[pm]):
+            last[pm] = ca
+    return {
+        'cash_mad': {'balance': bal['cash_mad'], 'last_movement': last['cash_mad']},
+        'cash_eur': {'balance': bal['cash_eur'], 'last_movement': last['cash_eur']},
+        'as_of': datetime.now(timezone.utc).isoformat(),
+    }
+
+@api_router.post("/accounting/cash/in")
+async def acct_cash_in(payload: AcctCashMovement, current_user: dict = Depends(get_current_user)):
+    """Registra una entrada de efectivo en caja (MAD o EUR)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if payload.currency not in ACCT_CURRENCIES:
+        raise HTTPException(status_code=400, detail="Moneda inválida (MAD o EUR)")
+    method = 'cash_mad' if payload.currency == 'MAD' else 'cash_eur'
+    return await _acct_create_txn(
+        current_user, type_='cash_in', amount=payload.amount, currency=payload.currency,
+        method=method, description=payload.description, action='CASH_IN',
+    )
+
+@api_router.post("/accounting/cash/out")
+async def acct_cash_out(payload: AcctCashMovement, current_user: dict = Depends(get_current_user)):
+    """Registra una salida de efectivo de caja, validando que haya saldo suficiente."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if payload.currency not in ACCT_CURRENCIES:
+        raise HTTPException(status_code=400, detail="Moneda inválida (MAD o EUR)")
+    method = 'cash_mad' if payload.currency == 'MAD' else 'cash_eur'
+    # Validar saldo disponible
+    balance = await acct_cash_balance(current_user)
+    available = balance['cash_mad']['balance'] if payload.currency == 'MAD' else balance['cash_eur']['balance']
+    if payload.amount > available:
+        raise HTTPException(status_code=400,
+                            detail=f"Saldo insuficiente en caja {payload.currency}: disponible {available}, solicitado {payload.amount}")
+    return await _acct_create_txn(
+        current_user, type_='cash_out', amount=payload.amount, currency=payload.currency,
+        method=method, description=payload.description, action='CASH_OUT',
+    )
+
+@api_router.get("/accounting/payroll")
+async def acct_payroll(start_date: Optional[str] = None, end_date: Optional[str] = None,
+                       rate: float = DEFAULT_COMMISSION_RATE,
+                       current_user: dict = Depends(get_current_user)):
+    """Nóminas de couriers (Abejas) en un periodo: entregas, comisión EUR y equivalente MAD, con estado de pago."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        per = await _compute_earnings({'status': 'delivered', 'driver_id': {'$ne': None}}, start_date, end_date, rate)
+        names = {}
+        if per:
+            async for u in db.users.find({'id': {'$in': list(per.keys())}}, {'_id': 0, 'id': 1, 'name': 1}):
+                names[u['id']] = u.get('name')
+        paid_map = {}
+        async for p in db.driver_payouts.find(
+            {'period_start': start_date or '', 'period_end': end_date or '', 'status': 'paid'}, {'_id': 0}
+        ):
+            paid_map[p['driver_id']] = p
+    except Exception as e:
+        raise db_error("GET /accounting/payroll", e)
+    eur_per_mad = round(1 / ACCT_MAD_TO_EUR, 4)  # ~10.87
+    entries = []
+    for did, v in per.items():
+        earnings_eur = round(v['revenue'] * rate, 2)
+        p = paid_map.get(did)
+        entries.append({
+            'courier_id': did,
+            'courier_name': names.get(did, 'N/D'),
+            'total_deliveries': v['deliveries'],
+            'gross_revenue_eur': round(v['revenue'], 2),
+            'net_amount_eur': earnings_eur,
+            'net_amount_mad': round(earnings_eur * eur_per_mad, 2),
+            'is_paid': bool(p),
+            'paid_at': p.get('paid_at') if p else None,
+        })
+    entries.sort(key=lambda r: -r['net_amount_eur'])
+    total_eur = round(sum(e['net_amount_eur'] for e in entries), 2)
+    return {
+        'period': {'from': start_date, 'to': end_date},
+        'rate': rate,
+        'entries': entries,
+        'total_net_eur': total_eur,
+        'total_net_mad': round(total_eur * eur_per_mad, 2),
+        'paid_net_eur': round(sum(e['net_amount_eur'] for e in entries if e['is_paid']), 2),
+        'pending_net_eur': round(sum(e['net_amount_eur'] for e in entries if not e['is_paid']), 2),
+    }
+
+@api_router.get("/accounting/export/transactions")
+async def acct_export_transactions(date_from: Optional[str] = None, date_to: Optional[str] = None,
+                                   current_user: dict = Depends(get_current_user)):
+    """Exporta las transacciones del periodo a CSV (admin)."""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    q = _acct_date_query(date_from, date_to)
+    try:
+        rows = await db.transactions.find(q, {'_id': 0}).sort('created_at', -1).to_list(50000)
+    except Exception as e:
+        raise db_error("GET /accounting/export/transactions", e)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(['fecha', 'tipo', 'importe', 'moneda', 'importe_eur', 'metodo', 'descripcion', 'referencia', 'creado_por'])
+    for t in rows:
+        w.writerow([t.get('created_at', ''), t.get('type', ''), t.get('amount', 0), t.get('currency', ''),
+                    t.get('amount_eur', 0), t.get('payment_method', ''), t.get('description', ''),
+                    t.get('reference_id', '') or '', t.get('created_by_name', '') or ''])
+    filename = f"transacciones_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.csv"
+    return Response(content=buf.getvalue(), media_type='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
+
+# ============================================================
 # CÁLCULO DE ENTREGA (precio + ETA por tipo de vehículo)
 # Usa Google Distance Matrix para distancia/tiempo reales.
 # ============================================================

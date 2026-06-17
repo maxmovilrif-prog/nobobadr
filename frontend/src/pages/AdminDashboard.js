@@ -14,6 +14,7 @@ import { Package, RefreshCw, Crosshair, Loader2, MapPin, History, ArrowRightLeft
 import CityManager from '@/components/CityManager';
 import AdminLayout from '@/layouts/AdminLayout';
 import OverviewSection from '@/pages/admin/OverviewSection';
+import ContabilidadSection from '@/pages/admin/ContabilidadSection';
 
 const SPAIN_CENTER = [37.5, -4.8];
 
@@ -757,6 +758,11 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* CONTABILIDAD */}
+      <div hidden={section !== 'accounting'} data-testid="section-accounting">
+        <ContabilidadSection />
       </div>
 
       {/* ZONAS OPERATIVAS */}

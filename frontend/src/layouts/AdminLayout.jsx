@@ -23,6 +23,7 @@ const SECTION_TITLES = {
   map: 'Mapa en vivo',
   orders: 'Pedidos',
   finances: 'Finanzas',
+  accounting: 'Contabilidad',
   cities: 'Zonas operativas',
   history: 'Historial',
 };

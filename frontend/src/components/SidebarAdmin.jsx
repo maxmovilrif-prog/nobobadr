@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard, Map, Package, Wallet, MapPin, History,
-  LogOut, ChevronLeft, Menu, X, Hexagon,
+  LogOut, ChevronLeft, Menu, X, Hexagon, Calculator,
 } from 'lucide-react';
 
 /**
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { id: 'map', label: 'Mapa en vivo', icon: Map },
   { id: 'orders', label: 'Pedidos', icon: Package },
   { id: 'finances', label: 'Finanzas', icon: Wallet },
+  { id: 'accounting', label: 'Contabilidad', icon: Calculator },
   { id: 'cities', label: 'Zonas operativas', icon: MapPin },
   { id: 'history', label: 'Historial', icon: History },
 ];
