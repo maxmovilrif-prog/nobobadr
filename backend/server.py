@@ -1806,8 +1806,22 @@ class DeliveryRequest(BaseModel):
 @api_router.get("/public/cities")
 async def list_public_cities():
     """Ciudades operativas (público) para la calculadora de tarifa: id, name, lat, lng, country."""
-    cities = await db.cities.find({}, {'_id': 0, 'id': 1, 'name': 1, 'lat': 1, 'lng': 1, 'country': 1}).sort('name', 1).to_list(1000)
-    return {'cities': cities}
+    try:
+        cities = await db.cities.find(
+            {}, {'_id': 0, 'id': 1, 'name': 1, 'lat': 1, 'lng': 1, 'country': 1}
+        ).sort('name', 1).to_list(1000)
+        return {'cities': cities}
+    except Exception as e:
+        db_name = os.environ.get('DB_NAME', '?')
+        logger.error(
+            "DB ERROR en GET /public/cities | base de datos='%s' | tipo=%s | detalle=%s",
+            db_name, type(e).__name__, str(e)
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=(f"No se pudo leer las ciudades de MongoDB (db='{db_name}'): "
+                    f"{type(e).__name__}: {e}")
+        )
 
 @api_router.get("/public/orders/{order_id}/tracking")
 async def public_order_tracking(order_id: str):
