@@ -51,6 +51,7 @@ export default function AdminDashboard() {
   const [drivers, setDrivers] = useState([]);
   const [stats, setStats] = useState({ total_drivers: 0, active_drivers: 0, total_businesses: 0, total_orders: 0 });
   const [pendingOrders, setPendingOrders] = useState([]);
+  const [pendingPayroll, setPendingPayroll] = useState(0);
   const [history, setHistory] = useState([]);
   const [historyDrivers, setHistoryDrivers] = useState([]);
   const [historyFilters, setHistoryFilters] = useState({ action: '', driver_id: '', date_from: '', date_to: '' });
@@ -231,6 +232,13 @@ export default function AdminDashboard() {
     } catch (e) { /* noop */ }
   };
 
+  const fetchPendingPayroll = async () => {
+    try {
+      const res = await axios.get(`${API}/accounting/payroll`, { headers: { Authorization: `Bearer ${token}` } });
+      setPendingPayroll((res.data.entries || []).filter((e) => !e.is_paid).length);
+    } catch (e) { /* noop */ }
+  };
+
   const fetchAllOrders = async (filters) => {
     const f = filters || ordersFilters;
     setOrdersLoading(true);
@@ -386,7 +394,8 @@ export default function AdminDashboard() {
     fetchPayouts();
     fetchCitiesList();
     fetchAllOrders();
-    const interval = setInterval(fetchData, 10000);
+    fetchPendingPayroll();
+    const interval = setInterval(() => { fetchData(); fetchPendingPayroll(); }, 10000);
     return () => clearInterval(interval);
     // eslint-disable-next-line
   }, []);
@@ -406,7 +415,7 @@ export default function AdminDashboard() {
       onNavigate={setSection}
       user={user}
       onLogout={logout}
-      badges={{ orders: pendingOrders.length }}
+      badges={{ orders: pendingOrders.length, accounting: pendingPayroll }}
       actions={
         <Button data-testid="refresh-btn" onClick={fetchData} variant="outline" size="sm" className="gap-2">
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Actualizar
