@@ -32,6 +32,20 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+def db_error(endpoint: str, e: Exception) -> HTTPException:
+    """Registra un error de base de datos con detalle (nombre de db, tipo y mensaje)
+    y devuelve un HTTP 503 descriptivo. Útil para diagnosticar fallos de autorización
+    de la MongoDB gestionada en producción (p.ej. 'not authorized on <db> ...')."""
+    db_name = os.environ.get('DB_NAME', '?')
+    logger.error(
+        "DB ERROR en %s | base de datos='%s' | tipo=%s | detalle=%s",
+        endpoint, db_name, type(e).__name__, str(e)
+    )
+    return HTTPException(
+        status_code=503,
+        detail=f"Error de base de datos en {endpoint} (db='{db_name}'): {type(e).__name__}: {e}"
+    )
+
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
 JWT_ALGORITHM = 'HS256'
@@ -386,26 +400,31 @@ async def admin_login(credentials: AdminLogin):
     Incluye bloqueo anti fuerza bruta. Validación 100% en servidor."""
     email = credentials.email.lower().strip()
 
-    locked_minutes = await _admin_check_lockout(email)
-    if locked_minutes:
-        raise HTTPException(status_code=429, detail=f"Demasiados intentos. Cuenta bloqueada {locked_minutes} min.")
+    try:
+        locked_minutes = await _admin_check_lockout(email)
+        if locked_minutes:
+            raise HTTPException(status_code=429, detail=f"Demasiados intentos. Cuenta bloqueada {locked_minutes} min.")
 
-    user = await db.users.find_one({'email': email}, {'_id': 0})
+        user = await db.users.find_one({'email': email}, {'_id': 0})
 
-    password_ok = bool(user) and user.get('role') == 'admin' and verify_password(credentials.password, user['password_hash'])
-    code_ok = bool(ADMIN_SECRET_CODE) and hmac.compare_digest(str(credentials.secret_code), str(ADMIN_SECRET_CODE))
+        password_ok = bool(user) and user.get('role') == 'admin' and verify_password(credentials.password, user['password_hash'])
+        code_ok = bool(ADMIN_SECRET_CODE) and hmac.compare_digest(str(credentials.secret_code), str(ADMIN_SECRET_CODE))
 
-    if not (password_ok and code_ok):
-        remaining = await _admin_record_failure(email)
-        detail = "Credenciales o código de acceso inválidos."
-        if remaining <= 2 and remaining > 0:
-            detail += f" Te quedan {remaining} intento(s) antes del bloqueo."
-        raise HTTPException(status_code=401, detail=detail)
+        if not (password_ok and code_ok):
+            remaining = await _admin_record_failure(email)
+            detail = "Credenciales o código de acceso inválidos."
+            if remaining <= 2 and remaining > 0:
+                detail += f" Te quedan {remaining} intento(s) antes del bloqueo."
+            raise HTTPException(status_code=401, detail=detail)
 
-    await _admin_reset_attempts(email)
-    token = create_token(user['id'], user['role'])
-    user.pop('password_hash', None)
-    return {'token': token, 'user': user}
+        await _admin_reset_attempts(email)
+        token = create_token(user['id'], user['role'])
+        user.pop('password_hash', None)
+        return {'token': token, 'user': user}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise db_error("POST /admin-auth/login", e)
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
@@ -499,18 +518,21 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     order_dict['customer_id'] = current_user['id']
     order_dict['total_amount'] = total
     order_dict['status'] = 'pending'
-    # Resolver nombre de ciudad si se indicó city_id
-    if order_dict.get('city_id'):
-        city = await db.cities.find_one({'id': order_dict['city_id']}, {'_id': 0, 'name': 1})
-        order_dict['city_name'] = city['name'] if city else None
-    
-    order = Order(**order_dict)
-    doc = order.model_dump()
-    doc['created_at'] = doc['created_at'].isoformat()
-    doc['updated_at'] = doc['updated_at'].isoformat()
-    
-    await db.orders.insert_one(doc)
-    return order
+    try:
+        # Resolver nombre de ciudad si se indicó city_id
+        if order_dict.get('city_id'):
+            city = await db.cities.find_one({'id': order_dict['city_id']}, {'_id': 0, 'name': 1})
+            order_dict['city_name'] = city['name'] if city else None
+
+        order = Order(**order_dict)
+        doc = order.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        doc['updated_at'] = doc['updated_at'].isoformat()
+
+        await db.orders.insert_one(doc)
+        return order
+    except Exception as e:
+        raise db_error("POST /orders", e)
 
 @api_router.post("/orders/express", response_model=Order)
 async def create_express_order(order_data: ExpressOrderCreate, current_user: dict = Depends(get_current_user)):
@@ -519,39 +541,42 @@ async def create_express_order(order_data: ExpressOrderCreate, current_user: dic
         raise HTTPException(status_code=403, detail="Only customers can create orders")
 
     # Resolver la ciudad de origen (para el geofencing / auto-despacho)
-    city_name = None
-    city_id = order_data.origin_city_id
-    if city_id:
-        city = await db.cities.find_one({'id': city_id}, {'_id': 0, 'name': 1})
-        city_name = city['name'] if city else None
+    try:
+        city_name = None
+        city_id = order_data.origin_city_id
+        if city_id:
+            city = await db.cities.find_one({'id': city_id}, {'_id': 0, 'name': 1})
+            city_name = city['name'] if city else None
 
-    order = Order(
-        customer_id=current_user['id'],
-        business_id=None,
-        items=[],
-        total_amount=order_data.fee,
-        delivery_address=order_data.destination_name,
-        city_id=city_id,
-        city_name=city_name,
-        status='pending',
-        order_type='express',
-        vehicle_type=order_data.vehicle_type,
-        origin_name=order_data.origin_name,
-        origin_lat=order_data.origin_lat,
-        origin_lng=order_data.origin_lng,
-        destination_name=order_data.destination_name,
-        destination_lat=order_data.destination_lat,
-        destination_lng=order_data.destination_lng,
-        distance_km=order_data.distance_km,
-        eta_mins=order_data.eta_mins,
-        currency=order_data.currency,
-    )
-    doc = order.model_dump()
-    doc['created_at'] = doc['created_at'].isoformat()
-    doc['updated_at'] = doc['updated_at'].isoformat()
+        order = Order(
+            customer_id=current_user['id'],
+            business_id=None,
+            items=[],
+            total_amount=order_data.fee,
+            delivery_address=order_data.destination_name,
+            city_id=city_id,
+            city_name=city_name,
+            status='pending',
+            order_type='express',
+            vehicle_type=order_data.vehicle_type,
+            origin_name=order_data.origin_name,
+            origin_lat=order_data.origin_lat,
+            origin_lng=order_data.origin_lng,
+            destination_name=order_data.destination_name,
+            destination_lat=order_data.destination_lat,
+            destination_lng=order_data.destination_lng,
+            distance_km=order_data.distance_km,
+            eta_mins=order_data.eta_mins,
+            currency=order_data.currency,
+        )
+        doc = order.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        doc['updated_at'] = doc['updated_at'].isoformat()
 
-    await db.orders.insert_one(doc)
-    return order
+        await db.orders.insert_one(doc)
+        return order
+    except Exception as e:
+        raise db_error("POST /orders/express", e)
 
 @api_router.get("/orders", response_model=List[Order])
 async def get_orders(current_user: dict = Depends(get_current_user)):
@@ -773,8 +798,11 @@ def _history_query(action=None, driver_id=None, date_from=None, date_to=None):
 @api_router.get("/cities")
 async def list_cities(current_user: dict = Depends(get_current_user)):
     """Lista de ciudades/zonas disponibles."""
-    cities = await db.cities.find({}, {'_id': 0}).sort('name', 1).to_list(1000)
-    return {'cities': cities}
+    try:
+        cities = await db.cities.find({}, {'_id': 0}).sort('name', 1).to_list(1000)
+        return {'cities': cities}
+    except Exception as e:
+        raise db_error("GET /cities", e)
 
 @api_router.post("/admin/cities", response_model=City)
 async def admin_create_city(data: CityCreate, current_user: dict = Depends(get_current_user)):
@@ -1812,16 +1840,7 @@ async def list_public_cities():
         ).sort('name', 1).to_list(1000)
         return {'cities': cities}
     except Exception as e:
-        db_name = os.environ.get('DB_NAME', '?')
-        logger.error(
-            "DB ERROR en GET /public/cities | base de datos='%s' | tipo=%s | detalle=%s",
-            db_name, type(e).__name__, str(e)
-        )
-        raise HTTPException(
-            status_code=503,
-            detail=(f"No se pudo leer las ciudades de MongoDB (db='{db_name}'): "
-                    f"{type(e).__name__}: {e}")
-        )
+        raise db_error("GET /public/cities", e)
 
 @api_router.get("/public/orders/{order_id}/tracking")
 async def public_order_tracking(order_id: str):
