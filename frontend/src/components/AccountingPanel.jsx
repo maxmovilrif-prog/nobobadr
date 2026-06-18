@@ -215,7 +215,7 @@ export default function AccountingPanel() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-nubo-600 text-white">
                 <Wallet className="h-5 w-5" />
               </div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900">Nubo Express</h1>
@@ -231,7 +231,7 @@ export default function AccountingPanel() {
                   onClick={() => changeCurrency(cur)}
                   className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
                     currency === cur
-                      ? "bg-indigo-600 text-white"
+                      ? "bg-nubo-600 text-white"
                       : "text-slate-600 hover:bg-slate-50"
                   }`}
                 >
@@ -246,7 +246,7 @@ export default function AccountingPanel() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                className="rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm font-medium text-slate-700 outline-none focus:border-nubo-500 focus:ring-2 focus:ring-nubo-100"
               />
             </div>
             <button
@@ -295,7 +295,7 @@ export default function AccountingPanel() {
             icon={Scale}
             label="Saldo final esperado"
             value={summary?.saldo_final_esperado}
-            accent={{ bg: "bg-indigo-100", text: "text-indigo-600", value: "text-indigo-700" }}
+            accent={{ bg: "bg-nubo-100", text: "text-nubo-600", value: "text-nubo-700" }}
             testId={ACCOUNTING.saldoFinal}
             delay={0.2}
             currency={currency}
@@ -319,7 +319,7 @@ export default function AccountingPanel() {
           <button
             data-testid={ACCOUNTING.downloadPdf}
             onClick={() => download("pdf")}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-nubo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nubo-700"
           >
             <FileText className="h-4 w-4" />
             Descargar PDF
@@ -370,7 +370,7 @@ export default function AccountingPanel() {
                           value={qty}
                           onChange={(e) => setCountQty(d, e.target.value)}
                           placeholder="0"
-                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-nubo-500 focus:ring-2 focus:ring-nubo-100"
                         />
                       </div>
                       <p className="mt-1.5 text-right text-xs font-medium text-slate-500">{fmt(subtotal, currency)}</p>
@@ -382,7 +382,7 @@ export default function AccountingPanel() {
                 <button
                   data-testid={ACCOUNTING.cashCountSaveBtn}
                   onClick={saveCount}
-                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                  className="inline-flex items-center gap-2 rounded-lg bg-nubo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-nubo-700"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   Guardar conteo
@@ -470,7 +470,7 @@ export default function AccountingPanel() {
               <button
                 data-testid={ACCOUNTING.seedBtn}
                 onClick={seed}
-                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-nubo-600 transition-colors hover:bg-nubo-50"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 Cargar demo
@@ -539,7 +539,7 @@ export default function AccountingPanel() {
                   value={opening}
                   onChange={(e) => setOpening(e.target.value)}
                   placeholder="0.00"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500 focus:ring-2 focus:ring-nubo-100"
                 />
                 <button
                   data-testid={ACCOUNTING.openingSaveBtn}
@@ -583,7 +583,7 @@ export default function AccountingPanel() {
                   value={mov.concept}
                   onChange={(e) => setMov((p) => ({ ...p, concept: e.target.value }))}
                   placeholder="Concepto (ej. Venta iPhone)"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500 focus:ring-2 focus:ring-nubo-100"
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -592,13 +592,13 @@ export default function AccountingPanel() {
                     value={mov.amount}
                     onChange={(e) => setMov((p) => ({ ...p, amount: e.target.value }))}
                     placeholder="Monto"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500 focus:ring-2 focus:ring-nubo-100"
                   />
                   <select
                     data-testid={ACCOUNTING.movMethod}
                     value={mov.method}
                     onChange={(e) => setMov((p) => ({ ...p, method: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500 focus:ring-2 focus:ring-nubo-100"
                   >
                     <option value="efectivo">Efectivo</option>
                     <option value="tarjeta">Tarjeta</option>
@@ -608,7 +608,7 @@ export default function AccountingPanel() {
                 <button
                   data-testid={ACCOUNTING.movAddBtn}
                   onClick={addMovement}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-nubo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-nubo-700"
                 >
                   <Plus className="h-4 w-4" />
                   Agregar movimiento
@@ -622,7 +622,7 @@ export default function AccountingPanel() {
         <section data-testid={ACCOUNTING.monthlySection} className="mt-6">
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <ScaleIcon className="h-5 w-5 text-indigo-500" />
+              <ScaleIcon className="h-5 w-5 text-nubo-500" />
               <h2 className="text-sm font-semibold text-slate-800">Resumen mensual por moneda</h2>
             </div>
             <input
@@ -630,7 +630,7 @@ export default function AccountingPanel() {
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="ml-auto rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              className="ml-auto rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 outline-none focus:border-nubo-500 focus:ring-2 focus:ring-nubo-100"
             />
           </div>
 
@@ -656,7 +656,7 @@ export default function AccountingPanel() {
                   >
                     <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-nubo-600 text-xs font-bold text-white">
                           {SYMBOLS[m.currency]}
                         </span>
                         <span className="text-sm font-semibold text-slate-800">{m.currency}</span>
@@ -717,7 +717,7 @@ export default function AccountingPanel() {
           className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white"
         >
           <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
-            <History className="h-5 w-5 text-indigo-500" />
+            <History className="h-5 w-5 text-nubo-500" />
             <h2 className="text-sm font-semibold text-slate-800">Historial de cierres anteriores</h2>
             <span className="ml-auto text-xs text-slate-500">{history.length} registro(s)</span>
           </div>
@@ -757,7 +757,7 @@ export default function AccountingPanel() {
                       key={h.date}
                       data-testid={`${ACCOUNTING.historyRow}-${h.date}`}
                       className={`border-b border-slate-50 transition-colors hover:bg-slate-50/60 ${
-                        h.date === date ? "bg-indigo-50/40" : ""
+                        h.date === date ? "bg-nubo-50/40" : ""
                       }`}
                     >
                       <td className="px-5 py-3 font-medium text-slate-800">{h.date}</td>
@@ -793,7 +793,7 @@ export default function AccountingPanel() {
                         <button
                           data-testid={`${ACCOUNTING.historyViewBtn}-${h.date}`}
                           onClick={() => setDate(h.date)}
-                          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+                          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-nubo-600 transition-colors hover:bg-nubo-50"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           Ver

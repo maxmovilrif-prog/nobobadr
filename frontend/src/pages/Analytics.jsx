@@ -56,7 +56,7 @@ export default function Analytics() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900">
-            <TrendingUp className="h-5 w-5 text-indigo-600" /> Rentabilidad & Auditoría COD
+            <TrendingUp className="h-5 w-5 text-nubo-600" /> Rentabilidad & Auditoría COD
           </h1>
           <p className="text-sm text-slate-500">Ingresos por repartidor y ciudad · control de efectivo recaudado</p>
         </div>
@@ -68,7 +68,7 @@ export default function Analytics() {
               type="date"
               value={start}
               onChange={(e) => setStart(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-nubo-500"
             />
           </div>
           <div>
@@ -78,7 +78,7 @@ export default function Analytics() {
               type="date"
               value={end}
               onChange={(e) => setEnd(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-nubo-500"
             />
           </div>
         </div>
@@ -89,7 +89,7 @@ export default function Analytics() {
         {[
           { icon: Package, label: "Pedidos", value: t?.orders ?? 0, cls: "bg-slate-100 text-slate-600" },
           { icon: Truck, label: "Entregados", value: t?.delivered ?? 0, cls: "bg-emerald-100 text-emerald-600" },
-          { icon: TrendingUp, label: "Ingresos", money: t?.revenue, cls: "bg-indigo-100 text-indigo-600" },
+          { icon: TrendingUp, label: "Ingresos", money: t?.revenue, cls: "bg-nubo-100 text-nubo-600" },
           { icon: ShieldCheck, label: "COD efectivo", money: t?.cod_cash, cls: "bg-amber-100 text-amber-600" },
         ].map((s) => (
           <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -111,7 +111,7 @@ export default function Analytics() {
       {/* Cash audit */}
       <section className="mt-6">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <ShieldCheck className="h-4 w-4 text-indigo-500" /> Auditoría de efectivo COD (recaudado vs registrado)
+          <ShieldCheck className="h-4 w-4 text-nubo-500" /> Auditoría de efectivo COD (recaudado vs registrado)
         </h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {(data?.cash_audit || []).map((a) => {
@@ -165,7 +165,7 @@ export default function Analytics() {
         {/* By rider */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
-            <Bike className="h-4 w-4 text-indigo-500" />
+            <Bike className="h-4 w-4 text-nubo-500" />
             <h2 className="text-sm font-semibold text-slate-800">Rentabilidad por repartidor</h2>
           </div>
           <div className="overflow-x-auto">

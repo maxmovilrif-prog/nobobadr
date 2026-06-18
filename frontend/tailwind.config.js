@@ -7,12 +7,29 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Poppins', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)'
       },
       colors: {
+        nubo: {
+          DEFAULT: '#1E90FF',
+          50: '#EAF5FF',
+          100: '#CFE8FF',
+          500: '#3B9EFF',
+          600: '#1E90FF',
+          700: '#1877CC'
+        },
+        bee: {
+          DEFAULT: '#FFD700',
+          100: '#FFF3C4',
+          600: '#E6C200'
+        },
+        ink: '#2D3748',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

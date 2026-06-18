@@ -29,7 +29,7 @@ export default function LiveMap({ riders = [], orders = [] }) {
               className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs shadow-sm"
             >
               <span className="flex items-center gap-1.5 font-medium text-slate-700">
-                <Bike className="h-3.5 w-3.5 text-indigo-500" /> {r.name}
+                <Bike className="h-3.5 w-3.5 text-bee-600" /> {r.name}
               </span>
               <span className="text-slate-400">
                 {r.location.lat.toFixed(4)}, {r.location.lng.toFixed(4)}
@@ -61,8 +61,8 @@ export default function LiveMap({ riders = [], orders = [] }) {
         >
           {located.map((r) => (
             <AdvancedMarker key={r.id} position={{ lat: r.location.lat, lng: r.location.lng }}>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-indigo-600 shadow-lg">
-                <Bike className="h-4 w-4 text-white" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-bee shadow-lg">
+                <Bike className="h-4 w-4 text-ink" />
               </div>
             </AdvancedMarker>
           ))}

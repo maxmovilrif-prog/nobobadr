@@ -149,7 +149,7 @@ export default function Operations() {
           { icon: Package, label: "Pendientes", value: stats.pending, cls: "text-slate-600 bg-slate-100" },
           { icon: Truck, label: "En curso", value: stats.active, cls: "text-amber-600 bg-amber-100" },
           { icon: CheckCircle2, label: "Entregados", value: stats.delivered, cls: "text-emerald-600 bg-emerald-100" },
-          { icon: CircleDollarSign, label: "COD efectivo", value: fmt(stats.cod), cls: "text-indigo-600 bg-indigo-100" },
+          { icon: CircleDollarSign, label: "COD efectivo", value: fmt(stats.cod), cls: "text-nubo-600 bg-nubo-100" },
         ].map((s) => (
           <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4">
             <div className={`mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg ${s.cls}`}>
@@ -215,7 +215,7 @@ export default function Operations() {
                             data-testid={`assign-select-${o.code}`}
                             defaultValue=""
                             onChange={(e) => assign(o.id, e.target.value)}
-                            className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-indigo-500"
+                            className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-nubo-500"
                           >
                             <option value="" disabled>
                               Asignar a…
@@ -235,7 +235,7 @@ export default function Operations() {
                               <button
                                 data-testid={`advance-${o.code}`}
                                 onClick={() => setStatus(o.id, next)}
-                                className="rounded-md bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                className="rounded-md bg-nubo-600 px-2 py-1 text-xs font-medium text-white hover:bg-nubo-700"
                               >
                                 → {STATUS_META[next].label}
                               </button>
@@ -262,20 +262,20 @@ export default function Operations() {
               placeholder="Nombre del cliente"
               value={form.customer_name}
               onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500"
             />
             <input
               placeholder="Teléfono"
               value={form.customer_phone}
               onChange={(e) => setForm({ ...form, customer_phone: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500"
             />
             <input
               data-testid="order-address"
               placeholder="Dirección de entrega"
               value={form.address}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500"
             />
             <div className="grid grid-cols-2 gap-2">
               <input
@@ -283,13 +283,13 @@ export default function Operations() {
                 placeholder="Ciudad"
                 value={form.city}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500"
               />
               <select
                 data-testid="order-country"
                 value={form.country}
                 onChange={(e) => setForm({ ...form, country: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500"
               >
                 <option value="Morocco">Marruecos (MAD)</option>
                 <option value="Spain">España (EUR)</option>
@@ -303,13 +303,13 @@ export default function Operations() {
                 placeholder="Monto"
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500"
               />
               <select
                 data-testid="order-payment"
                 value={form.payment_method}
                 onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-nubo-500"
               >
                 <option value="cod_cash">COD efectivo</option>
                 <option value="card">Tarjeta</option>
@@ -320,7 +320,7 @@ export default function Operations() {
               data-testid="order-submit"
               type="submit"
               disabled={creating}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-nubo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-nubo-700 disabled:opacity-60"
             >
               <Plus className="h-4 w-4" /> Crear pedido
             </button>
@@ -334,7 +334,7 @@ export default function Operations() {
       {/* Live tracking */}
       <section className="mt-6">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <Bike className="h-4 w-4 text-indigo-500" /> Seguimiento en vivo de repartidores
+          <Bike className="h-4 w-4 text-nubo-500" /> Seguimiento en vivo de repartidores
         </h2>
         <LiveMap riders={riders} orders={orders} />
       </section>

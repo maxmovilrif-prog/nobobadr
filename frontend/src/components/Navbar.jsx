@@ -12,7 +12,7 @@ export default function Navbar() {
       data-testid={testId}
       className={({ isActive }) =>
         `inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-          isActive ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"
+          isActive ? "bg-nubo-600 text-white" : "text-slate-600 hover:bg-slate-100"
         }`
       }
     >
@@ -25,10 +25,10 @@ export default function Navbar() {
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-6 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-nubo-600 to-nubo-500 text-white shadow-sm ring-2 ring-bee/40">
             <Wallet className="h-4 w-4" />
           </div>
-          <span className="text-base font-bold tracking-tight text-slate-900">Nubo Express</span>
+          <span className="text-base font-bold tracking-tight text-ink">Nubo Express</span>
         </div>
         <nav className="flex items-center gap-1">
           {link("/", <LayoutDashboard className="h-4 w-4" />, "Operaciones", "nav-operaciones")}

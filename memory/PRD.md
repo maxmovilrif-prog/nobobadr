@@ -76,3 +76,12 @@ Se implementó el feature completo (backend + frontend) en la rama `main`.
   -> totals, by_rider, by_city (revenue y cod_cash por moneda MAD/EUR), cash_audit (cod_expected vs cod_registered con estado ok/fuga/exceso).
 - UI /rentabilidad: totales, auditoría COD por moneda (anti-fuga), tablas por repartidor (tasa entrega, km prom, COD) y por ciudad.
 - Nav link "Rentabilidad". Build verde.
+
+## Update 2026-06-18 (f) — Rebrand "Nubo Express" + identidad visual
+- Renombrado completo MoboExpress -> Nubo Express (UI, backend, PDF/CSV, emails seed @nuboexpress.com).
+- Paleta oficial en tailwind.config.js: nubo (#1E90FF primario), bee (#FFD700 repartidores), ink (#2D3748 texto).
+- index.css: tema CLARO (fondo #F8F9FA/blanco), variables HSL de marca, fuente Poppins (index.html font link).
+- indigo-* -> nubo-* en todos los componentes (64 clases). Login pasado de dark a claro. Navbar blanco, nombre en ink, azul solo en activo, logo gradiente azul+ring abeja. Cards rounded-2xl.
+- Backend/COD/WebSockets/analytics SIN cambios. Build verde.
+- Credenciales: admin@nuboexpress.com / admin123 ; rider@nuboexpress.com / rider123.
+- DOMINIO nuboexpress.com: se configura vía "Custom Domain" de Emergent (Link domain -> Entri -> DNS), NO editando REACT_APP_BACKEND_URL. SSL automático.
