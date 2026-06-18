@@ -52,6 +52,9 @@ async def public_order_tracking(order_id: str):
         'destination': destination,
         'price': order.get('total_amount'),
         'currency': order.get('currency') or 'EUR',
+        'distance_km': order.get('distance_km'),
+        'eta_mins': order.get('eta_mins'),
+        'order_type': order.get('order_type', 'marketplace'),
         'updated_at': order.get('updated_at'),
     }
 

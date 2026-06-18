@@ -127,8 +127,11 @@ export const OperationsManager = ({ API, token }) => {
                   <MapPin className="w-3.5 h-3.5 mt-0.5 text-emerald-600 shrink-0" />
                   <span className="truncate">{o.origin_name || o.city_name || 'Recogida'} → {o.destination_name || '—'}</span>
                 </div>
+                {o.distance_km != null && (
+                  <p className="text-xs text-gray-500 mt-1 ml-5" data-testid={`ops-pending-distance-${o.id}`}>Distancia: {o.distance_km} km</p>
+                )}
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-sm font-semibold text-emerald-700">{fmtMoney(o.total_amount, o.currency)}</span>
+                  <span className="text-sm font-semibold text-emerald-700" data-testid={`ops-pending-price-${o.id}`}>{fmtMoney(o.total_amount, o.currency)}</span>
                   <Button
                     data-testid={`ops-assign-btn-${o.id}`}
                     size="sm" className="bg-emerald-600 hover:bg-emerald-700"
@@ -164,6 +167,10 @@ export const OperationsManager = ({ API, token }) => {
                   🐝 <span className="font-medium">{o.driver_name}</span>
                   <span className="text-xs text-gray-500">· {VLABEL[o.driver_vehicle_type] || o.driver_vehicle_type || ''}</span>
                 </p>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-sm font-semibold text-emerald-700" data-testid={`ops-active-price-${o.id}`}>{fmtMoney(o.total_amount, o.currency)}</span>
+                  {o.distance_km != null && <span className="text-xs text-gray-500">{o.distance_km} km</span>}
+                </div>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-gray-500 truncate">{o.destination_name || '—'}</span>
                   <Button

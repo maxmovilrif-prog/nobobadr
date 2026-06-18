@@ -150,6 +150,7 @@ async def ops_orders(current_user: dict = Depends(get_current_admin)):
             'city_name': o.get('city_name'),
             'total_amount': o.get('total_amount'),
             'currency': o.get('currency') or 'EUR',
+            'distance_km': o.get('distance_km'),
             'created_at': o.get('created_at'),
         }
         if with_driver:

@@ -129,6 +129,7 @@ export default function PublicTracking() {
         order_id: d.order_id, client_name: '', delivery_status: mapTrackingStatus(d.status),
         driver_name: d.driver_name || S.searchingDriver, vehicle: vehicleLabel(d.driver_vehicle_type),
         vehicle_type: d.driver_vehicle_type || 'motorcycle', price: priceMad,
+        distance_km: d.distance_km, eta_mins: d.eta_mins, order_type: d.order_type,
         origin: { lat: d.origin.lat, lng: d.origin.lng, label: d.origin.label },
         destination: { lat: d.destination.lat, lng: d.destination.lng, label: d.destination.label },
         current: d.driver_location || { lat: d.origin.lat, lng: d.origin.lng },
@@ -350,11 +351,17 @@ export default function PublicTracking() {
                   </div>
                 )}
 
-                <Card className="border-0 shadow-lg">
+                <Card className="border-0 shadow-lg" data-testid="tracking-cost-card">
                   <CardContent className="p-4">
                     <p className="text-[11px] text-gray-400">{S.cost}</p>
                     <p className="text-2xl font-bold text-emerald-700" data-testid="tracking-cost-main">{formatCurrency(order.price, currency)}</p>
-                    <p className="text-xs text-gray-500">≈ {formatCurrency(order.price, currency === 'MAD' ? 'EUR' : 'MAD')}</p>
+                    <p className="text-xs text-gray-500" data-testid="tracking-cost-alt">≈ {formatCurrency(order.price, currency === 'MAD' ? 'EUR' : 'MAD')}</p>
+                    {order.distance_km != null && (
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between" data-testid="tracking-distance-breakdown">
+                        <span className="text-xs text-gray-400 flex items-center gap-1"><RouteIcon className="w-3 h-3" /> {S.distance} (tarifa)</span>
+                        <span className="text-sm font-semibold text-gray-700">{order.distance_km} km</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

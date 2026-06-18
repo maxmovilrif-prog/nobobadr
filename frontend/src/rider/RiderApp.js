@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { ScanLine, LogOut, MapPin, Package, Power, Loader2, Bike, Car, Truck, Zap, ShieldAlert, Camera, X } from 'lucide-react';
+import { ScanLine, LogOut, MapPin, Package, Power, Loader2, Bike, Car, Truck, Zap, ShieldAlert, Camera, X, Banknote, Route } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -288,16 +288,29 @@ export default function RiderApp() {
               {orders.map((o) => (
                 <Card key={o.id} data-testid={`rider-order-${o.id}`} className="border-0 shadow-sm">
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between mb-2">
                       <span className="font-semibold text-gray-900">#{o.id.slice(0, 8)}</span>
                       <Badge className="bg-emerald-100 text-emerald-700">{o.status}</Badge>
                     </div>
-                    <p className="text-sm text-gray-600 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {o.delivery_address}
+                    <p className="text-sm text-gray-600 flex items-start gap-1">
+                      <MapPin className="w-3.5 h-3.5 mt-0.5 text-emerald-600 shrink-0" />
+                      <span>{o.origin_name ? `${o.origin_name} → ` : ''}{o.destination_name || o.delivery_address}</span>
                     </p>
-                    <p className="text-sm font-medium text-gray-800 mt-1">
-                      {(o.currency === 'MAD' ? `${o.total_amount} د.م` : `€${o.total_amount?.toFixed(2)}`)}
-                    </p>
+                    {/* Tarifa de entrega — transparencia financiera */}
+                    <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="w-4 h-4 text-emerald-600" />
+                        <span className="text-xs text-gray-500">Tarifa de entrega</span>
+                      </div>
+                      <span className="text-lg font-bold text-emerald-700" data-testid={`rider-order-price-${o.id}`}>
+                        {o.currency === 'MAD' ? `${(o.total_amount ?? 0).toFixed(2)} د.م` : `€${(o.total_amount ?? 0).toFixed(2)}`}
+                      </span>
+                    </div>
+                    {o.distance_km != null && (
+                      <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1" data-testid={`rider-order-distance-${o.id}`}>
+                        <Route className="w-3 h-3" /> {o.distance_km} km{o.eta_mins != null ? ` · ~${o.eta_mins} min` : ''}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               ))}
