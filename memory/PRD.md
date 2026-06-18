@@ -34,8 +34,13 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Sistema de riders backend** `routes/riders.py`: alta admin con **código `NUBO-XXXX` + QR (base64 PNG)**, `/rider/activate`, `/rider/me`, `/rider/location`, `/rider/availability`, suspender/reactivar, regenerar código. `get_current_rider`, `create_rider_token` (30 días), `generate_qr_data_url` (lib `qrcode`).
 - **Seguridad capa Fundador**: login con **brute-force lockout** (5 intentos/15 min, IP real vía `X-Forwarded-For`). Registro público no crea admin. Consola admin exclusiva.
 - **Gestión de riders en panel** `RiderManager.jsx` (alta + QR imprimible + suspender + regenerar). ✅ 58/58 pytest + frontend e2e 100%.
+- **Escáner QR de cámara** en la app del rider (`html5-qrcode`): botón "Escanear QR" + overlay, además del código manual. ✅
 
-## Pendiente / Backlog (actualizado)
+## Bloque B — Seguimiento público de pedidos (2026-06-18) ✅
+- Backend `GET /api/public/orders/{id}/tracking` (público): estado, ruta origen/destino, precio €/MAD, repartidor y ubicación (en vivo por WebSocket si existe).
+- Frontend `PublicTracking.js` (`/track`, público): búsqueda por nº de pedido, mapa con ruta, switch €/MAD, compartir por WhatsApp, demos `ORD-4821`/`ORD-4823`, auto-refresco cada 15s, deep-link `?order=`. Botón "Seguir mi pedido" en CustomerDashboard. ✅ 62/62 pytest + frontend e2e 100%.
+
+## Pendiente / Backlog (actualizado 2)
 - **P0/Infra**: Dominio personalizado **nuboexpress.com** (bloqueado, requiere acción del usuario en UI de Emergent o soporte). Contraseña "Emergent Code Server" ($PASSWORD vacío en entorno — es tema de plataforma).
 - **P1**: Configurar clave real de Google Maps (`REACT_APP_GOOGLE_MAPS_API_KEY`) — actualmente placeholder, el mapa muestra error de Google (esperado).
 - **P2 (calidad)**: `server.py` ~1159 líneas; conviene modularizar (auth, orders, admin, search). Considerar persistir `current_location` de conductores en BD para mostrarlos en el mapa aunque no tengan pedido activo.
