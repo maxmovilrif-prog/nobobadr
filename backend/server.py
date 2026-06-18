@@ -13,6 +13,9 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+import json
+import re
 import sys
 sys.path.append(str(Path(__file__).parent))
 
@@ -31,6 +34,9 @@ JWT_EXPIRATION_HOURS = 24
 
 # Stripe Configuration
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
+
+# LLM Configuration (Emergent Universal Key)
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
 # Create the main app
 app = FastAPI()
@@ -214,6 +220,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 @api_router.post("/auth/register", response_model=UserResponse)
 async def register(user_data: UserCreate):
+    # Public registration cannot create privileged accounts
+    if user_data.role not in ('customer', 'driver', 'business'):
+        raise HTTPException(status_code=400, detail="Rol no válido")
     # Check if user exists
     existing = await db.users.find_one({'email': user_data.email}, {'_id': 0})
     if existing:
@@ -318,6 +327,120 @@ async def get_products(business_id: str):
             product['created_at'] = datetime.fromisoformat(product['created_at'])
     
     return products
+
+# =========================
+# AI SMART SEARCH
+# =========================
+
+class SmartSearchRequest(BaseModel):
+    query: str
+    language: Optional[str] = "es"
+
+VALID_CATEGORIES = ["restaurant", "supermarket", "courier", "vehicles", "electronics", "transport"]
+
+def _extract_json(text: str) -> dict:
+    """Extrae el primer bloque JSON de la respuesta del LLM de forma robusta."""
+    text = text.strip()
+    # Remove code fences if present
+    text = re.sub(r"^```(?:json)?", "", text).strip()
+    text = re.sub(r"```$", "", text).strip()
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+@api_router.post("/search/smart")
+async def smart_search(req: SmartSearchRequest):
+    """
+    Búsqueda en lenguaje natural. Interpreta la intención del usuario (ej. "tengo hambre")
+    usando el LLM y devuelve negocios y productos relevantes ordenados.
+    """
+    query = (req.query or "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="La búsqueda no puede estar vacía")
+
+    categories: List[str] = []
+    keywords: List[str] = []
+    ai_message = ""
+
+    # 1. Interpretar la consulta con el LLM
+    if EMERGENT_LLM_KEY:
+        try:
+            system_message = (
+                "Eres el asistente de búsqueda de Nubo, un marketplace multiservicio en España. "
+                "Las categorías disponibles son: restaurant (comida/restaurantes), supermarket (supermercado/alimentación), "
+                "courier (paquetería/envíos), vehicles (vehículos/coches), electronics (electrónica/tecnología), "
+                "transport (NuboRide/viajes en coche con conductor). "
+                "Analiza la consulta del usuario e identifica su intención. "
+                "Responde ÚNICAMENTE con un objeto JSON válido (sin texto adicional, sin markdown) con esta estructura exacta: "
+                '{\"categories\": [lista de categorías relevantes de la lista permitida], '
+                '\"keywords\": [lista de palabras clave en español para buscar productos], '
+                '\"message\": \"un mensaje corto y amable en el idioma del usuario explicando qué le mostramos\"}. '
+                "Ejemplo: para 'tengo hambre' devuelve categories ['restaurant','supermarket'] y un mensaje amable."
+            )
+            chat = LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=f"search-{uuid.uuid4()}",
+                system_message=system_message,
+            ).with_model("openai", "gpt-5.4-mini")
+            response = await chat.send_message(UserMessage(text=query))
+            parsed = _extract_json(response if isinstance(response, str) else str(response))
+            categories = [c for c in parsed.get("categories", []) if c in VALID_CATEGORIES]
+            keywords = [str(k).lower() for k in parsed.get("keywords", []) if k]
+            ai_message = parsed.get("message", "")
+        except Exception as e:
+            logger.error(f"Smart search LLM error: {e}")
+
+    # 2. Fallback simple si el LLM falla o no hay clave
+    if not keywords:
+        keywords = [w.lower() for w in re.findall(r"\w+", query) if len(w) > 2]
+    if not ai_message:
+        ai_message = "Esto es lo que encontramos para tu búsqueda:"
+
+    # 3. Buscar negocios por categoría y por texto
+    business_query: dict = {}
+    or_conditions = []
+    if categories:
+        or_conditions.append({"category": {"$in": categories}})
+    if keywords:
+        kw_regex = "|".join(re.escape(k) for k in keywords)
+        or_conditions.append({"name": {"$regex": kw_regex, "$options": "i"}})
+        or_conditions.append({"description": {"$regex": kw_regex, "$options": "i"}})
+    if or_conditions:
+        business_query = {"$or": or_conditions}
+
+    businesses = await db.businesses.find(business_query, {'_id': 0}).to_list(50)
+
+    # 4. Buscar productos por palabras clave
+    products = []
+    if keywords:
+        kw_regex = "|".join(re.escape(k) for k in keywords)
+        products = await db.products.find({
+            "$or": [
+                {"name": {"$regex": kw_regex, "$options": "i"}},
+                {"description": {"$regex": kw_regex, "$options": "i"}},
+                {"category": {"$regex": kw_regex, "$options": "i"}},
+            ]
+        }, {'_id': 0}).to_list(50)
+
+    # 5. Limpiar fechas para serialización
+    for b in businesses:
+        if isinstance(b.get('created_at'), str):
+            b['created_at'] = b['created_at']
+    for p in products:
+        if isinstance(p.get('created_at'), str):
+            p['created_at'] = p['created_at']
+
+    return {
+        "message": ai_message,
+        "categories": categories,
+        "keywords": keywords,
+        "businesses": businesses,
+        "products": products,
+    }
 
 # =========================
 # ORDER ENDPOINTS
@@ -935,6 +1058,84 @@ async def get_driver_location(order_id: str):
     if location:
         return location
     raise HTTPException(status_code=404, detail="No location data available")
+
+# =========================
+# ADMIN - FLEET TRACKING
+# =========================
+
+async def get_current_admin(current_user: dict = Depends(get_current_user)):
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Acceso solo para administradores")
+    return current_user
+
+@api_router.get("/admin/active-drivers")
+async def admin_active_drivers(current_user: dict = Depends(get_current_admin)):
+    """
+    Devuelve todas las 'Abejas' (conductores) activas en tiempo real.
+    Combina las ubicaciones en vivo (WebSocket) con los conductores disponibles.
+    """
+    fleet = []
+    seen_order_ids = set()
+
+    # 1. Conductores en vivo (con pedido activo, ubicación por WebSocket)
+    for order_id, loc in manager.driver_locations.items():
+        seen_order_ids.add(order_id)
+        order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+        fleet.append({
+            "order_id": order_id,
+            "driver_name": loc.get("driver_name", "Abeja"),
+            "lat": loc.get("lat"),
+            "lng": loc.get("lng"),
+            "status": loc.get("status", "en_camino"),
+            "timestamp": loc.get("timestamp"),
+            "delivery_address": order.get("delivery_address") if order else None,
+            "live": True,
+        })
+
+    # 2. Conductores disponibles registrados (pueden no tener pedido activo)
+    drivers = await db.users.find(
+        {'role': 'driver', 'is_available': True},
+        {'_id': 0, 'password_hash': 0}
+    ).to_list(500)
+    for d in drivers:
+        loc = d.get('current_location')
+        fleet.append({
+            "driver_id": d.get("id"),
+            "driver_name": d.get("name", "Abeja"),
+            "lat": loc.get("lat") if loc else None,
+            "lng": loc.get("lng") if loc else None,
+            "vehicle_type": d.get("vehicle_type"),
+            "status": "disponible",
+            "live": False,
+        })
+
+    active_orders = await db.orders.count_documents({'status': 'in_transit'})
+
+    return {
+        "count": len(fleet),
+        "live_count": len(seen_order_ids),
+        "available_count": len(drivers),
+        "active_orders": active_orders,
+        "drivers": fleet,
+    }
+
+@api_router.get("/admin/stats")
+async def admin_stats(current_user: dict = Depends(get_current_admin)):
+    total_orders = await db.orders.count_documents({})
+    in_transit = await db.orders.count_documents({'status': 'in_transit'})
+    delivered = await db.orders.count_documents({'status': 'delivered'})
+    total_drivers = await db.users.count_documents({'role': 'driver'})
+    available_drivers = await db.users.count_documents({'role': 'driver', 'is_available': True})
+    total_businesses = await db.businesses.count_documents({})
+    return {
+        "total_orders": total_orders,
+        "in_transit": in_transit,
+        "delivered": delivered,
+        "total_drivers": total_drivers,
+        "available_drivers": available_drivers,
+        "total_businesses": total_businesses,
+        "live_drivers": len(manager.driver_locations),
+    }
 
 # =========================
 # APP CONFIGURATION

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car } from 'lucide-react';
+import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car, Sparkles, Search, X } from 'lucide-react';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleFilters from '@/components/VehicleFilters';
 import RideBooking from '@/components/RideBooking';
@@ -34,6 +34,11 @@ export default function CustomerDashboard() {
     sortBy: 'name'
   });
   const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
+
+  // AI Smart Search
+  const [smartQuery, setSmartQuery] = useState('');
+  const [smartLoading, setSmartLoading] = useState(false);
+  const [smartResults, setSmartResults] = useState(null); // {message, businesses, products}
 
   useEffect(() => {
     fetchBusinesses();
@@ -60,15 +65,38 @@ export default function CustomerDashboard() {
     }
   };
 
-  const fetchProducts = async (businessId) => {
+  const fetchProducts = async (businessId, businessObj = null) => {
     try {
       const response = await axios.get(`${API}/products/${businessId}`);
       setProducts(response.data);
-      setSelectedBusiness(businesses.find(b => b.id === businessId));
+      setSelectedBusiness(businessObj || businesses.find(b => b.id === businessId));
     } catch (error) {
       toast.error('Error al cargar productos');
     }
   };
+
+  const handleSmartSearch = async (e) => {
+    if (e) e.preventDefault();
+    const q = smartQuery.trim();
+    if (!q) return;
+    setSmartLoading(true);
+    try {
+      const response = await axios.post(`${API}/search/smart`, { query: q });
+      setSmartResults(response.data);
+    } catch (error) {
+      toast.error('Error en la búsqueda inteligente');
+    } finally {
+      setSmartLoading(false);
+    }
+  };
+
+  const clearSmartSearch = () => {
+    setSmartResults(null);
+    setSmartQuery('');
+  };
+
+  // Map product id -> business object for displaying search product results
+  const businessById = (id) => businesses.find(b => b.id === id);
 
   const addToCart = (product) => {
     const existing = cart.find(item => item.product_id === product.id);
@@ -330,6 +358,104 @@ export default function CustomerDashboard() {
           </TabsList>
 
           <TabsContent value="businesses">
+            {/* AI Smart Search */}
+            <Card className="mb-6 border-0 shadow-lg bg-white">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">Búsqueda inteligente</h3>
+                  <Badge className="bg-emerald-100 text-emerald-700">IA</Badge>
+                </div>
+                <form onSubmit={handleSmartSearch} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      data-testid="smart-search-input"
+                      className="pl-9"
+                      placeholder='Prueba: "tengo hambre", "necesito enviar un paquete", "quiero un coche"...'
+                      value={smartQuery}
+                      onChange={(e) => setSmartQuery(e.target.value)}
+                    />
+                  </div>
+                  <Button data-testid="smart-search-btn" type="submit" disabled={smartLoading} className="bg-emerald-600">
+                    {smartLoading ? 'Buscando...' : 'Buscar'}
+                  </Button>
+                  {smartResults && (
+                    <Button data-testid="smart-search-clear-btn" type="button" variant="outline" onClick={clearSmartSearch}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* AI Search Results */}
+            {smartResults && (
+              <div data-testid="smart-search-results" className="mb-8">
+                <Card className="mb-6 border-0 bg-gradient-to-r from-emerald-50 to-teal-50">
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                    <p data-testid="smart-search-message" className="text-gray-800">{smartResults.message}</p>
+                  </CardContent>
+                </Card>
+
+                {smartResults.businesses?.length > 0 && (
+                  <>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3">Negocios encontrados</h4>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                      {smartResults.businesses.map(business => (
+                        <Card key={business.id} data-testid={`search-business-card-${business.id}`} className="hover-lift cursor-pointer border-0 shadow-lg" onClick={() => fetchProducts(business.id, business)}>
+                          <div className="aspect-video bg-gradient-to-br from-emerald-400 to-teal-500 rounded-t-lg overflow-hidden">
+                            <img src={business.image_url} alt={business.name} className="w-full h-full object-cover" />
+                          </div>
+                          <CardContent className="p-4">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-1">{business.name}</h3>
+                            <p className="text-sm text-gray-600 mb-2">{business.description}</p>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="flex items-center text-gray-600">
+                                <Clock className="w-4 h-4 mr-1" />
+                                {business.delivery_time}
+                              </span>
+                              <Badge className="bg-emerald-100 text-emerald-700">{business.category}</Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {smartResults.products?.length > 0 && (
+                  <>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3">Productos encontrados</h4>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                      {smartResults.products.map(product => {
+                        const biz = businessById(product.business_id);
+                        return (
+                          <Card key={product.id} data-testid={`search-product-card-${product.id}`} className="border-0 shadow-md hover-lift cursor-pointer" onClick={() => biz && fetchProducts(biz.id, biz)}>
+                            <CardContent className="p-4 flex gap-3">
+                              <img src={product.image_url} alt={product.name} className="w-20 h-20 object-cover rounded-lg" />
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900 text-sm">{product.name}</h4>
+                                <p className="text-xs text-gray-600 mb-1 line-clamp-2">{product.description}</p>
+                                <span className="text-base font-bold text-emerald-600">€{product.price.toFixed(2)}</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {(!smartResults.businesses?.length && !smartResults.products?.length) && (
+                  <Card><CardContent className="p-8 text-center text-gray-600">No encontramos resultados. Prueba con otra búsqueda.</CardContent></Card>
+                )}
+              </div>
+            )}
+
             {/* Category Filter */}
             <div className="flex gap-4 mb-6 overflow-x-auto pb-2">
               {[
