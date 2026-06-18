@@ -368,6 +368,15 @@ export default function CustomerDashboard() {
                   Calcular envío
                   <Calculator className="w-4 h-4 ml-2" />
                 </Button>
+                <Button
+                  data-testid="public-track-btn"
+                  onClick={() => navigate('/track')}
+                  variant="outline"
+                  className="ml-3 bg-transparent border-white text-white hover:bg-white/10"
+                >
+                  Seguir mi pedido
+                  <MapPin className="w-4 h-4 ml-2" />
+                </Button>
               </div>
               <div className="hidden md:block text-6xl opacity-20">🐝</div>
             </div>

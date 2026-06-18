@@ -6,7 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { ScanLine, LogOut, MapPin, Package, Power, Loader2, Bike, Car, Truck, Zap, ShieldAlert } from 'lucide-react';
+import { ScanLine, LogOut, MapPin, Package, Power, Loader2, Bike, Car, Truck, Zap, ShieldAlert, Camera, X } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const RIDER_TOKEN_KEY = 'nubo_rider_token';
@@ -22,7 +23,9 @@ export default function RiderApp() {
   const [activating, setActivating] = useState(false);
   const [orders, setOrders] = useState([]);
   const [sharing, setSharing] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const watchIdRef = useRef(null);
+  const scannerRef = useRef(null);
 
   const authHeaders = useCallback(() => ({ headers: { Authorization: `Bearer ${token}` } }), [token]);
 
@@ -54,9 +57,8 @@ export default function RiderApp() {
     if (rider) loadOrders();
   }, [rider, loadOrders]);
 
-  const handleActivate = async (e) => {
-    e.preventDefault();
-    const c = code.trim().toUpperCase();
+  const activateWithCode = async (rawCode) => {
+    const c = (rawCode || '').trim().toUpperCase();
     if (!c) return;
     setActivating(true);
     try {
@@ -70,6 +72,42 @@ export default function RiderApp() {
     } finally {
       setActivating(false);
     }
+  };
+
+  const handleActivate = async (e) => {
+    e.preventDefault();
+    await activateWithCode(code);
+  };
+
+  const stopScan = useCallback(async () => {
+    if (scannerRef.current) {
+      try { await scannerRef.current.stop(); await scannerRef.current.clear(); } catch (e) { /* noop */ }
+      scannerRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
+  const startScan = () => {
+    setScanning(true);
+    setTimeout(async () => {
+      try {
+        const html5 = new Html5Qrcode('qr-reader');
+        scannerRef.current = html5;
+        await html5.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: 220 },
+          async (decodedText) => {
+            await stopScan();
+            setCode(decodedText.trim().toUpperCase());
+            activateWithCode(decodedText);
+          },
+          () => {}
+        );
+      } catch (e) {
+        toast.error('No se pudo abrir la cámara. Escribe el código manualmente.');
+        setScanning(false);
+      }
+    }, 150);
   };
 
   const logout = () => {
@@ -110,7 +148,7 @@ export default function RiderApp() {
     setSharing(false);
   };
 
-  useEffect(() => () => stopSharing(), []);
+  useEffect(() => () => { stopSharing(); stopScan(); }, [stopScan]);
 
   // ---- Loading ----
   if (loading) {
@@ -144,7 +182,25 @@ export default function RiderApp() {
               {activating ? <Loader2 className="w-5 h-5 animate-spin" /> : <ScanLine className="w-5 h-5" />}
               Activar mi app
             </Button>
+            <div className="flex items-center gap-3 text-white/30 text-xs">
+              <div className="flex-1 h-px bg-white/15" /> o <div className="flex-1 h-px bg-white/15" />
+            </div>
+            <Button data-testid="rider-scan-btn" type="button" onClick={startScan} variant="outline"
+              className="w-full h-12 bg-transparent border-white/20 text-white hover:bg-white/10 gap-2">
+              <Camera className="w-5 h-5" /> Escanear QR con la cámara
+            </Button>
           </form>
+
+          {scanning && (
+            <div className="fixed inset-0 z-[60] bg-black/95 flex flex-col items-center justify-center p-6" data-testid="rider-scanner">
+              <p className="text-white text-sm mb-4">Apunta la cámara al código QR</p>
+              <div id="qr-reader" className="w-full max-w-xs rounded-xl overflow-hidden bg-black" />
+              <Button data-testid="rider-scan-cancel" onClick={stopScan} variant="outline"
+                className="mt-6 bg-transparent border-white/30 text-white hover:bg-white/10 gap-2">
+                <X className="w-4 h-4" /> Cancelar
+              </Button>
+            </div>
+          )}
           <p className="text-white/30 text-xs mt-8">Escanea tu QR o escribe el código. Solo conductores autorizados.</p>
         </div>
       </div>

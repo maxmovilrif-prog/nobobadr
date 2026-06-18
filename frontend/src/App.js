@@ -10,6 +10,7 @@ import BusinessDashboard from '@/pages/BusinessDashboard';
 import AdminDashboard from '@/pages/AdminDashboard';
 import DeliveryQuote from '@/pages/DeliveryQuote';
 import RiderApp from '@/rider/RiderApp';
+import PublicTracking from '@/pages/PublicTracking';
 import OrderTracking from '@/pages/OrderTracking';
 import OrderSuccess from '@/pages/OrderSuccess';
 import DropshippingPanel from '@/pages/DropshippingPanel';
@@ -91,6 +92,7 @@ function App() {
           <Route path="/admin" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/auth" />} />
           <Route path="/presupuesto" element={<DeliveryQuote />} />
           <Route path="/rider" element={<RiderApp />} />
+          <Route path="/track" element={<PublicTracking />} />
           <Route path="/orders" element={user ? <CustomerDashboard /> : <Navigate to="/auth" />} />
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />

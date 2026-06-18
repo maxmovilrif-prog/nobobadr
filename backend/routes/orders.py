@@ -4,11 +4,54 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException, Depends
 
-from core import db, get_current_user
+from core import db, get_current_user, manager
 from models import Order, OrderCreate, OrderStatusUpdate, ExpressOrderCreate
 import telegram_alerts
 
 router = APIRouter()
+
+
+@router.get("/public/orders/{order_id}/tracking")
+async def public_order_tracking(order_id: str):
+    """Seguimiento público de un pedido (sin login): estado, ruta y ubicación del repartidor."""
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+
+    driver_name = None
+    driver_vehicle = None
+    driver_location = None
+    if order.get('driver_id'):
+        d = await db.users.find_one({'id': order['driver_id']}, {'_id': 0})
+        if d:
+            driver_name = d.get('name')
+            driver_vehicle = d.get('vehicle_type')
+            loc = d.get('current_location')
+            if loc and loc.get('lat') is not None:
+                driver_location = {'lat': loc['lat'], 'lng': loc['lng']}
+
+    # La ubicación en vivo (WebSocket) tiene prioridad si existe
+    live = manager.get_driver_location(order_id)
+    if live and live.get('lat') is not None:
+        driver_location = {'lat': live['lat'], 'lng': live['lng']}
+
+    origin = destination = None
+    if order.get('origin_lat') is not None and order.get('destination_lat') is not None:
+        origin = {'lat': order['origin_lat'], 'lng': order['origin_lng'], 'label': order.get('origin_name')}
+        destination = {'lat': order['destination_lat'], 'lng': order['destination_lng'], 'label': order.get('destination_name')}
+
+    return {
+        'order_id': order['id'],
+        'status': order['status'],
+        'driver_name': driver_name,
+        'driver_vehicle_type': driver_vehicle,
+        'driver_location': driver_location,
+        'origin': origin,
+        'destination': destination,
+        'price': order.get('total_amount'),
+        'currency': order.get('currency') or 'EUR',
+        'updated_at': order.get('updated_at'),
+    }
 
 
 @router.post("/orders", response_model=Order)

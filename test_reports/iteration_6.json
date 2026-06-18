@@ -1,0 +1,48 @@
+{
+  "summary": "BLOQUE B (public order tracking at /track) + rider QR camera scanner toggle end-to-end tested. Backend pytest 62/62 GREEN (58 prior + 4 new in /app/backend/tests/test_public_tracking.py covering GET /api/public/orders/{id}/tracking 404, no-auth access, full payload contract for a freshly-created express order, _id excluded). Frontend public tracking /track: page loads with data-testid=public-tracking-page; searching DEMO ORD-4821 shows tracking-order-id='ORD-4821', tracking-status='En camino', tracking-cost-main flips between '78,20 €' (EUR) and '850,00 MAD' on currency-EUR/currency-MAD click; tracking-share-btn visible; bogus id 'BOGUS-XYZ-999' surfaces tracking-error with 'No encontramos ningún pedido…'; deep link /track?order=ORD-4823 auto-loads ORD-4823 (Tetuán -> Tarifa). Real express order (created via /api/orders/express, customer qa_customer) opened via /track?order=<id> renders sidebar with origin label 'FE_Madrid', destination label 'FE_Tanger', price 99,00 € / 1.076,09 MAD, status 'Pendiente' and 'Buscando repartidor...' (no driver assigned) — map area shows Google 'Oops' overlay (placeholder key, EXPECTED). Rider /rider activation screen: rider-scan-btn renders; clicking it opens rider-scanner overlay; rider-scan-cancel closes it cleanly (overlay shows graceful 'No se pudo abrir la cámara. Escribe el código manualmente.' since headless has no camera — expected). MANUAL code activation still works end-to-end: created rider via POST /api/admin/riders → activation_code NUBO-CW19 → typed into rider-code-input → rider-activate-btn → rider-home rendered. CustomerDashboard public-track-btn present after customer login at /dashboard and correctly navigates to /track (page shows ¡Bienvenido! toast + tracking page). REGRESSION: all 58 prior pytest tests (Bloque A calculator, cities, riders/lockout, nubo features, regression modularization) still pass alongside the 4 new public-tracking tests.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login (brute-force lockout)", "issue": "Pre-existing from iter5 — lockout uses request.client.host which is the K8s ingress proxy pod IP, not the real client IP. Works on localhost (5x 401 → 429) but is bypassable through the public URL. Fix: derive ip from request.headers.get('x-forwarded-for','').split(',')[0].strip() or request.client.host fallback in core.check_login_lockout caller."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PublicTracking /track map panel", "issues": ["Google Maps placeholder key causes Google's gray 'Oops! Something went wrong' overlay inside tracking-map. EXPECTED per problem statement (REACT_APP_GOOGLE_MAPS_API_KEY=YOUR_API_KEY_HERE). Sidebar (status, cost, origin/destination, driver, currency switch, share) renders correctly. Consider replacing this with a friendlier branded placeholder image when key is missing — non-blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_public_tracking.py",
+    "/app/backend/tests/test_riders_and_lockout.py",
+    "/app/backend/tests/test_nubo_features.py",
+    "/app/backend/tests/test_regression_modularization.py",
+    "/app/backend/tests/test_bloque_a_cities_delivery.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(carry-over HIGH security from iter5) Make /api/auth/login brute-force lockout K8s-ingress aware (X-Forwarded-For).",
+    "(LOW cosmetic) Replace Google 'Oops' map overlay with a friendlier branded placeholder until a real REACT_APP_GOOGLE_MAPS_API_KEY is configured.",
+    "(LOW UX) Rider QR scanner: when getUserMedia fails (camera unavailable / permission denied), the overlay shows a clear error but stays open until cancel; consider auto-collapsing and surfacing the manual-input field. Today's behavior is acceptable.",
+    "(LOW UX) PublicTracking currency switch keeps the previous EUR/MAD selection across queries — confirmed working; just document in i18n that 'price' returned by /api/public/orders/{id}/tracking is in `currency` field's native unit (the order's stored currency) and the UI does the conversion using a constant EXCHANGE_RATE_MAD_EUR=0.092. Hard-coded rate may drift; consider fetching from an FX endpoint or surfacing it as a config."
+  ],
+  "critical_code_review_comments": [
+    "routes/orders.py public_order_tracking: uses projection {'_id': 0} on both orders.find_one and users.find_one — good. Live WS location correctly overrides DB current_location when present. Origin/destination only populated when origin_lat AND destination_lat are non-null, so normal (non-express) orders return origin=destination=null (acceptable since map is express-focused).",
+    "PublicTracking.js DEMO_ORDERS is hard-coded inside the bundle for ORD-4821 / ORD-4823 — fine for demo, but the price stored there is MAD (e.g. 850, 180) and the formatCurrency function treats `amount` as MAD then multiplies by 0.092 to get EUR. For REAL orders returned by /api/public/orders/{id}/tracking the price is whatever the customer chose (EUR in our test → 99) but the same formatCurrency assumes MAD as the base — i.e. switching to MAD on a real EUR-priced order shows '1.076,09 MAD' (99 / 0.092 ≈ 1076), which works because the EXCHANGE constant happens to be reciprocal-consistent, but if the real order currency is already EUR the MAD display is a back-conversion. Consider normalising: convert to MAD-base on load (e.g. const priceMAD = currency==='EUR' ? price/RATE : price) so the unit semantics are explicit.",
+    "PublicTracking.js useEffect doing axios.get(`${API}/public/orders/${id}/tracking`) does NOT send the Authorization header — verified. No CORS issue observed.",
+    "RiderApp.js html5-qrcode lifecycle: startScan/stopScan refactor cleanly toggles rider-scanner overlay; when camera unavailable a Spanish error is shown (good UX). Verified the overlay closes via rider-scan-cancel.",
+    "CustomerDashboard public-track-btn: anchor with data-testid present in express banner — navigation to /track works. Tap target adequate.",
+    "Backend GET /api/public/orders/{order_id}/tracking returns updated_at as an ISO string (it was stored as ISO string by create_express_order); the contract returns it unchanged — acceptable since the frontend renders it via new Date().toLocaleString()."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_public_tracking.py (new — 4 tests: 404 for unknown id, no-auth required, full payload contract on a created express order, _id excluded)"
+  ],
+  "success_rate": {"backend": "100% (62/62 pytest incl. 4 new public-tracking tests)", "frontend": "100% (public-tracking-page load, ORD-4821 search, currency EUR↔MAD switch, share btn visible, bogus → tracking-error, deep link ORD-4823 auto-load, real express order via /track?order=<id> with sidebar data, rider-scan-btn → rider-scanner overlay → rider-scan-cancel close, manual NUBO-CW19 activation → rider-home, CustomerDashboard public-track-btn → /track navigation)"},
+  "test_credentials": "admin@nubo.com / Admin1234!  ;  qa_customer@nubo.com / Test1234!  ;  rider activation code NUBO-CW19 (rider test_fe_qr@nubo.com — TEST_ prefix in name).",
+  "seed_data_creation": "Created 1 TEST_FE_QR_Rider via POST /api/admin/riders. Created 1 express order id=cd68edfa-1147-4746-b850-97e9676d5b9b (status=pending, origin FE_Madrid, dest FE_Tanger, 99 EUR) for the real-order tracking test. Created 1 express order via test_public_tracking.py module fixture (TEST_ORIGIN Madrid → TEST_DEST Tanger, 42.5 EUR). No cleanup needed (TEST_ prefixed; safe for next run).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression cmd: `cd /app/backend && export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2) && python3 -m pytest tests/ -q` → expect 62 passed. Login page is at /auth (NOT /login). Submit button text exactly 'Iniciar Sesión'. Demo public-tracking ids: ORD-4821 (Tánger Med → Jerez, status in_transit) and ORD-4823 (Tetuán → Tarifa, in_transit). For real orders use POST /api/orders/express then open /track?order=<id>. Google Maps placeholder key → expect Google's gray 'Oops' overlay inside tracking-map (NOT a bug). Rider camera scan cannot be tested headless (no getUserMedia); only the overlay toggle (rider-scan-btn / rider-scan-cancel) is verifiable. Brute-force lockout remains broken through public URL (proxy IP rotation) — unfixed from iter5.",
+  "rca of the issue": "No new bug found in BLOQUE B / rider QR. Carry-over: brute-force lockout bypassable through K8s ingress (see iter5 RCA — identifier built from request.client.host = proxy pod IP). Map 'Oops' overlay is expected behavior of the @react-google-maps/api loader when given a placeholder key (InvalidKeyMapError) — the page-level MapErrorBoundary catches downstream render errors but Google's own JS API draws the gray overlay inside the GoogleMap container before any React error is thrown, which is why MapErrorBoundary's fallback is not shown. If a friendlier placeholder is desired, check `loadError` from useJsApiLoader and short-circuit-render the custom fallback BEFORE rendering <GoogleMap />."
+}
