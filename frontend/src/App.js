@@ -8,6 +8,7 @@ import CustomerDashboard from '@/pages/CustomerDashboard';
 import DriverDashboard from '@/pages/DriverDashboard';
 import BusinessDashboard from '@/pages/BusinessDashboard';
 import AdminDashboard from '@/pages/AdminDashboard';
+import DeliveryQuote from '@/pages/DeliveryQuote';
 import OrderTracking from '@/pages/OrderTracking';
 import OrderSuccess from '@/pages/OrderSuccess';
 import DropshippingPanel from '@/pages/DropshippingPanel';
@@ -87,6 +88,7 @@ function App() {
             ) : <Navigate to="/auth" />
           } />
           <Route path="/admin" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/auth" />} />
+          <Route path="/presupuesto" element={<DeliveryQuote />} />
           <Route path="/orders" element={user ? <CustomerDashboard /> : <Navigate to="/auth" />} />
           <Route path="/order-tracking/:orderId" element={user ? <OrderTracking /> : <Navigate to="/auth" />} />
           <Route path="/order-success" element={user ? <OrderSuccess /> : <Navigate to="/auth" />} />

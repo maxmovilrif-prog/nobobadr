@@ -1,0 +1,43 @@
+{
+  "summary": "Bloque A (cities + dual-currency delivery quote + express orders + admin City CRUD) end-to-end verified. Backend pytest 45/45 green (32 prior + 13 new for Bloque A in /app/backend/tests/test_bloque_a_cities_delivery.py). Public /api/public/cities returns 16 seeded ciudades (ES + MA) without auth and excludes Mongo _id; /api/cities requires auth (401 without token); /api/v1/calculate-delivery returns correct EUR fee (base+per_km*distance) for motorcycle/car/bicycle and MAD ≈ 10.87 × EUR (measured ratio ~10.87). Customer can POST /api/orders/express (order_type='express', business_id=null, persistence verified via GET); admin & unauth get 403/401. Admin City CRUD: create OK, duplicate name → 400, PATCH updates persist, DELETE removes; non-admin → 403. Frontend /presupuesto loads publicly, computes Algeciras→Tánger by car = 69,22 € and 752,39 د.م (ratio 10.87 ✓), same-city → quote-error 'El origen y el destino no pueden ser iguales'. CustomerDashboard 'Envío exprés' (data-testid express-quote-btn) correctly navigates to /presupuesto. Admin Dashboard (rendered at /dashboard for role=admin via App.js route guard) shows city-manager-card; full add → edit → delete-with-confirm cycle works, city-count goes 16 → 17 → 16. Google Maps placeholder error remains (expected, key not set).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard fleet map", "issues": ["Google Maps 'Oops! Something went wrong.' overlay continues (placeholder REACT_APP_GOOGLE_MAPS_API_KEY — expected). A friendlier fallback would improve UX."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_bloque_a_cities_delivery.py",
+    "/app/backend/tests/test_nubo_features.py",
+    "/app/backend/tests/test_regression_modularization.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional/cosmetic) Same as iter 3: replace Google Maps error block with a friendlier placeholder until a real key is configured.",
+    "(Optional/cosmetic) Admin role logs in and is redirected to /dashboard which conditionally renders AdminDashboard — the route /admin also works but Auth.js sends every user to /dashboard. Not a bug; just a small UX inconsistency."
+  ],
+  "critical_code_review_comments": [
+    "routes/cities.py correctly excludes _id via projection {'_id': 0} on every read.",
+    "geo.calculate_delivery_quote uses haversine + per-vehicle base/per_km/speed and applies ETA_TRAFFIC_FACTOR=1.3 with a 5-min minimum — formulas verified to within rounding by both pytest and live UI.",
+    "MAD conversion uses MAD_PER_EUR = 1/0.092 ≈ 10.8696; matches the 10.87× requirement (measured ratio 752.39 / 69.22 = 10.870).",
+    "models.ExpressOrderCreate accepts fee + optional distance_km/eta_mins/origin_city_id; routes/orders.create_express_order stamps order_type='express' and resolves city_name from city_id when provided.",
+    "admin_delete_city blocks deletion when there are non-terminal orders (status not in delivered/cancelled) for that city_id — correct guard.",
+    "Public /api/public/cities and /api/v1/calculate-delivery are intentionally unauthenticated; OK for the presupuesto landing flow but worth rate-limiting in production.",
+    "Auth.js post-login navigation lands every role on /dashboard; /admin route also resolves to AdminDashboard via role check. Works, just two entry points to the same view."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_bloque_a_cities_delivery.py (new — 13 tests covering public/cities, /cities auth, /v1/calculate-delivery EUR+MAD+vehicle variants, /orders/express incl. role check, /admin/cities CRUD incl. duplicate-name 400 + non-admin 403)"
+  ],
+  "success_rate": {"backend": "100% (45/45 pytest, +13 new Bloque A)", "frontend": "100% (presupuesto public calc EUR+MAD+same-city error; express-quote-btn nav; admin city add/edit/delete with toast 'Ciudad eliminada')"},
+  "test_credentials": "admin@nubo.com / Admin1234!  ; qa_customer@nubo.com / Test1234!",
+  "seed_data_creation": "None persisted. UI test created and then deleted one TEST_UI_* city; backend tests create and delete TEST_City_<uuid> cities; one express order (Algeciras→Tánger, 27.10 €) was created by the customer fixture and left in DB (status pending).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Bloque A is fully integrated and green. Quick re-run command: `cd /app/backend && export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2) && python3 -m pytest tests/ -q`. The presupuesto page is at /presupuesto (public, no login). Customer banner button [data-testid=express-quote-btn] navigates there. The admin city manager lives inside AdminDashboard at the bottom of the page; admin login currently redirects to /dashboard (role guard renders AdminDashboard), so wait for [data-testid=city-manager-card] instead of url '**/admin**'. Google Maps placeholder error is still expected. EUR→MAD ratio in this codebase is 1 / 0.092 = 10.8696; tests assert 10.5 < ratio < 11.2 to allow rounding.",
+  "rca of the issue": "N/A — no bugs found. The previous run's iteration_3 cosmetic Google Maps placeholder remains unresolved by design (no real API key in this preview env)."
+}

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car, Sparkles, Search, X } from 'lucide-react';
+import { LogOut, ShoppingBag, Package, Clock, Store, MapPin, Plus, Minus, ShoppingCart, CreditCard, Car, Sparkles, Search, X, Calculator } from 'lucide-react';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleFilters from '@/components/VehicleFilters';
 import RideBooking from '@/components/RideBooking';
@@ -347,6 +347,29 @@ export default function CustomerDashboard() {
               <div className="hidden md:block text-6xl opacity-20">
                 🌍
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Express Delivery Banner */}
+        <Card className="mb-8 bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0 overflow-hidden relative">
+          <CardContent className="p-6 relative z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-2">📦 Envío exprés España ↔ Marruecos</h3>
+                <p className="text-white/90 mb-4">
+                  Calcula al instante la tarifa de tu envío punto a punto (€ / MAD) según distancia y vehículo
+                </p>
+                <Button
+                  data-testid="express-quote-btn"
+                  onClick={() => navigate('/presupuesto')}
+                  className="bg-white text-emerald-600 hover:bg-gray-100"
+                >
+                  Calcular envío
+                  <Calculator className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+              <div className="hidden md:block text-6xl opacity-20">🐝</div>
             </div>
           </CardContent>
         </Card>

@@ -9,7 +9,7 @@ from core import client, manager, logger
 import telegram_alerts
 from routes import (
     auth, businesses, search, orders, drivers,
-    messages, payments, dropshipping, affiliate, tracking, admin,
+    messages, payments, dropshipping, affiliate, tracking, admin, cities,
 )
 
 app = FastAPI(title="Nubo API")
@@ -17,7 +17,7 @@ api_router = APIRouter(prefix="/api")
 
 # Montar todos los routers bajo /api
 for module in (auth, businesses, search, orders, drivers, messages,
-               payments, dropshipping, affiliate, tracking, admin):
+               payments, dropshipping, affiliate, tracking, admin, cities):
     api_router.include_router(module.router)
 
 
