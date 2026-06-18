@@ -51,3 +51,11 @@ Se implementó el feature completo (backend + frontend) en la rama `main`.
 - Nuevo endpoint GET /api/accounting/history (lista de cierres por fecha con estado/diferencia).
 - Nueva tabla "Historial de cierres anteriores" con badges y botón Ver (cambia de fecha).
 - CSV/PDF incluyen la moneda. Build de producción verde.
+
+## Update 2026-06-18 (c) — Mini-resumen mensual por moneda
+- Endpoint GET /api/accounting/monthly-summary?month=YYYY-MM
+  -> por moneda: total_entradas, total_salidas, acum. faltante/sobrante, diferencia_neta,
+     #cierres, #cuadran, #descuadran.
+- UI: sección "Resumen mensual por moneda" arriba del historial, una tarjeta por moneda (MAD/EUR)
+  con selector de mes. Muestra descuadre neto con color (cuadrada/faltante/sobrante).
+- Se refresca al cambiar de mes o tras cualquier mutación (depende de history).

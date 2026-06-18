@@ -30,4 +30,7 @@ export const ACCOUNTING = {
         historyTable: 'accounting-history-table',
         historyRow: 'accounting-history-row',
         historyViewBtn: 'accounting-history-view-btn',
+        monthlySection: 'accounting-monthly-section',
+        monthlyPicker: 'accounting-monthly-picker',
+        monthlyCard: 'accounting-monthly-card',
 };

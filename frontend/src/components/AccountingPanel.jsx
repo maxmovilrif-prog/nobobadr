@@ -19,6 +19,9 @@ import {
   Eraser,
   History,
   Eye,
+  TrendingUp,
+  TrendingDown,
+  Scale as ScaleIcon,
 } from "lucide-react";
 import { ACCOUNTING } from "@/constants/testIds";
 
@@ -69,6 +72,17 @@ export default function AccountingPanel() {
   const [counts, setCounts] = useState({});
   const [currency, setCurrency] = useState("MAD");
   const [history, setHistory] = useState([]);
+  const [month, setMonth] = useState(todayStr().slice(0, 7));
+  const [monthly, setMonthly] = useState([]);
+
+  const fetchMonthly = useCallback(async (m) => {
+    try {
+      const res = await axios.get(`${API}/accounting/monthly-summary`, { params: { month: m } });
+      setMonthly(res.data.summary || []);
+    } catch (e) {
+      console.error("Error al cargar resumen mensual", e);
+    }
+  }, []);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -98,6 +112,10 @@ export default function AccountingPanel() {
     fetchSummary(date);
     fetchHistory();
   }, [date, fetchSummary, fetchHistory]);
+
+  useEffect(() => {
+    fetchMonthly(month);
+  }, [month, fetchMonthly, history]);
 
   const download = async (format) => {
     try {
@@ -599,6 +617,99 @@ export default function AccountingPanel() {
             </div>
           </section>
         </div>
+
+        {/* Monthly summary */}
+        <section data-testid={ACCOUNTING.monthlySection} className="mt-6">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <ScaleIcon className="h-5 w-5 text-indigo-500" />
+              <h2 className="text-sm font-semibold text-slate-800">Resumen mensual por moneda</h2>
+            </div>
+            <input
+              data-testid={ACCOUNTING.monthlyPicker}
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="ml-auto rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+
+          {monthly.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-400">
+              Sin datos para {month}. Registra cierres para ver el resumen.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {monthly.map((m) => {
+                const neta = m.diferencia_neta;
+                const netaCfg =
+                  Math.abs(neta) < 0.005
+                    ? { c: "text-emerald-600", t: "Cuadrada" }
+                    : neta < 0
+                    ? { c: "text-rose-600", t: "Faltante neto" }
+                    : { c: "text-amber-600", t: "Sobrante neto" };
+                return (
+                  <div
+                    key={m.currency}
+                    data-testid={`${ACCOUNTING.monthlyCard}-${m.currency}`}
+                    className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
+                          {SYMBOLS[m.currency]}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-800">{m.currency}</span>
+                      </div>
+                      <span className="text-xs text-slate-400">
+                        {m.cierres} cierre(s) · {m.cierres_cuadran} cuadran / {m.cierres_descuadran} descuadran
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-px bg-slate-100">
+                      <div className="bg-white p-4">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Entradas del mes
+                        </div>
+                        <p className="mt-1 text-lg font-bold text-emerald-600">
+                          {fmt(m.total_entradas, m.currency)}
+                        </p>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <TrendingDown className="h-3.5 w-3.5 text-rose-500" /> Salidas del mes
+                        </div>
+                        <p className="mt-1 text-lg font-bold text-rose-600">
+                          {fmt(m.total_salidas, m.currency)}
+                        </p>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="text-xs text-slate-500">Acum. faltantes</div>
+                        <p className="mt-1 text-lg font-bold text-rose-600">
+                          −{fmt(m.total_faltante, m.currency)}
+                        </p>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="text-xs text-slate-500">Acum. sobrantes</div>
+                        <p className="mt-1 text-lg font-bold text-amber-600">
+                          +{fmt(m.total_sobrante, m.currency)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
+                      <span className="text-xs font-medium text-slate-500">
+                        Descuadre neto del mes · {netaCfg.t}
+                      </span>
+                      <span className={`text-base font-bold ${netaCfg.c}`}>
+                        {neta > 0 ? "+" : ""}
+                        {fmt(neta, m.currency)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {/* History of past closings */}
         <section

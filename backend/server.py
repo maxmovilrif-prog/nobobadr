@@ -282,6 +282,63 @@ async def cash_closing_history():
     return {"history": rows}
 
 
+@api_router.get("/accounting/monthly-summary")
+async def monthly_summary(month: Optional[str] = Query(default=None, description="YYYY-MM")):
+    target_month = month or _today()[:7]
+
+    dates = set()
+    for coll in (db.cash_movements, db.cash_openings, db.cash_counts):
+        for d in await coll.distinct("date"):
+            if d and str(d).startswith(target_month):
+                dates.add(d)
+
+    # Acumular por moneda
+    acc = {}
+    def _bucket(cur):
+        if cur not in acc:
+            acc[cur] = {
+                "currency": cur,
+                "total_entradas": 0.0,
+                "total_salidas": 0.0,
+                "total_faltante": 0.0,
+                "total_sobrante": 0.0,
+                "diferencia_neta": 0.0,
+                "cierres": 0,
+                "cierres_cuadran": 0,
+                "cierres_descuadran": 0,
+            }
+        return acc[cur]
+
+    for d in dates:
+        s = await _build_summary(d)
+        cur = s.currency
+        b = _bucket(cur)
+        b["total_entradas"] += s.total_entradas
+        b["total_salidas"] += s.total_salidas
+        b["cierres"] += 1
+        if s.reconciliation:
+            diff = s.reconciliation.diferencia
+            b["diferencia_neta"] += diff
+            if diff < -0.005:
+                b["total_faltante"] += abs(diff)
+                b["cierres_descuadran"] += 1
+            elif diff > 0.005:
+                b["total_sobrante"] += diff
+                b["cierres_descuadran"] += 1
+            else:
+                b["cierres_cuadran"] += 1
+
+    result = []
+    for cur in sorted(acc.keys()):
+        b = acc[cur]
+        for k in ("total_entradas", "total_salidas", "total_faltante",
+                  "total_sobrante", "diferencia_neta"):
+            b[k] = round(b[k], 2)
+        result.append(b)
+
+    return {"month": target_month, "summary": result}
+
+
 @api_router.get("/accounting/cash-closing", response_model=CashClosingSummary)
 async def cash_closing(date: Optional[str] = Query(default=None)):
     target = date or _today()
