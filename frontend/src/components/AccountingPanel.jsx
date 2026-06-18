@@ -17,24 +17,32 @@ import {
   CheckCircle2,
   AlertTriangle,
   Eraser,
+  History,
+  Eye,
 } from "lucide-react";
 import { ACCOUNTING } from "@/constants/testIds";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-const DENOMINATIONS = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5];
+const DENOMINATIONS = {
+  MAD: [200, 100, 50, 20, 10, 5, 2, 1, 0.5],
+  EUR: [500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05],
+};
+const SYMBOLS = { MAD: "DH", EUR: "€" };
+const CURRENCIES = ["MAD", "EUR"];
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-const fmt = (n) =>
-  new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
+const fmt = (n, currency = "MAD") => {
+  const num = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Number(n || 0));
+  return `${num} ${SYMBOLS[currency] || currency}`;
+};
 
-const SummaryCard = ({ icon: Icon, label, value, accent, testId, delay }) => (
+const SummaryCard = ({ icon: Icon, label, value, accent, testId, delay, currency }) => (
   <motion.div
     initial={{ opacity: 0, y: 18 }}
     animate={{ opacity: 1, y: 0 }}
@@ -47,7 +55,7 @@ const SummaryCard = ({ icon: Icon, label, value, accent, testId, delay }) => (
     </div>
     <p className="text-sm font-medium text-slate-500">{label}</p>
     <p data-testid={testId} className={`mt-1 text-2xl font-bold tracking-tight ${accent.value}`}>
-      {fmt(value)}
+      {fmt(value, currency)}
     </p>
   </motion.div>
 );
@@ -59,12 +67,24 @@ export default function AccountingPanel() {
   const [opening, setOpening] = useState("");
   const [mov, setMov] = useState({ concept: "", amount: "", type: "entrada", method: "efectivo" });
   const [counts, setCounts] = useState({});
+  const [currency, setCurrency] = useState("MAD");
+  const [history, setHistory] = useState([]);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/accounting/history`);
+      setHistory(res.data.history || []);
+    } catch (e) {
+      console.error("Error al cargar historial", e);
+    }
+  }, []);
 
   const fetchSummary = useCallback(async (d) => {
     setLoading(true);
     try {
       const res = await axios.get(`${API}/accounting/cash-closing`, { params: { date: d } });
       setSummary(res.data);
+      setCurrency(res.data?.currency || "MAD");
       const saved = res.data?.reconciliation?.counts;
       setCounts(saved ? { ...saved } : {});
     } catch (e) {
@@ -76,7 +96,8 @@ export default function AccountingPanel() {
 
   useEffect(() => {
     fetchSummary(date);
-  }, [date, fetchSummary]);
+    fetchHistory();
+  }, [date, fetchSummary, fetchHistory]);
 
   const download = async (format) => {
     try {
@@ -105,6 +126,7 @@ export default function AccountingPanel() {
     });
     setOpening("");
     fetchSummary(date);
+    fetchHistory();
   };
 
   const addMovement = async () => {
@@ -118,16 +140,26 @@ export default function AccountingPanel() {
     });
     setMov({ concept: "", amount: "", type: "entrada", method: "efectivo" });
     fetchSummary(date);
+    fetchHistory();
   };
 
   const deleteMovement = async (id) => {
     await axios.delete(`${API}/accounting/movements/${id}`);
     fetchSummary(date);
+    fetchHistory();
   };
 
   const seed = async () => {
     await axios.post(`${API}/accounting/seed`, null, { params: { date } });
     fetchSummary(date);
+    fetchHistory();
+  };
+
+  const denoms = DENOMINATIONS[currency];
+
+  const changeCurrency = (cur) => {
+    setCurrency(cur);
+    setCounts({});
   };
 
   const setCountQty = (denom, val) => {
@@ -135,7 +167,7 @@ export default function AccountingPanel() {
     setCounts((p) => ({ ...p, [String(denom)]: qty }));
   };
 
-  const totalContado = DENOMINATIONS.reduce(
+  const totalContado = denoms.reduce(
     (acc, d) => acc + d * (parseInt(counts[String(d)], 10) || 0),
     0
   );
@@ -146,11 +178,12 @@ export default function AccountingPanel() {
 
   const saveCount = async () => {
     const clean = {};
-    DENOMINATIONS.forEach((d) => {
+    denoms.forEach((d) => {
       clean[String(d)] = parseInt(counts[String(d)], 10) || 0;
     });
-    await axios.post(`${API}/accounting/cash-count`, { date, counts: clean });
+    await axios.post(`${API}/accounting/cash-count`, { date, currency, counts: clean });
     fetchSummary(date);
+    fetchHistory();
   };
 
   const clearCount = () => setCounts({});
@@ -172,6 +205,22 @@ export default function AccountingPanel() {
             <p className="mt-1 text-sm text-slate-500">Cierre de caja diario · Arqueo</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
+              {CURRENCIES.map((cur) => (
+                <button
+                  key={cur}
+                  data-testid={`accounting-currency-${cur}`}
+                  onClick={() => changeCurrency(cur)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                    currency === cur
+                      ? "bg-indigo-600 text-white"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {cur} {SYMBOLS[cur]}
+                </button>
+              ))}
+            </div>
             <div className="relative">
               <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -204,6 +253,7 @@ export default function AccountingPanel() {
             accent={{ bg: "bg-slate-100", text: "text-slate-600", value: "text-slate-900" }}
             testId={ACCOUNTING.saldoInicial}
             delay={0.02}
+            currency={currency}
           />
           <SummaryCard
             icon={ArrowUpCircle}
@@ -212,6 +262,7 @@ export default function AccountingPanel() {
             accent={{ bg: "bg-emerald-100", text: "text-emerald-600", value: "text-emerald-600" }}
             testId={ACCOUNTING.totalEntradas}
             delay={0.08}
+            currency={currency}
           />
           <SummaryCard
             icon={ArrowDownCircle}
@@ -220,6 +271,7 @@ export default function AccountingPanel() {
             accent={{ bg: "bg-rose-100", text: "text-rose-600", value: "text-rose-600" }}
             testId={ACCOUNTING.totalSalidas}
             delay={0.14}
+            currency={currency}
           />
           <SummaryCard
             icon={Scale}
@@ -228,6 +280,7 @@ export default function AccountingPanel() {
             accent={{ bg: "bg-indigo-100", text: "text-indigo-600", value: "text-indigo-700" }}
             testId={ACCOUNTING.saldoFinal}
             delay={0.2}
+            currency={currency}
           />
         </section>
 
@@ -262,11 +315,13 @@ export default function AccountingPanel() {
         >
           <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
             <Coins className="h-5 w-5 text-amber-500" />
-            <h2 className="text-sm font-semibold text-slate-800">Conteo de efectivo físico (arqueo)</h2>
+            <h2 className="text-sm font-semibold text-slate-800">
+              Conteo de efectivo físico (arqueo) · {currency}
+            </h2>
             <span className="ml-auto text-xs text-slate-500">
               Efectivo esperado en caja:{" "}
               <span data-testid={ACCOUNTING.efectivoEsperado} className="font-semibold text-slate-800">
-                {fmt(efectivoEsperado)}
+                {fmt(efectivoEsperado, currency)}
               </span>
             </span>
           </div>
@@ -275,17 +330,18 @@ export default function AccountingPanel() {
             {/* Denominations */}
             <div className="lg:col-span-2">
               <p className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-                Captura la cantidad de billetes y monedas
+                Captura la cantidad de billetes y monedas ({currency})
               </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {DENOMINATIONS.map((d) => {
+                {denoms.map((d) => {
                   const qty = counts[String(d)] === "" || counts[String(d)] == null ? "" : counts[String(d)];
                   const subtotal = d * (parseInt(qty, 10) || 0);
+                  const isBill = currency === "EUR" ? d >= 5 : d >= 20;
                   return (
                     <div key={d} className="rounded-xl border border-slate-200 p-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-700">{fmt(d)}</span>
-                        <span className="text-xs text-slate-400">{d >= 20 ? "billete" : "moneda"}</span>
+                        <span className="text-sm font-semibold text-slate-700">{fmt(d, currency)}</span>
+                        <span className="text-xs text-slate-400">{isBill ? "billete" : "moneda"}</span>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
                         <span className="text-xs text-slate-400">×</span>
@@ -299,7 +355,7 @@ export default function AccountingPanel() {
                           className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                         />
                       </div>
-                      <p className="mt-1.5 text-right text-xs font-medium text-slate-500">{fmt(subtotal)}</p>
+                      <p className="mt-1.5 text-right text-xs font-medium text-slate-500">{fmt(subtotal, currency)}</p>
                     </div>
                   );
                 })}
@@ -330,12 +386,12 @@ export default function AccountingPanel() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Total contado</span>
                   <span data-testid={ACCOUNTING.cashCountTotal} className="font-semibold text-slate-900">
-                    {fmt(totalContado)}
+                    {fmt(totalContado, currency)}
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <span className="text-slate-500">Efectivo esperado</span>
-                  <span className="font-semibold text-slate-900">{fmt(efectivoEsperado)}</span>
+                  <span className="font-semibold text-slate-900">{fmt(efectivoEsperado, currency)}</span>
                 </div>
               </div>
 
@@ -374,7 +430,7 @@ export default function AccountingPanel() {
                       className="mt-1 text-2xl font-bold tracking-tight"
                     >
                       {diferencia > 0 ? "+" : ""}
-                      {fmt(diferencia)}
+                      {fmt(diferencia, currency)}
                     </p>
                     <p className="mt-1 text-xs opacity-80">
                       {estado === "cuadra"
@@ -434,7 +490,7 @@ export default function AccountingPanel() {
                         }`}
                       >
                         {m.type === "entrada" ? "+" : "−"}
-                        {fmt(m.amount)}
+                        {fmt(m.amount, currency)}
                       </td>
                       <td className="px-5 py-3 text-right">
                         <button
@@ -543,6 +599,102 @@ export default function AccountingPanel() {
             </div>
           </section>
         </div>
+
+        {/* History of past closings */}
+        <section
+          data-testid={ACCOUNTING.historySection}
+          className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white"
+        >
+          <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
+            <History className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-sm font-semibold text-slate-800">Historial de cierres anteriores</h2>
+            <span className="ml-auto text-xs text-slate-500">{history.length} registro(s)</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table data-testid={ACCOUNTING.historyTable} className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 font-medium">Fecha</th>
+                  <th className="px-5 py-3 font-medium">Moneda</th>
+                  <th className="px-5 py-3 text-right font-medium">Saldo inicial</th>
+                  <th className="px-5 py-3 text-right font-medium">Entradas</th>
+                  <th className="px-5 py-3 text-right font-medium">Salidas</th>
+                  <th className="px-5 py-3 text-right font-medium">Saldo final</th>
+                  <th className="px-5 py-3 text-right font-medium">Contado</th>
+                  <th className="px-5 py-3 text-right font-medium">Diferencia</th>
+                  <th className="px-5 py-3 text-center font-medium">Estado</th>
+                  <th className="px-5 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="px-5 py-10 text-center text-slate-400">
+                      Aún no hay cierres registrados.
+                    </td>
+                  </tr>
+                )}
+                {history.map((h) => {
+                  const badge = {
+                    cuadra: "bg-emerald-100 text-emerald-700",
+                    faltante: "bg-rose-100 text-rose-700",
+                    sobrante: "bg-amber-100 text-amber-700",
+                    pendiente: "bg-slate-100 text-slate-500",
+                  }[h.estado];
+                  return (
+                    <tr
+                      key={h.date}
+                      data-testid={`${ACCOUNTING.historyRow}-${h.date}`}
+                      className={`border-b border-slate-50 transition-colors hover:bg-slate-50/60 ${
+                        h.date === date ? "bg-indigo-50/40" : ""
+                      }`}
+                    >
+                      <td className="px-5 py-3 font-medium text-slate-800">{h.date}</td>
+                      <td className="px-5 py-3 text-slate-500">{h.currency}</td>
+                      <td className="px-5 py-3 text-right text-slate-600">{fmt(h.saldo_inicial, h.currency)}</td>
+                      <td className="px-5 py-3 text-right text-emerald-600">{fmt(h.total_entradas, h.currency)}</td>
+                      <td className="px-5 py-3 text-right text-rose-600">{fmt(h.total_salidas, h.currency)}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-slate-900">{fmt(h.saldo_final_esperado, h.currency)}</td>
+                      <td className="px-5 py-3 text-right text-slate-600">
+                        {h.total_contado == null ? "—" : fmt(h.total_contado, h.currency)}
+                      </td>
+                      <td
+                        className={`px-5 py-3 text-right font-semibold ${
+                          h.diferencia == null
+                            ? "text-slate-400"
+                            : Math.abs(h.diferencia) < 0.005
+                            ? "text-emerald-600"
+                            : h.diferencia < 0
+                            ? "text-rose-600"
+                            : "text-amber-600"
+                        }`}
+                      >
+                        {h.diferencia == null
+                          ? "—"
+                          : `${h.diferencia > 0 ? "+" : ""}${fmt(h.diferencia, h.currency)}`}
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium capitalize ${badge}`}>
+                          {h.estado}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          data-testid={`${ACCOUNTING.historyViewBtn}-${h.date}`}
+                          onClick={() => setDate(h.date)}
+                          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Ver
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </main>
     </div>
   );

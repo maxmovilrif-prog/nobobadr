@@ -42,3 +42,12 @@ Se implementó el feature completo (backend + frontend) en la rama `main`.
 - Persistencia en colección cash_counts; incluido en export CSV y PDF.
 - Endpoints: POST /api/accounting/cash-count, GET /api/accounting/denominations.
 - Verificado end-to-end: cuadre exacto (dif 0.0), sobrante y faltante; exports 200.
+
+## Update 2026-06-18 (b) — Multi-moneda MAD/EUR + Historial
+- Moneda MAD (DH) y EUR (€) con selector en cabecera; denominaciones y símbolos por moneda.
+  - MAD: 200,100,50,20,10,5,2,1,0.5 · EUR: 500..0.05.
+- Bug corregido: DENOMINATIONS pasó a objeto {MAD,EUR}; UI usa denoms=DENOMINATIONS[currency].
+- cash_counts guarda currency; reconciliación usa denominaciones de su moneda.
+- Nuevo endpoint GET /api/accounting/history (lista de cierres por fecha con estado/diferencia).
+- Nueva tabla "Historial de cierres anteriores" con badges y botón Ver (cambia de fecha).
+- CSV/PDF incluyen la moneda. Build de producción verde.

@@ -68,10 +68,12 @@ class OpeningCreate(BaseModel):
 
 class CashCountSave(BaseModel):
     date: str
-    counts: dict = Field(default_factory=dict, description="Mapa denominacion->cantidad, ej {'500': 2}")
+    currency: Literal["MAD", "EUR"] = "MAD"
+    counts: dict = Field(default_factory=dict, description="Mapa denominacion->cantidad, ej {'200': 2}")
 
 
 class Reconciliation(BaseModel):
+    currency: str
     efectivo_esperado: float
     total_contado: float
     diferencia: float
@@ -82,6 +84,7 @@ class Reconciliation(BaseModel):
 
 class CashClosingSummary(BaseModel):
     date: str
+    currency: str = "MAD"
     saldo_inicial: float
     total_entradas: float
     total_salidas: float
@@ -91,8 +94,12 @@ class CashClosingSummary(BaseModel):
     reconciliation: Optional[Reconciliation] = None
 
 
-# Denominaciones MXN (billetes y monedas)
-DENOMINATIONS = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5]
+# Denominaciones por moneda (billetes y monedas)
+DENOMINATIONS = {
+    "MAD": [200, 100, 50, 20, 10, 5, 2, 1, 0.5],
+    "EUR": [500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05],
+}
+CURRENCY_SYMBOLS = {"MAD": "DH", "EUR": "EUR"}
 
 
 # ----------------------------- Helpers -----------------------------
@@ -100,10 +107,14 @@ def _today() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def _build_reconciliation(efectivo_esperado: float, counts: dict) -> Reconciliation:
+def _denoms(currency: str) -> list:
+    return DENOMINATIONS.get(currency, DENOMINATIONS["MAD"])
+
+
+def _build_reconciliation(efectivo_esperado: float, counts: dict, currency: str) -> Reconciliation:
     desglose = []
     total = 0.0
-    for denom in DENOMINATIONS:
+    for denom in _denoms(currency):
         key = str(denom)
         qty = int(counts.get(key, 0) or 0)
         subtotal = round(denom * qty, 2)
@@ -118,11 +129,12 @@ def _build_reconciliation(efectivo_esperado: float, counts: dict) -> Reconciliat
     else:
         estado = "sobrante"
     return Reconciliation(
+        currency=currency,
         efectivo_esperado=round(efectivo_esperado, 2),
         total_contado=total,
         diferencia=diferencia,
         estado=estado,
-        counts={str(d): int(counts.get(str(d), 0) or 0) for d in DENOMINATIONS},
+        counts={str(d): int(counts.get(str(d), 0) or 0) for d in _denoms(currency)},
         desglose=desglose,
     )
 
@@ -144,13 +156,16 @@ async def _build_summary(target_date: str) -> CashClosingSummary:
     efectivo_salidas = sum(m.amount for m in movimientos if m.type == "salida" and m.method == "efectivo")
     efectivo_esperado = saldo_inicial + efectivo_entradas - efectivo_salidas
 
-    reconciliation = None
     count_doc = await db.cash_counts.find_one({"date": target_date}, {"_id": 0})
+    currency = (count_doc or {}).get("currency", "MAD")
+
+    reconciliation = None
     if count_doc and count_doc.get("counts"):
-        reconciliation = _build_reconciliation(efectivo_esperado, count_doc["counts"])
+        reconciliation = _build_reconciliation(efectivo_esperado, count_doc["counts"], currency)
 
     return CashClosingSummary(
         date=target_date,
+        currency=currency,
         saldo_inicial=round(saldo_inicial, 2),
         total_entradas=round(total_entradas, 2),
         total_salidas=round(total_salidas, 2),
@@ -218,20 +233,53 @@ async def delete_movement(movement_id: str):
 
 
 @api_router.get("/accounting/denominations")
-async def get_denominations():
-    return {"denominations": DENOMINATIONS}
+async def get_denominations(currency: str = Query(default="MAD")):
+    return {
+        "currency": currency,
+        "symbol": CURRENCY_SYMBOLS.get(currency, currency),
+        "denominations": _denoms(currency),
+        "all": DENOMINATIONS,
+        "symbols": CURRENCY_SYMBOLS,
+    }
 
 
 @api_router.post("/accounting/cash-count", response_model=CashClosingSummary)
 async def save_cash_count(payload: CashCountSave):
-    clean = {str(d): int(payload.counts.get(str(d), 0) or 0) for d in DENOMINATIONS}
+    clean = {str(d): int(payload.counts.get(str(d), 0) or 0) for d in _denoms(payload.currency)}
     await db.cash_counts.update_one(
         {"date": payload.date},
-        {"$set": {"date": payload.date, "counts": clean,
+        {"$set": {"date": payload.date, "currency": payload.currency, "counts": clean,
                   "updated_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True,
     )
     return await _build_summary(payload.date)
+
+
+@api_router.get("/accounting/history")
+async def cash_closing_history():
+    dates = set()
+    for coll in (db.cash_movements, db.cash_openings, db.cash_counts):
+        for d in await coll.distinct("date"):
+            if d:
+                dates.add(d)
+
+    rows = []
+    for d in sorted(dates, reverse=True):
+        s = await _build_summary(d)
+        rows.append({
+            "date": s.date,
+            "currency": s.currency,
+            "saldo_inicial": s.saldo_inicial,
+            "total_entradas": s.total_entradas,
+            "total_salidas": s.total_salidas,
+            "saldo_final_esperado": s.saldo_final_esperado,
+            "efectivo_esperado": s.efectivo_esperado,
+            "movimientos_count": len(s.movimientos),
+            "total_contado": s.reconciliation.total_contado if s.reconciliation else None,
+            "diferencia": s.reconciliation.diferencia if s.reconciliation else None,
+            "estado": s.reconciliation.estado if s.reconciliation else "pendiente",
+        })
+    return {"history": rows}
 
 
 @api_router.get("/accounting/cash-closing", response_model=CashClosingSummary)
@@ -253,6 +301,7 @@ async def export_cash_closing(
         writer = csv.writer(buf)
         writer.writerow(["MoboExpress - Cierre de caja diario"])
         writer.writerow(["Fecha", target])
+        writer.writerow(["Moneda", summary.currency])
         writer.writerow([])
         writer.writerow(["Resumen"])
         writer.writerow(["Saldo inicial", f"{summary.saldo_inicial:.2f}"])
@@ -294,6 +343,7 @@ async def export_cash_closing(
     pdf.cell(0, 8, "Cierre de caja diario", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(0, 7, f"Fecha: {target}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 7, f"Moneda: {summary.currency}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
 
     def kv_row(label, value, bold=False, color=(0, 0, 0)):

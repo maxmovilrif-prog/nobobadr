@@ -26,4 +26,8 @@ export const ACCOUNTING = {
         cashCountClearBtn: 'accounting-cash-count-clear-btn',
         reconciliationBanner: 'accounting-reconciliation-banner',
         reconciliationDiff: 'accounting-reconciliation-diff',
+        historySection: 'accounting-history-section',
+        historyTable: 'accounting-history-table',
+        historyRow: 'accounting-history-row',
+        historyViewBtn: 'accounting-history-view-btn',
 };
