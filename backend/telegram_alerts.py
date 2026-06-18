@@ -21,35 +21,57 @@ def is_configured() -> bool:
     return bool(core.TELEGRAM_BOT_TOKEN and core.TELEGRAM_ADMIN_CHAT_ID)
 
 
-async def send_telegram_message(text: str, chat_id=None) -> bool:
+async def _tg_api(method: str, payload: dict):
+    """Llama a un método de la API de Telegram. No-op si no hay token."""
+    if not core.TELEGRAM_BOT_TOKEN:
+        return None
+    url = f"https://api.telegram.org/bot{core.TELEGRAM_BOT_TOKEN}/{method}"
+    try:
+        async with httpx.AsyncClient(timeout=15) as http:
+            resp = await http.post(url, json=payload)
+            data = resp.json()
+            if not data.get("ok"):
+                logger.error(f"Telegram {method} error: {data}")
+            return data
+    except Exception as e:
+        logger.error(f"Telegram {method} exception: {e}")
+        return None
+
+
+async def send_telegram_message(text: str, chat_id=None, reply_markup=None) -> bool:
     """Envía un mensaje. Usa chat_id explícito o el del admin (.env). No-op si falta token/destino."""
     target = chat_id or core.TELEGRAM_ADMIN_CHAT_ID
     if not core.TELEGRAM_BOT_TOKEN or not target:
         logger.info("Telegram no configurado; se omite el envío de alerta.")
         return False
-    url = f"https://api.telegram.org/bot{core.TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": target,
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
     }
-    try:
-        async with httpx.AsyncClient(timeout=10) as http:
-            resp = await http.post(url, json=payload)
-            if resp.status_code != 200:
-                logger.error(f"Telegram sendMessage error {resp.status_code}: {resp.text}")
-                return False
-            return True
-    except Exception as e:
-        logger.error(f"Telegram send error: {e}")
-        return False
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    data = await _tg_api("sendMessage", payload)
+    return bool(data and data.get("ok"))
+
+
+async def _answer_callback(callback_id: str, text: str = "", show_alert: bool = False):
+    await _tg_api("answerCallbackQuery", {"callback_query_id": callback_id, "text": text, "show_alert": show_alert})
+
+
+async def _edit_message_text(chat_id, message_id, text: str, reply_markup=None):
+    payload = {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    await _tg_api("editMessageText", payload)
 
 
 async def notify_new_order(order: dict) -> None:
-    """Notifica al admin cuando entra un pedido nuevo."""
+    """Notifica al admin cuando entra un pedido nuevo, con botones de acción inline."""
     try:
-        order_id = str(order.get("id", ""))[:8]
+        full_id = str(order.get("id", ""))
+        order_id = full_id[:8]
         total = order.get("total_amount", 0)
         address = order.get("delivery_address", "—")
         text = (
@@ -58,7 +80,13 @@ async def notify_new_order(order: dict) -> None:
             f"💶 Total: €{total:.2f}\n"
             f"📍 Entrega: {address}"
         )
-        await send_telegram_message(text)
+        reply_markup = {
+            "inline_keyboard": [[
+                {"text": "✅ Asignar a Abeja", "callback_data": f"assign:{full_id}"},
+                {"text": "👁 Ver pedido", "callback_data": f"view:{full_id}"},
+            ]]
+        }
+        await send_telegram_message(text, reply_markup=reply_markup)
     except Exception as e:
         logger.error(f"notify_new_order error: {e}")
 
@@ -146,10 +174,109 @@ async def build_fleet_summary() -> str:
 
 
 _command_offset = 0
+_pending_assign: dict = {}  # short_code -> {order_id, driver_id, driver_name}
+
+
+async def _handle_callback(cq: dict) -> None:
+    """Procesa los toques en los botones inline (ver/asignar/seleccionar Abeja)."""
+    import uuid as _uuid
+    cq_id = cq.get("id")
+    data = cq.get("data") or ""
+    message = cq.get("message") or {}
+    chat = message.get("chat") or {}
+    chat_id = chat.get("id")
+    message_id = message.get("message_id")
+
+    # Ver detalle del pedido
+    if data.startswith("view:"):
+        oid = data.split(":", 1)[1]
+        order = await core.db.orders.find_one({"id": oid}, {"_id": 0})
+        await _answer_callback(cq_id)
+        if not order:
+            await send_telegram_message("❌ Pedido no encontrado.", chat_id=chat_id)
+            return
+        items = "\n".join(f"• {i['quantity']}× {i['product_name']} (€{i['price']:.2f})" for i in order.get("items", []))
+        driver = "Sin asignar"
+        if order.get("driver_id"):
+            d = await core.db.users.find_one({"id": order["driver_id"]}, {"_id": 0})
+            driver = d.get("name", "Abeja") if d else "Abeja"
+        await send_telegram_message(
+            f"📦 <b>Pedido #{oid[:8]}</b>\n"
+            f"Estado: {order.get('status')}\n"
+            f"💶 Total: €{order.get('total_amount', 0):.2f}\n"
+            f"📍 {order.get('delivery_address', '—')}\n"
+            f"🐝 Abeja: {driver}\n\n<b>Artículos:</b>\n{items or '—'}",
+            chat_id=chat_id,
+        )
+        return
+
+    # Mostrar lista de Abejas disponibles para asignar
+    if data.startswith("assign:"):
+        oid = data.split(":", 1)[1]
+        order = await core.db.orders.find_one({"id": oid}, {"_id": 0})
+        if not order:
+            await _answer_callback(cq_id, "Pedido no encontrado", show_alert=True)
+            return
+        if order.get("driver_id"):
+            await _answer_callback(cq_id, "Este pedido ya está asignado", show_alert=True)
+            return
+        drivers = await core.db.users.find(
+            {"role": "driver", "is_available": True}, {"_id": 0, "password_hash": 0}
+        ).to_list(20)
+        if not drivers:
+            await _answer_callback(cq_id, "No hay Abejas disponibles ahora", show_alert=True)
+            return
+        await _answer_callback(cq_id)
+        rows = []
+        for d in drivers:
+            code = _uuid.uuid4().hex[:8]
+            _pending_assign[code] = {"order_id": oid, "driver_id": d["id"], "driver_name": d.get("name", "Abeja")}
+            label = f"🐝 {d.get('name', 'Abeja')}"
+            if d.get("vehicle_type"):
+                label += f" ({d['vehicle_type']})"
+            rows.append([{"text": label, "callback_data": f"drv:{code}"}])
+        await _edit_message_text(
+            chat_id, message_id,
+            f"🐝 Elige la Abeja para el pedido #{oid[:8]}:",
+            reply_markup={"inline_keyboard": rows},
+        )
+        return
+
+    # Confirmar asignación a una Abeja concreta
+    if data.startswith("drv:"):
+        code = data.split(":", 1)[1]
+        info = _pending_assign.get(code)
+        if not info:
+            await _answer_callback(cq_id, "Opción expirada, vuelve a intentarlo", show_alert=True)
+            return
+        order = await core.db.orders.find_one({"id": info["order_id"]}, {"_id": 0})
+        if not order:
+            await _answer_callback(cq_id, "Pedido no encontrado", show_alert=True)
+            return
+        if order.get("driver_id"):
+            await _answer_callback(cq_id, "Ya estaba asignado", show_alert=True)
+            await _edit_message_text(chat_id, message_id, f"⚠️ El pedido #{info['order_id'][:8]} ya estaba asignado.")
+            return
+        await core.db.orders.update_one(
+            {"id": info["order_id"]},
+            {"$set": {"driver_id": info["driver_id"], "status": "accepted",
+                      "updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        await _answer_callback(cq_id, "✅ Asignado")
+        await _edit_message_text(
+            chat_id, message_id,
+            f"✅ Pedido #{info['order_id'][:8]} asignado a 🐝 <b>{info['driver_name']}</b>.",
+        )
+        # Limpiar códigos de este pedido
+        for k in [k for k, v in _pending_assign.items() if v["order_id"] == info["order_id"]]:
+            _pending_assign.pop(k, None)
+        return
+
+    await _answer_callback(cq_id)
 
 
 async def command_listener_loop() -> None:
-    """Escucha comandos entrantes (/flota, /start, /help) vía long polling de getUpdates."""
+    """Escucha comandos (/flota, /start, /help) y callbacks de botones vía long polling."""
     global _command_offset
     while True:
         try:
@@ -166,6 +293,12 @@ async def command_listener_loop() -> None:
                 continue
             for upd in data.get("result", []):
                 _command_offset = upd["update_id"] + 1
+
+                # Callbacks de botones inline
+                if upd.get("callback_query"):
+                    await _handle_callback(upd["callback_query"])
+                    continue
+
                 msg = upd.get("message") or upd.get("edited_message") or {}
                 text = (msg.get("text") or "").strip().lower()
                 chat = msg.get("chat") or {}
@@ -186,7 +319,7 @@ async def command_listener_loop() -> None:
                         "Comandos disponibles:\n"
                         "/flota — resumen de Abejas y pedidos\n"
                         "/help — esta ayuda\n\n"
-                        "Recibirás avisos de pedidos nuevos y Abejas paradas.",
+                        "Recibirás avisos de pedidos nuevos (con botones para asignar) y de Abejas paradas.",
                         chat_id=chat_id,
                     )
         except asyncio.CancelledError:
