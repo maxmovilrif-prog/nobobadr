@@ -25,7 +25,17 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Alertas por Telegram (backend, panel cerrado)** — `telegram_alerts.py`: notifica al admin de **pedido nuevo** (en `POST /api/orders`, con **botones inline** "✅ Asignar a Abeja" y "👁 Ver pedido") y **Abeja parada** (monitor background cada 30s, >90s). **Comando `/flota`** + `/start`/`/help` (devuelven chat_id) vía listener long-polling. **Callbacks inline**: asignar pedido → lista de Abejas disponibles → asignación en 1 toque (set driver_id + status `accepted`); ver pedido → detalle. Endpoints admin: `telegram/status`, `telegram/test`, `telegram/chats`. UI: tarjeta "Alertas Telegram". Lógica de asignación verificada por test directo; 32/32 pytest sin regresión. ⏳ PENDIENTE token válido en `backend/.env` (`TELEGRAM_BOT_TOKEN`); chat_id se autodetecta con /start o `TELEGRAM_ADMIN_CHAT_ID`. No-op seguro sin token.
 - **Fix `POST /api/products`**: validación de rol movida a dependencia `get_current_business` → devuelve 403 antes que 422. ✅ Verificado.
 
-## Pendiente / Backlog
+## Bloque A — Envíos por distancia + cobertura por ciudades (2026-06-18) ✅
+- Backend `geo.py` (haversine, moneda por país ES€/MA·MAD, tarifas por vehículo, `calculate_delivery_quote`). `routes/cities.py`: `GET /public/cities`, `GET /cities`, `POST /v1/calculate-delivery`, CRUD admin `/admin/cities`. `POST /orders/express` (pedido punto a punto). Modelos City/Express. `seed_cities.py` (16 ciudades ES+MA).
+- Frontend `DeliveryQuote.js` (`/presupuesto`, público, €/MAD), `CityManager.jsx` (en AdminDashboard). Banner exprés en CustomerDashboard. ✅ 45/45 pytest + e2e.
+
+## Arquitectura separada: Panel Fundador + App Riders (2026-06-18) ✅
+- **App de Conductores (Riders)** en `/rider` (PWA mobile, token aislado `nubo_rider_token`): activación por **código/QR** (sin email/contraseña), home con perfil, disponibilidad, ubicación en vivo y pedidos asignados.
+- **Sistema de riders backend** `routes/riders.py`: alta admin con **código `NUBO-XXXX` + QR (base64 PNG)**, `/rider/activate`, `/rider/me`, `/rider/location`, `/rider/availability`, suspender/reactivar, regenerar código. `get_current_rider`, `create_rider_token` (30 días), `generate_qr_data_url` (lib `qrcode`).
+- **Seguridad capa Fundador**: login con **brute-force lockout** (5 intentos/15 min, IP real vía `X-Forwarded-For`). Registro público no crea admin. Consola admin exclusiva.
+- **Gestión de riders en panel** `RiderManager.jsx` (alta + QR imprimible + suspender + regenerar). ✅ 58/58 pytest + frontend e2e 100%.
+
+## Pendiente / Backlog (actualizado)
 - **P0/Infra**: Dominio personalizado **nuboexpress.com** (bloqueado, requiere acción del usuario en UI de Emergent o soporte). Contraseña "Emergent Code Server" ($PASSWORD vacío en entorno — es tema de plataforma).
 - **P1**: Configurar clave real de Google Maps (`REACT_APP_GOOGLE_MAPS_API_KEY`) — actualmente placeholder, el mapa muestra error de Google (esperado).
 - **P2 (calidad)**: `server.py` ~1159 líneas; conviene modularizar (auth, orders, admin, search). Considerar persistir `current_location` de conductores en BD para mostrarlos en el mapa aunque no tengan pedido activo.

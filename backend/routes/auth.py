@@ -33,7 +33,9 @@ async def register(user_data: UserCreate):
 
 @router.post("/auth/login")
 async def login(credentials: UserLogin, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    # Detrás del ingress de K8s, request.client.host es la IP del proxy; usar X-Forwarded-For
+    fwd = request.headers.get('x-forwarded-for', '')
+    ip = fwd.split(',')[0].strip() if fwd else (request.client.host if request.client else "unknown")
     identifier = f"{ip}:{credentials.email.lower()}"
     await check_login_lockout(identifier)
 
