@@ -59,3 +59,14 @@ Se implementó el feature completo (backend + frontend) en la rama `main`.
 - UI: sección "Resumen mensual por moneda" arriba del historial, una tarjeta por moneda (MAD/EUR)
   con selector de mes. Muestra descuadre neto con color (cuadrada/faltante/sobrante).
 - Se refresca al cambiar de mes o tras cualquier mutación (depende de history).
+
+## Update 2026-06-18 (d) — Integración Web ↔ Móvil (Delivery)
+- Backend modular nuevo: auth.py (JWT), orders.py, assignments.py, riders.py, realtime.py (WS), geo.py, database.py.
+- JWT auth (admin/dispatcher/rider/customer). Seed: admin@moboexpress.com/admin123, rider@moboexpress.com/rider123.
+- Pedidos: ciclo pending->assigned->picked_up->in_transit->delivered; currency por país/ciudad (Marruecos=MAD, España/UE=EUR); distance_km haversine.
+- Asignaciones: admin/dispatcher asignan a rider; rider acepta/rechaza (RBAC: rider 403 en asignar).
+- COD efectivo + delivered => entrada automática en arqueo del día (order_id + moneda). Card NO genera entrada.
+- Real-time: WebSocket /api/ws?token= (broadcast order_created/order_status/rider_location/cash_entry_created). Riders envían GPS.
+- Frontend: AuthContext + login, navbar (Operaciones/Contabilidad), dashboard Operaciones (pedidos, crear, asignar, avanzar estado, stats, mapa con fallback si no hay GOOGLE_MAPS key), badge tiempo real.
+- Testing: 15/15 backend + 100% flujos críticos frontend (iteration_1.json). Sin bugs bloqueantes.
+- PENDIENTE: REACT_APP_GOOGLE_MAPS_API_KEY (mapa en modo dev). App móvil nativa (consume esta API) = próxima fase.
