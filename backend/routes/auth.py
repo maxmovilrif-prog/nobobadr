@@ -1,0 +1,44 @@
+"""Rutas de autenticación."""
+from fastapi import APIRouter, HTTPException, Depends
+
+from core import db, hash_password, verify_password, create_token, get_current_user
+from models import User, UserCreate, UserLogin, UserResponse
+
+router = APIRouter()
+
+
+@router.post("/auth/register", response_model=UserResponse)
+async def register(user_data: UserCreate):
+    # Public registration cannot create privileged accounts
+    if user_data.role not in ('customer', 'driver', 'business'):
+        raise HTTPException(status_code=400, detail="Rol no válido")
+    existing = await db.users.find_one({'email': user_data.email}, {'_id': 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user_dict = user_data.model_dump()
+    password = user_dict.pop('password')
+    user_dict['password_hash'] = hash_password(password)
+
+    user = User(**user_dict)
+    doc = user.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+
+    await db.users.insert_one(doc)
+    return UserResponse(**user.model_dump())
+
+
+@router.post("/auth/login")
+async def login(credentials: UserLogin):
+    user = await db.users.find_one({'email': credentials.email}, {'_id': 0})
+    if not user or not verify_password(credentials.password, user['password_hash']):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    token = create_token(user['id'], user['role'])
+    user.pop('password_hash')
+    return {'token': token, 'user': user}
+
+
+@router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    return UserResponse(**current_user)

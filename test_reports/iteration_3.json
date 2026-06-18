@@ -1,0 +1,40 @@
+{
+  "summary": "Full regression after backend modularization (server.py -> core.py + models.py + routes/*.py) and new admin real-time ALERTS. All 32 pytest tests pass. Frontend e2e validates: admin sound toggle activates and shows toast 'Alertas de sonido activadas'; creating an order via API while admin dashboard is open triggers toast 'Nuevo pedido recibido (total: N)' AND adds an entry with data-testid alert-item-order to 'Alertas recientes'; customer AI smart search 'tengo hambre' returns smart-search-results. Backend idle_count top-level field plus per-live-driver idle/idle_seconds fields are present on /api/admin/active-drivers (idle bee can't be triggered live without a stale WebSocket location, but the computation/fields exist).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard fleet map", "issues": ["Google Maps 'Oops! Something went wrong.' overlay continues to show because REACT_APP_GOOGLE_MAPS_API_KEY is the placeholder 'YOUR_API_KEY_HERE' (expected per main agent). Consider a friendlier fallback UI until a real key is provided."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_nubo_features.py",
+    "/app/backend/tests/test_regression_modularization.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional, code review) Some routes still validate body before role check, so non-business users hitting POST /api/products with an incomplete payload get 422 (e.g., missing image_url) instead of 403. Consider making Product image_url optional or doing role-check before pydantic body coercion. Not a regression.",
+    "(Optional) Replace Google Maps error block with a friendlier placeholder until a real REACT_APP_GOOGLE_MAPS_API_KEY is configured."
+  ],
+  "critical_code_review_comments": [
+    "Modularization is clean: server.py is now ~75 lines and mounts 11 routers; core.py centralizes db/auth/manager. Good split.",
+    "routes/admin.py correctly computes idle_seconds with tz-aware datetimes and exposes top-level idle_count + per-live-driver idle/idle_seconds. Threshold 90s as specified.",
+    "Public /api/auth/register still rejects role='admin' with 400 after refactor.",
+    "WebSocket /ws/tracking/{order_id} is kept on the app (not the /api router) which is correct (ingress would otherwise force /api prefix). No regression.",
+    "models.Product.image_url is non-Optional; combined with role check after validation this surfaces a 422 instead of 403 for non-business users. Cosmetic only."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_regression_modularization.py (new — full regression suite for the modular split + new idle fields)"
+  ],
+  "success_rate": {"backend": "100% (32/32 pytest)", "frontend": "100% (admin alerts + new-order alert + customer smart search e2e)"},
+  "test_credentials": "admin@nubo.com / Admin1234!  ; qa_customer@nubo.com / Test1234!",
+  "seed_data_creation": "None. Created one customer order (id 5cf16470-...) during the new-order alert test using the existing 'Test Restaurant Algeciras' business.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend modularization verified — no regression. /app/backend/tests/test_regression_modularization.py covers auth/businesses/products/orders/search/dropshipping/affiliate/admin and the new idle_count field. Frontend admin alerts feature: enable sound via [data-testid=admin-sound-toggle-btn], then any new order created (anywhere) triggers within ~7s a toast 'Nuevo pedido recibido' and an [data-testid=alert-item-order] entry in [data-testid=admin-alerts]. Idle-bee alert requires a WebSocket-pushed driver location older than 90s to be present in manager.driver_locations; in a live preview env this is hard to set up, so we verified the backend fields only. Google Maps placeholder error is still expected.",
+  "rca of the issue": "N/A — no bugs found in scope."
+}

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import axios from 'axios';
+import { toast } from 'sonner';
 import { AuthContext } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import MapComponent from '@/components/MapComponent';
-import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower } from 'lucide-react';
+import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
 
@@ -35,9 +36,60 @@ const StatCard = ({ icon: Icon, label, value, color, testid }) => (
 export default function AdminDashboard() {
   const { user, token, logout, API } = useContext(AuthContext);
   const [stats, setStats] = useState(null);
-  const [fleet, setFleet] = useState({ count: 0, live_count: 0, available_count: 0, drivers: [] });
+  const [fleet, setFleet] = useState({ count: 0, live_count: 0, available_count: 0, idle_count: 0, drivers: [] });
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [alerts, setAlerts] = useState([]); // recent alert feed
   const intervalRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const prevOrdersRef = useRef(null);
+  const idleAlertedRef = useRef(new Set());
+  const firstLoadRef = useRef(true);
+
+  // --- Sound (Web Audio API beep, no assets needed) ---
+  const enableSound = () => {
+    try {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      setSoundEnabled(true);
+      playBeep(880, 0.12); // confirmation chirp
+      toast.success('Alertas de sonido activadas');
+    } catch (e) {
+      toast.error('Tu navegador no permite alertas de sonido');
+    }
+  };
+
+  const playBeep = (frequency = 880, duration = 0.15, type = 'sine') => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  };
+
+  const pushAlert = (type, message) => {
+    setAlerts(prev => [{ id: Date.now() + Math.random(), type, message, time: new Date() }, ...prev].slice(0, 8));
+  };
+
+  const triggerNewOrderAlert = (count) => {
+    playBeep(660, 0.18, 'triangle');
+    setTimeout(() => playBeep(990, 0.18, 'triangle'), 180);
+    toast.success(`🛍️ Nuevo pedido recibido (total: ${count})`, { duration: 6000 });
+    pushAlert('order', `Nuevo pedido recibido (total: ${count})`);
+  };
+
+  const triggerIdleAlert = (driverName) => {
+    playBeep(300, 0.3, 'sawtooth');
+    toast.warning(`⚠️ ${driverName} lleva demasiado tiempo parada`, { duration: 8000 });
+    pushAlert('idle', `${driverName} lleva demasiado tiempo parada`);
+  };
 
   const fetchData = async () => {
     try {
@@ -46,8 +98,33 @@ export default function AdminDashboard() {
         axios.get(`${API}/admin/stats`, { headers }),
         axios.get(`${API}/admin/active-drivers`, { headers }),
       ]);
-      setStats(statsRes.data);
-      setFleet(fleetRes.data);
+      const newStats = statsRes.data;
+      const newFleet = fleetRes.data;
+
+      // --- New order detection ---
+      const totalOrders = newStats.total_orders;
+      if (!firstLoadRef.current && prevOrdersRef.current != null && totalOrders > prevOrdersRef.current) {
+        triggerNewOrderAlert(totalOrders);
+      }
+      prevOrdersRef.current = totalOrders;
+
+      // --- Idle bee detection ---
+      const currentIdleKeys = new Set();
+      (newFleet.drivers || []).forEach(d => {
+        if (d.idle && d.live) {
+          const key = d.order_id || d.driver_id || d.driver_name;
+          currentIdleKeys.add(key);
+          if (!firstLoadRef.current && !idleAlertedRef.current.has(key)) {
+            triggerIdleAlert(d.driver_name);
+          }
+        }
+      });
+      // Clear alerted keys that are no longer idle so they can re-alert later
+      idleAlertedRef.current = currentIdleKeys;
+
+      firstLoadRef.current = false;
+      setStats(newStats);
+      setFleet(newFleet);
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Error fetching admin data:', error);
@@ -82,10 +159,16 @@ export default function AdminDashboard() {
               <p className="text-sm text-gray-600">Panel de Control · {user?.name}</p>
             </div>
           </div>
-          <Button data-testid="admin-logout-btn" onClick={logout} variant="outline" size="sm">
-            <LogOut className="w-4 h-4 mr-2" />
-            Salir
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button data-testid="admin-sound-toggle-btn" onClick={enableSound} variant={soundEnabled ? 'default' : 'outline'} size="sm" className={soundEnabled ? 'bg-emerald-600' : ''}>
+              {soundEnabled ? <Bell className="w-4 h-4 mr-2" /> : <BellOff className="w-4 h-4 mr-2" />}
+              {soundEnabled ? 'Alertas ON' : 'Activar alertas'}
+            </Button>
+            <Button data-testid="admin-logout-btn" onClick={logout} variant="outline" size="sm">
+              <LogOut className="w-4 h-4 mr-2" />
+              Salir
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -126,7 +209,44 @@ export default function AdminDashboard() {
           </div>
 
           {/* Live driver list */}
-          <div>
+          <div className="space-y-6">
+            {/* Recent alerts feed */}
+            <Card data-testid="admin-alerts" className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-emerald-600" />
+                    Alertas recientes
+                  </span>
+                  {fleet.idle_count > 0 && (
+                    <Badge data-testid="idle-count-badge" className="bg-amber-100 text-amber-700">{fleet.idle_count} paradas</Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!soundEnabled && (
+                  <p className="text-xs text-amber-600 mb-3 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Pulsa "Activar alertas" para oír el sonido.
+                  </p>
+                )}
+                {alerts.length === 0 ? (
+                  <p className="text-sm text-gray-500">Sin alertas por ahora.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[160px] overflow-y-auto">
+                    {alerts.map(a => (
+                      <div key={a.id} data-testid={`alert-item-${a.type}`} className={`flex items-start gap-2 p-2 rounded-lg text-sm ${a.type === 'idle' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>
+                        {a.type === 'idle' ? <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> : <ShoppingBag className="w-4 h-4 mt-0.5 shrink-0" />}
+                        <div className="flex-1 min-w-0">
+                          <p>{a.message}</p>
+                          <p className="text-xs opacity-60">{a.time.toLocaleTimeString('es-ES')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -142,18 +262,18 @@ export default function AdminDashboard() {
                   </div>
                 ) : (
                   fleet.drivers.map((d, i) => (
-                    <div key={d.order_id || d.driver_id || i} data-testid={`fleet-driver-${i}`} className="flex items-center gap-3 p-3 rounded-lg border bg-white">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg ${d.live ? 'bg-emerald-100' : 'bg-gray-100'}`}>
+                    <div key={d.order_id || d.driver_id || i} data-testid={`fleet-driver-${i}`} className={`flex items-center gap-3 p-3 rounded-lg border ${d.idle ? 'bg-amber-50 border-amber-200' : 'bg-white'}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg ${d.idle ? 'bg-amber-100' : (d.live ? 'bg-emerald-100' : 'bg-gray-100')}`}>
                         🐝
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 truncate">{d.driver_name}</p>
                         <p className="text-xs text-gray-500 truncate">
-                          {d.delivery_address ? d.delivery_address : (d.vehicle_type || 'Sin pedido activo')}
+                          {d.idle ? `Parada hace ${d.idle_seconds}s` : (d.delivery_address ? d.delivery_address : (d.vehicle_type || 'Sin pedido activo'))}
                         </p>
                       </div>
-                      <Badge className={d.live ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}>
-                        {d.live ? 'En vivo' : d.status}
+                      <Badge className={d.idle ? 'bg-amber-100 text-amber-700' : (d.live ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600')}>
+                        {d.idle ? 'Parada' : (d.live ? 'En vivo' : d.status)}
                       </Badge>
                     </div>
                   ))
