@@ -1,0 +1,46 @@
+{
+  "summary": "End-to-end test of new Rider App (code/QR activation) + Admin Rider Manager + brute-force lockout. Backend pytest 58/58 GREEN (45 prior + 13 new in /app/backend/tests/test_riders_and_lockout.py). All rider endpoints validated: POST /api/admin/riders returns NUBO-XXXX code + base64 QR PNG (qr_data_url starts 'data:image/png;base64,'); invalid vehicle => 400; non-admin => 403; GET /api/admin/riders lists with count, non-admin 403; POST /api/rider/activate returns {token, rider} and flips activated=true, invalid code => 404, suspended => 403; GET /api/rider/me with rider token OK and with admin token => 403; PATCH /api/rider/availability?is_available=true => {is_available:true}; POST /api/rider/location => {ok:true}; PATCH /api/admin/riders/{id} suspend/reactivate works and invalid contract_status => 400; POST /api/admin/riders/{id}/regenerate-code emits new code+QR, OLD code => 404 on activation, NEW code => 200. Frontend /rider: rider-activation visible, invalid code stays on activation, valid code → rider-home with rider-name correct, availability switch + start-location button present, token persists in localStorage key 'nubo_rider_token' across reload. Frontend admin: login admin → /dashboard, rider-manager-card visible, full add form (name/phone/vehicle/dni/plate) → rider-qr-dialog shows rider-qr-image (base64 PNG) and rider-qr-code (NUBO-K1O3), count goes 6→7; per-row show-QR, regenerate-code (NUBO-K1O3 → NUBO-RZY3) and suspend (badge → 'Suspendido', toast 'Rider suspendido') all work. REGRESSION: Bloque A pytest tests still pass; founder login still works; AI smart search + admin stats + city manager remain green inside the same module pytest run.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login (brute-force lockout)", "issue": "Per-(ip:email) lockout works on localhost (5x 401 then 429) but is INEFFECTIVE through the K8s ingress because the backend reads request.client.host (proxy pod IP, e.g. 10.227.1.2 vs 10.227.1.6) rather than the X-Forwarded-For header. In production an attacker hitting through the ingress will spread attempts across multiple proxy IPs and never trip the counter. Fix: derive client IP from request.headers.get('x-forwarded-for', '').split(',')[0].strip() or request.client.host as fallback."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard fleet map", "issues": ["Google Maps 'InvalidKeyMapError' overlay still shown (placeholder REACT_APP_GOOGLE_MAPS_API_KEY) — expected/pre-existing, not blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_riders_and_lockout.py",
+    "/app/backend/tests/test_nubo_features.py",
+    "/app/backend/tests/test_regression_modularization.py",
+    "/app/backend/tests/test_bloque_a_cities_delivery.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "HIGH (security): make /api/auth/login brute-force lockout K8s-ingress aware — use X-Forwarded-For to derive the real client IP in routes/auth.py (currently uses request.client.host which is the proxy pod). On localhost the lockout works correctly; through the public URL the counter gets split across proxy pod IPs and never reaches MAX_LOGIN_ATTEMPTS.",
+    "LOW (cosmetic, pre-existing): replace Google Maps error block with a friendlier placeholder until a real REACT_APP_GOOGLE_MAPS_API_KEY is configured.",
+    "LOW (housekeeping): there is no DELETE /api/admin/riders/{id} endpoint, only suspend; consider adding a hard-delete or a soft 'archived' state for cleanup."
+  ],
+  "critical_code_review_comments": [
+    "core.py brute-force counter is keyed on '{ip}:{email}' where ip = request.client.host. Behind ingress this is the proxy pod IP and rotates → bypass. Must consume X-Forwarded-For (trust the closest reverse proxy hop).",
+    "routes/riders.py correctly excludes _id via projection {'_id': 0} on all reads and uses _public_rider() helper to strip password_hash before returning.",
+    "Rider activation re-issues a new 30-day token on every /rider/activate call — fine for device pairing, but consider invalidating prior tokens on regenerate-code (currently the old token still validates as long as the user record exists; only the activation code is rotated).",
+    "models.RiderUpdate accepts contract_status freely; the route validates ('active','suspended') but the model itself doesn't — fine, but a Literal['active','suspended'] would prevent typos at the schema layer.",
+    "RiderApp.js: localStorage key 'nubo_rider_token' is fine; consider clearing it on 401 from /rider/me (already done) — good.",
+    "RiderManager.jsx: 'Dar de alta y generar QR' POSTs and opens dialog; no error toast on backend 400 (e.g. invalid vehicle_type) — would be nice to surface err.response.data.detail."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_riders_and_lockout.py (new — 13 tests: 5 admin CRUD, 3 activation, 2 lifecycle, 3 brute-force; covers localhost lockout AND public-URL ingress-aware path)"
+  ],
+  "success_rate": {"backend": "100% (58/58 pytest incl. 13 new rider/lockout tests)", "frontend": "100% (rider-activation, invalid-code error, valid-code activation, rider-home with name, availability switch, localStorage persistence across reload, admin add form + QR dialog, count update 6→7, show-QR, regenerate-code rotates code, suspend toggle flips badge + toast)"},
+  "test_credentials": "admin@nubo.com / Admin1234!  ;  qa_customer@nubo.com / Test1234!  ; throwaway emails (bf_*@nope.com) used for brute-force tests (login_attempts collection cleared after run)",
+  "seed_data_creation": "Tests create TEST_Rider_* / TEST_FE* / TEST_UI_Rider users with role='driver' and clean them up at module/teardown; one express order from previous iteration still present (pending). All login_attempts entries from this run were deleted post-test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend: `cd /app/backend && export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2) && python3 -m pytest tests/ -q` should return 58 passed. Frontend rider app lives at /rider (separate route, no shared layout); activation code is uppercased client-side via onChange. Admin login lands on /dashboard (role guard renders AdminDashboard) — wait for [data-testid=rider-manager-card] (scroll into view; it's at the bottom under city-manager-card). Brute-force lockout: WORKS on http://localhost:8001 but is BROKEN through the public URL because of K8s ingress proxy IP rotation — recommend X-Forwarded-For fix in core.check_login_lockout caller (routes/auth.py login). Mocked: Google Maps (InvalidKeyMapError visible — expected) and Telegram (no-op). Clean login_attempts in mongosh if you accidentally lock: db.login_attempts.deleteMany({}).",
+  "rca of the issue": "Brute-force lockout ineffective in production: routes/auth.py builds identifier='{request.client.host}:{email.lower()}'. Through the K8s ingress, request.client.host is the ingress proxy pod (e.g. 10.227.1.2, 10.227.1.6 — observed in db.login_attempts.find()), not the real client IP. The ingress load-balances even within a single TCP session, so a determined attacker spreads attempts across N proxy pods and never trips the MAX_LOGIN_ATTEMPTS=5 threshold on any single (proxy_ip,email) pair. Mitigation (single line): use request.headers.get('x-forwarded-for','').split(',')[0].strip() or request.client.host. Verified on localhost: 5x 401 then 429 (deterministic)."
+}

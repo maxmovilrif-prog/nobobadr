@@ -192,6 +192,35 @@ class DeliveryQuoteRequest(BaseModel):
     currency: str = "EUR"
 
 
+# ===== Riders (App de conductores · activación por código/QR) =====
+class RiderCreate(BaseModel):
+    name: str
+    phone: str
+    vehicle_type: str  # bicycle | motorcycle | car | truck
+    dni: Optional[str] = None
+    license_plate: Optional[str] = None
+    city_id: Optional[str] = None
+
+
+class RiderUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    dni: Optional[str] = None
+    license_plate: Optional[str] = None
+    city_id: Optional[str] = None
+    contract_status: Optional[str] = None  # active | suspended
+
+
+class RiderActivate(BaseModel):
+    code: str
+
+
+class RiderLocation(BaseModel):
+    lat: float
+    lng: float
+
+
 # ===== Messages =====
 class Message(BaseModel):
     model_config = ConfigDict(extra="ignore")

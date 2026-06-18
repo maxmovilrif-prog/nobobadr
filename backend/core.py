@@ -53,10 +53,48 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 
-def create_token(user_id: str, role: str) -> str:
-    expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+def create_token(user_id: str, role: str, hours: int = JWT_EXPIRATION_HOURS) -> str:
+    expiration = datetime.now(timezone.utc) + timedelta(hours=hours)
     payload = {'user_id': user_id, 'role': role, 'exp': expiration}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+# Token de larga duración para el dispositivo del rider (app de conductores)
+RIDER_TOKEN_HOURS = 24 * 30  # 30 días
+
+def create_rider_token(user_id: str) -> str:
+    return create_token(user_id, 'driver', hours=RIDER_TOKEN_HOURS)
+
+
+# Protección anti fuerza bruta para el login del fundador (capa admin)
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
+async def check_login_lockout(identifier: str):
+    """Lanza 429 si el identificador {ip:email} está bloqueado por intentos fallidos."""
+    rec = await db.login_attempts.find_one({'identifier': identifier})
+    if not rec:
+        return
+    if rec.get('count', 0) >= MAX_LOGIN_ATTEMPTS:
+        locked_until = rec.get('locked_until')
+        if locked_until:
+            lu = datetime.fromisoformat(locked_until) if isinstance(locked_until, str) else locked_until
+            if lu.tzinfo is None:
+                lu = lu.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) < lu:
+                mins = int((lu - datetime.now(timezone.utc)).total_seconds() // 60) + 1
+                raise HTTPException(status_code=429, detail=f"Demasiados intentos. Cuenta bloqueada {mins} min.")
+
+async def register_failed_login(identifier: str):
+    rec = await db.login_attempts.find_one({'identifier': identifier})
+    count = (rec.get('count', 0) if rec else 0) + 1
+    update = {'count': count, 'updated_at': datetime.now(timezone.utc).isoformat()}
+    if count >= MAX_LOGIN_ATTEMPTS:
+        update['locked_until'] = (datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)).isoformat()
+    await db.login_attempts.update_one({'identifier': identifier}, {'$set': update}, upsert=True)
+
+async def clear_login_attempts(identifier: str):
+    await db.login_attempts.delete_one({'identifier': identifier})
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -84,6 +122,23 @@ async def get_current_business(current_user: dict = Depends(get_current_user)):
     if current_user.get('role') != 'business':
         raise HTTPException(status_code=403, detail="Only business users can perform this action")
     return current_user
+
+
+async def get_current_rider(current_user: dict = Depends(get_current_user)):
+    if current_user.get('role') != 'driver':
+        raise HTTPException(status_code=403, detail="Acceso solo para conductores")
+    return current_user
+
+
+def generate_qr_data_url(text: str) -> str:
+    """Genera un QR como data URL PNG base64 (para mostrar/imprimir en la ficha del rider)."""
+    import io
+    import base64
+    import qrcode
+    img = qrcode.make(text)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 # =========================

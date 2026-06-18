@@ -1,7 +1,10 @@
 """Rutas de autenticación."""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 
-from core import db, hash_password, verify_password, create_token, get_current_user
+from core import (
+    db, hash_password, verify_password, create_token, get_current_user,
+    check_login_lockout, register_failed_login, clear_login_attempts,
+)
 from models import User, UserCreate, UserLogin, UserResponse
 
 router = APIRouter()
@@ -29,11 +32,17 @@ async def register(user_data: UserCreate):
 
 
 @router.post("/auth/login")
-async def login(credentials: UserLogin):
+async def login(credentials: UserLogin, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    identifier = f"{ip}:{credentials.email.lower()}"
+    await check_login_lockout(identifier)
+
     user = await db.users.find_one({'email': credentials.email}, {'_id': 0})
     if not user or not verify_password(credentials.password, user['password_hash']):
+        await register_failed_login(identifier)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    await clear_login_attempts(identifier)
     token = create_token(user['id'], user['role'])
     user.pop('password_hash')
     return {'token': token, 'user': user}

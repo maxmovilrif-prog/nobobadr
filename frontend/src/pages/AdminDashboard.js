@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import MapComponent from '@/components/MapComponent';
 import CityManager from '@/components/CityManager';
+import RiderManager from '@/components/RiderManager';
 import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
@@ -344,6 +345,9 @@ export default function AdminDashboard() {
 
         {/* Gestión de zonas operativas (ciudades) */}
         <CityManager API={API} token={token} />
+
+        {/* Gestión de conductores (Riders) + códigos QR */}
+        <RiderManager API={API} token={token} />
       </div>
     </div>
   );
