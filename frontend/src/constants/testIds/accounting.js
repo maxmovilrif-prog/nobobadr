@@ -1,0 +1,21 @@
+// Test IDs for the daily cash-closing (Cierre de caja) feature.
+export const ACCOUNTING = {
+        panel: 'accounting-panel',
+        datePicker: 'accounting-date-picker',
+        refreshBtn: 'accounting-refresh-btn',
+        seedBtn: 'accounting-seed-btn',
+        saldoInicial: 'accounting-saldo-inicial',
+        totalEntradas: 'accounting-total-entradas',
+        totalSalidas: 'accounting-total-salidas',
+        saldoFinal: 'accounting-saldo-final',
+        downloadCsv: 'accounting-download-csv',
+        downloadPdf: 'accounting-download-pdf',
+        movementsTable: 'accounting-movements-table',
+        openingInput: 'accounting-opening-input',
+        openingSaveBtn: 'accounting-opening-save-btn',
+        movConcept: 'accounting-mov-concept',
+        movAmount: 'accounting-mov-amount',
+        movType: 'accounting-mov-type',
+        movMethod: 'accounting-mov-method',
+        movAddBtn: 'accounting-mov-add-btn',
+};
