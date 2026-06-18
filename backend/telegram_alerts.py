@@ -91,15 +91,25 @@ async def notify_new_order(order: dict) -> None:
         logger.error(f"notify_new_order error: {e}")
 
 
-async def notify_idle_driver(driver_name: str, idle_seconds: int) -> None:
-    """Notifica al admin cuando una Abeja lleva demasiado tiempo parada."""
+async def notify_idle_driver(driver_name: str, idle_seconds: int, order_id=None) -> None:
+    """Notifica al admin cuando una Abeja lleva demasiado tiempo parada, con botón de reasignación."""
     minutes = max(1, idle_seconds // 60)
     text = (
         "⚠️ <b>Abeja parada</b>\n"
         f"🐝 {driver_name} lleva ~{minutes} min sin moverse.\n"
-        "Revisa el panel de flota."
     )
-    await send_telegram_message(text)
+    reply_markup = None
+    if order_id:
+        text += f"📦 Pedido #{str(order_id)[:8]}"
+        reply_markup = {
+            "inline_keyboard": [[
+                {"text": "🔄 Reasignar", "callback_data": f"reassign:{order_id}"},
+                {"text": "👁 Ver pedido", "callback_data": f"view:{order_id}"},
+            ]]
+        }
+    else:
+        text += "Revisa el panel de flota."
+    await send_telegram_message(text, reply_markup=reply_markup)
 
 
 async def idle_monitor_loop() -> None:
@@ -126,7 +136,7 @@ async def idle_monitor_loop() -> None:
                     current_idle.add(order_id)
                     if order_id not in _idle_alerted:
                         _idle_alerted.add(order_id)
-                        await notify_idle_driver(loc.get("driver_name", "Abeja"), idle_seconds)
+                        await notify_idle_driver(loc.get("driver_name", "Abeja"), idle_seconds, order_id=order_id)
             # Limpiar avisos de Abejas que volvieron a moverse o terminaron
             _idle_alerted.intersection_update(current_idle)
         except asyncio.CancelledError:
@@ -230,7 +240,7 @@ async def _handle_callback(cq: dict) -> None:
         rows = []
         for d in drivers:
             code = _uuid.uuid4().hex[:8]
-            _pending_assign[code] = {"order_id": oid, "driver_id": d["id"], "driver_name": d.get("name", "Abeja")}
+            _pending_assign[code] = {"order_id": oid, "driver_id": d["id"], "driver_name": d.get("name", "Abeja"), "reassign": False}
             label = f"🐝 {d.get('name', 'Abeja')}"
             if d.get("vehicle_type"):
                 label += f" ({d['vehicle_type']})"
@@ -238,6 +248,37 @@ async def _handle_callback(cq: dict) -> None:
         await _edit_message_text(
             chat_id, message_id,
             f"🐝 Elige la Abeja para el pedido #{oid[:8]}:",
+            reply_markup={"inline_keyboard": rows},
+        )
+        return
+
+    # Reasignar un pedido (Abeja parada) a otra Abeja disponible
+    if data.startswith("reassign:"):
+        oid = data.split(":", 1)[1]
+        order = await core.db.orders.find_one({"id": oid}, {"_id": 0})
+        if not order:
+            await _answer_callback(cq_id, "Pedido no encontrado", show_alert=True)
+            return
+        current_driver = order.get("driver_id")
+        drivers = await core.db.users.find(
+            {"role": "driver", "is_available": True, "id": {"$ne": current_driver}},
+            {"_id": 0, "password_hash": 0}
+        ).to_list(20)
+        if not drivers:
+            await _answer_callback(cq_id, "No hay otras Abejas disponibles ahora", show_alert=True)
+            return
+        await _answer_callback(cq_id)
+        rows = []
+        for d in drivers:
+            code = _uuid.uuid4().hex[:8]
+            _pending_assign[code] = {"order_id": oid, "driver_id": d["id"], "driver_name": d.get("name", "Abeja"), "reassign": True}
+            label = f"🐝 {d.get('name', 'Abeja')}"
+            if d.get("vehicle_type"):
+                label += f" ({d['vehicle_type']})"
+            rows.append([{"text": label, "callback_data": f"drv:{code}"}])
+        await _edit_message_text(
+            chat_id, message_id,
+            f"🔄 Reasignar pedido #{oid[:8]} — elige nueva Abeja:",
             reply_markup={"inline_keyboard": rows},
         )
         return
@@ -253,7 +294,7 @@ async def _handle_callback(cq: dict) -> None:
         if not order:
             await _answer_callback(cq_id, "Pedido no encontrado", show_alert=True)
             return
-        if order.get("driver_id"):
+        if order.get("driver_id") and not info.get("reassign"):
             await _answer_callback(cq_id, "Ya estaba asignado", show_alert=True)
             await _edit_message_text(chat_id, message_id, f"⚠️ El pedido #{info['order_id'][:8]} ya estaba asignado.")
             return
@@ -262,11 +303,14 @@ async def _handle_callback(cq: dict) -> None:
             {"$set": {"driver_id": info["driver_id"], "status": "accepted",
                       "updated_at": datetime.now(timezone.utc).isoformat()}},
         )
-        await _answer_callback(cq_id, "✅ Asignado")
+        await _answer_callback(cq_id, "✅ Reasignado" if info.get("reassign") else "✅ Asignado")
+        verbo = "reasignado a" if info.get("reassign") else "asignado a"
         await _edit_message_text(
             chat_id, message_id,
-            f"✅ Pedido #{info['order_id'][:8]} asignado a 🐝 <b>{info['driver_name']}</b>.",
+            f"✅ Pedido #{info['order_id'][:8]} {verbo} 🐝 <b>{info['driver_name']}</b>.",
         )
+        # Permitir que vuelva a alertar si esta Abeja también se para
+        _idle_alerted.discard(info["order_id"])
         # Limpiar códigos de este pedido
         for k in [k for k, v in _pending_assign.items() if v["order_id"] == info["order_id"]]:
             _pending_assign.pop(k, None)
