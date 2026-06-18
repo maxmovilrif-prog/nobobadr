@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 
-from core import db, get_current_user
+from core import db, get_current_user, get_current_business
 from models import Business, BusinessCreate, Product, ProductCreate
 
 router = APIRouter()
@@ -49,10 +49,8 @@ async def get_business(business_id: str):
 
 # ===== Products =====
 @router.post("/products", response_model=Product)
-async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
-    if current_user['role'] != 'business':
-        raise HTTPException(status_code=403, detail="Only business users can create products")
-
+async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_business)):
+    # Role is enforced by get_current_business (returns 403 before body validation)
     business = await db.businesses.find_one({'id': product_data.business_id, 'owner_id': current_user['id']}, {'_id': 0})
     if not business:
         raise HTTPException(status_code=403, detail="Not authorized for this business")

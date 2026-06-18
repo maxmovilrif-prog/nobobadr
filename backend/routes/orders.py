@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from core import db, get_current_user
 from models import Order, OrderCreate, OrderStatusUpdate
+import telegram_alerts
 
 router = APIRouter()
 
@@ -28,6 +29,10 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     doc['updated_at'] = doc['updated_at'].isoformat()
 
     await db.orders.insert_one(doc)
+
+    # Alerta al administrador por Telegram (no bloquea la respuesta)
+    await telegram_alerts.notify_new_order(doc)
+
     return order
 
 

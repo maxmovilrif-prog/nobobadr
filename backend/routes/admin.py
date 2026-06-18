@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 
 from core import db, manager, get_current_admin
+import telegram_alerts
 
 router = APIRouter()
 
@@ -96,3 +97,29 @@ async def admin_stats(current_user: dict = Depends(get_current_admin)):
         "total_businesses": total_businesses,
         "live_drivers": len(manager.driver_locations),
     }
+
+
+# =========================
+# TELEGRAM ALERTS CONFIG
+# =========================
+
+@router.get("/admin/telegram/status")
+async def telegram_status(current_user: dict = Depends(get_current_admin)):
+    return {"configured": telegram_alerts.is_configured()}
+
+
+@router.post("/admin/telegram/test")
+async def telegram_test(current_user: dict = Depends(get_current_admin)):
+    if not telegram_alerts.is_configured():
+        return {"sent": False, "detail": "Telegram no está configurado (faltan token/chat_id)."}
+    ok = await telegram_alerts.send_telegram_message(
+        "✅ <b>Nubo</b>: alertas de Telegram configuradas correctamente."
+    )
+    return {"sent": ok}
+
+
+@router.get("/admin/telegram/chats")
+async def telegram_chats(current_user: dict = Depends(get_current_admin)):
+    """Lista los chats recientes que han escrito al bot (para encontrar el chat_id)."""
+    chats = await telegram_alerts.get_recent_chats()
+    return {"chats": chats}

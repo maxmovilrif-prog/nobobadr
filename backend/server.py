@@ -6,6 +6,7 @@ from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
 from starlette.middleware.cors import CORSMiddleware
 
 from core import client, manager, logger
+import telegram_alerts
 from routes import (
     auth, businesses, search, orders, drivers,
     messages, payments, dropshipping, affiliate, tracking, admin,
@@ -69,6 +70,19 @@ app.add_middleware(
 )
 
 
+import asyncio
+
+
+@app.on_event("startup")
+async def start_background_tasks():
+    """Arranca el monitor de Abejas paradas (alertas Telegram con panel cerrado)."""
+    app.state.idle_monitor_task = asyncio.create_task(telegram_alerts.idle_monitor_loop())
+    logger.info("Idle monitor task started")
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    task = getattr(app.state, "idle_monitor_task", None)
+    if task:
+        task.cancel()
     client.close()

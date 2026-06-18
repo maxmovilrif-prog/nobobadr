@@ -35,6 +35,10 @@ STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 # LLM Configuration (Emergent Universal Key)
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
+# Telegram Bot (alertas al administrador)
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+TELEGRAM_ADMIN_CHAT_ID = os.environ.get('TELEGRAM_ADMIN_CHAT_ID')
+
 security = HTTPBearer()
 
 # =========================
@@ -73,6 +77,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def get_current_admin(current_user: dict = Depends(get_current_user)):
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Acceso solo para administradores")
+    return current_user
+
+
+async def get_current_business(current_user: dict = Depends(get_current_user)):
+    if current_user.get('role') != 'business':
+        raise HTTPException(status_code=403, detail="Only business users can perform this action")
     return current_user
 
 

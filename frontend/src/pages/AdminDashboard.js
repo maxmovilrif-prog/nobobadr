@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import MapComponent from '@/components/MapComponent';
-import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag } from 'lucide-react';
+import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
 
@@ -40,6 +40,8 @@ export default function AdminDashboard() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [alerts, setAlerts] = useState([]); // recent alert feed
+  const [telegramConfigured, setTelegramConfigured] = useState(null);
+  const [telegramTesting, setTelegramTesting] = useState(false);
   const intervalRef = useRef(null);
   const audioCtxRef = useRef(null);
   const prevOrdersRef = useRef(null);
@@ -136,6 +138,27 @@ export default function AdminDashboard() {
     intervalRef.current = setInterval(fetchData, 5000);
     return () => clearInterval(intervalRef.current);
   }, []);
+
+  // Telegram config status
+  useEffect(() => {
+    const headers = { Authorization: `Bearer ${token}` };
+    axios.get(`${API}/admin/telegram/status`, { headers })
+      .then(r => setTelegramConfigured(r.data.configured))
+      .catch(() => setTelegramConfigured(false));
+  }, [API, token]);
+
+  const testTelegram = async () => {
+    setTelegramTesting(true);
+    try {
+      const r = await axios.post(`${API}/admin/telegram/test`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      if (r.data.sent) toast.success('Mensaje de prueba enviado a Telegram');
+      else toast.error(r.data.detail || 'Telegram no configurado');
+    } catch (e) {
+      toast.error('Error al probar Telegram');
+    } finally {
+      setTelegramTesting(false);
+    }
+  };
 
   const markers = fleet.drivers
     .filter(d => d.lat != null && d.lng != null)
@@ -243,6 +266,41 @@ export default function AdminDashboard() {
                       </div>
                     ))}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Telegram alerts config */}
+            <Card data-testid="admin-telegram" className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Send className="w-5 h-5 text-sky-600" />
+                    Alertas Telegram
+                  </span>
+                  <Badge data-testid="telegram-status-badge" className={telegramConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}>
+                    {telegramConfigured == null ? '...' : (telegramConfigured ? 'Activo' : 'Sin configurar')}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600 mb-3">
+                  Recibe avisos de <b>pedidos nuevos</b> y <b>Abejas paradas</b> en tu móvil, aunque el panel esté cerrado.
+                </p>
+                <Button
+                  data-testid="telegram-test-btn"
+                  onClick={testTelegram}
+                  disabled={telegramTesting || !telegramConfigured}
+                  size="sm"
+                  className="bg-sky-600 hover:bg-sky-700"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  {telegramTesting ? 'Enviando...' : 'Enviar prueba'}
+                </Button>
+                {telegramConfigured === false && (
+                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Configura el bot para activar las alertas móviles.
+                  </p>
                 )}
               </CardContent>
             </Card>
