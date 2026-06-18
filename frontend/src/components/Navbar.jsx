@@ -28,7 +28,7 @@ export default function Navbar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
             <Wallet className="h-4 w-4" />
           </div>
-          <span className="text-base font-bold tracking-tight text-slate-900">MoboExpress</span>
+          <span className="text-base font-bold tracking-tight text-slate-900">Nubo Express</span>
         </div>
         <nav className="flex items-center gap-1">
           {link("/", <LayoutDashboard className="h-4 w-4" />, "Operaciones", "nav-operaciones")}

@@ -30,7 +30,7 @@ from analytics import router as analytics_router
 from realtime import ws_router
 
 # Create the main app without a prefix
-app = FastAPI(title="MoboExpress - Cierre de Caja & Delivery")
+app = FastAPI(title="Nubo Express - Cierre de Caja & Delivery")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -187,7 +187,7 @@ async def _build_summary(target_date: str) -> CashClosingSummary:
 # ----------------------------- Routes -----------------------------
 @api_router.get("/")
 async def root():
-    return {"message": "MoboExpress API - Cierre de caja diario"}
+    return {"message": "Nubo Express API - Cierre de caja diario"}
 
 
 @api_router.post("/status", response_model=StatusCheck)
@@ -364,7 +364,7 @@ async def export_cash_closing(
     if format == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(["MoboExpress - Cierre de caja diario"])
+        writer.writerow(["Nubo Express - Cierre de caja diario"])
         writer.writerow(["Fecha", target])
         writer.writerow(["Moneda", summary.currency])
         writer.writerow([])
@@ -403,7 +403,7 @@ async def export_cash_closing(
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "MoboExpress", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, "Nubo Express", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 12)
     pdf.cell(0, 8, "Cierre de caja diario", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
@@ -543,7 +543,7 @@ logger = logging.getLogger(__name__)
 async def startup_event():
     await ensure_indexes()
     await seed_admin()
-    logger.info("MoboExpress backend ready: auth, orders, assignments, riders, realtime")
+    logger.info("Nubo Express backend ready: auth, orders, assignments, riders, realtime")
 
 
 @app.on_event("shutdown")

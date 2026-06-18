@@ -218,7 +218,7 @@ export default function AccountingPanel() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
                 <Wallet className="h-5 w-5" />
               </div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">MoboExpress</h1>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">Nubo Express</h1>
             </div>
             <p className="mt-1 text-sm text-slate-500">Cierre de caja diario · Arqueo</p>
           </div>

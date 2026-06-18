@@ -207,7 +207,7 @@ async def refresh_token(request: Request, response: Response):
 
 # ----------------------------- Seeding -----------------------------
 async def seed_admin():
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@moboexpress.com").lower()
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@nuboexpress.com").lower()
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
@@ -224,7 +224,7 @@ async def seed_admin():
         )
 
     # Seed a demo rider for testing
-    rider_email = "rider@moboexpress.com"
+    rider_email = "rider@nuboexpress.com"
     if await db.users.find_one({"email": rider_email}) is None:
         await db.users.insert_one({
             "id": str(uuid.uuid4()), "email": rider_email, "name": "Amine (Rider)",

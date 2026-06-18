@@ -52,7 +52,7 @@ export default function LiveMap({ riders = [], orders = [] }) {
           style={{ width: "100%", height: "100%" }}
           defaultCenter={center}
           defaultZoom={12}
-          mapId="moboexpress-map"
+          mapId="nuboexpress-map"
           gestureHandling="greedy"
           disableDefaultUI={false}
           mapTypeControl={false}

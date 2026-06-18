@@ -15,7 +15,7 @@ function formatApiErrorDetail(detail) {
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("admin@moboexpress.com");
+  const [email, setEmail] = useState("admin@nuboexpress.com");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ export default function Login() {
             <Wallet className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white">MoboExpress</h1>
+            <h1 className="text-lg font-bold text-white">Nubo Express</h1>
             <p className="text-xs text-slate-400">Panel de control & delivery</p>
           </div>
         </div>
