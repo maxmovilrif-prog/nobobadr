@@ -125,18 +125,22 @@ async def admin_kpis(current_user: dict = Depends(get_current_admin)):
     today = now.date()
     month_start = today.replace(day=1)
     last_30 = now - timedelta(days=30)
+    # Optimización: solo cargamos pedidos recientes (60d) para las ventanas de cálculo;
+    # las entregas históricas se cuentan aparte con count_documents.
+    window_cutoff = (now - timedelta(days=60)).isoformat()
 
     orders = await db.orders.find(
-        {}, {'_id': 0, 'status': 1, 'total_amount': 1, 'currency': 1,
-             'created_at': 1, 'delivered_at': 1, 'driver_id': 1}
+        {'created_at': {'$gte': window_cutoff}},
+        {'_id': 0, 'status': 1, 'total_amount': 1, 'currency': 1,
+         'created_at': 1, 'delivered_at': 1, 'driver_id': 1}
     ).to_list(50000)
+    delivered_total = await db.orders.count_documents({'status': 'delivered'})
 
     # Serie de pedidos por día (últimos 7 días)
     days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
     series = {d.isoformat(): {'date': d.isoformat(), 'orders': 0, 'delivered': 0} for d in days}
     orders_today = 0
     revenue_month_eur = 0.0
-    delivered_total = 0
     delivery_durations = []
     bees = {}
 
@@ -150,7 +154,6 @@ async def admin_kpis(current_user: dict = Depends(get_current_admin)):
             if created.date() == today:
                 orders_today += 1
         if status == 'delivered':
-            delivered_total += 1
             delivered = _parse_iso(o.get('delivered_at'))
             # Ingresos del mes (pedidos entregados este mes)
             eff = delivered or created
