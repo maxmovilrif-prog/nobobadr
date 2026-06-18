@@ -7,6 +7,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, manager
 from models import Order, OrderCreate, OrderStatusUpdate, ExpressOrderCreate
 import telegram_alerts
+from assignments import auto_assign_order, release_driver
+from accounting import record_order_income
 
 router = APIRouter()
 
@@ -118,6 +120,12 @@ async def create_express_order(order_data: ExpressOrderCreate, current_user: dic
 
     await db.orders.insert_one(doc)
     await telegram_alerts.notify_new_order(doc)
+
+    # Despacho automático por proximidad: asigna la Abeja más cercana al origen (best-effort)
+    try:
+        await auto_assign_order(order.id)
+    except Exception:
+        pass
     return order
 
 
@@ -159,10 +167,18 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
     order = await db.orders.find_one({'id': order_id}, {'_id': 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    await db.orders.update_one(
-        {'id': order_id},
-        {'$set': {'status': status_update.status, 'updated_at': datetime.now(timezone.utc).isoformat()}}
-    )
+    now = datetime.now(timezone.utc).isoformat()
+    update_fields = {'status': status_update.status, 'updated_at': now}
+    if status_update.status == 'delivered':
+        update_fields['delivered_at'] = now
+    await db.orders.update_one({'id': order_id}, {'$set': update_fields})
+
+    # Al entregar: registra el ingreso en contabilidad (idempotente) y libera la Abeja
+    if status_update.status == 'delivered':
+        await record_order_income({**order, **update_fields})
+    if status_update.status in ('delivered', 'cancelled') and order.get('driver_id'):
+        await release_driver(order.get('driver_id'))
+
     return {'message': 'Order status updated', 'status': status_update.status}
 
 

@@ -9,6 +9,7 @@ import MapComponent from '@/components/MapComponent';
 import CityManager from '@/components/CityManager';
 import RiderManager from '@/components/RiderManager';
 import OperationsManager from '@/components/OperationsManager';
+import AccountingManager from '@/components/AccountingManager';
 import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
@@ -346,6 +347,9 @@ export default function AdminDashboard() {
 
         {/* Operaciones y Logística (Bloque C): despacho por proximidad + historial */}
         <OperationsManager API={API} token={token} />
+
+        {/* Contabilidad y Finanzas (Bloque D): caja, nóminas y libro contable */}
+        <AccountingManager API={API} token={token} />
 
         {/* Gestión de zonas operativas (ciudades) */}
         <CityManager API={API} token={token} />

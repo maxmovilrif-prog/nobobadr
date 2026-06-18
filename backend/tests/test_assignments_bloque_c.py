@@ -10,6 +10,7 @@ Cobertura:
 """
 import os
 import uuid
+import random
 import requests
 import pytest
 
@@ -21,8 +22,12 @@ ADMIN_PASS = "Admin1234!"
 CUSTOMER_EMAIL = "qa_customer@nubo.com"
 CUSTOMER_PASS = "Test1234!"
 
-# Punto de recogida de prueba (Madrid centro)
-PICKUP = {"lat": 40.4168, "lng": -3.7038}
+# Punto de recogida de prueba aleatorio (evita colisión con riders de pruebas previas en BD)
+PICKUP = {"lat": round(random.uniform(-55, 55), 4), "lng": round(random.uniform(-150, 150), 4)}
+# Origen lejano (sin riders en 10 km) para que el auto-despacho NO lo capture
+# y los pedidos queden en cola para las pruebas de asignación manual.
+FAR_ORIGIN = {"lat": round(PICKUP["lat"] + 30, 4) if PICKUP["lat"] < 25 else round(PICKUP["lat"] - 30, 4),
+              "lng": round(PICKUP["lng"] + 60, 4) if PICKUP["lng"] < 90 else round(PICKUP["lng"] - 60, 4)}
 
 
 @pytest.fixture(scope="module")
@@ -64,8 +69,8 @@ def near_rider(admin_token):
 @pytest.fixture
 def express_order(customer_token):
     payload = {
-        "vehicle_type": "moto", "origin_name": "TEST_C_ORIGIN", "origin_lat": PICKUP["lat"],
-        "origin_lng": PICKUP["lng"], "destination_name": "TEST_C_DEST",
+        "vehicle_type": "moto", "origin_name": "TEST_C_ORIGIN", "origin_lat": FAR_ORIGIN["lat"],
+        "origin_lng": FAR_ORIGIN["lng"], "destination_name": "TEST_C_DEST",
         "destination_lat": 35.7595, "destination_lng": -5.834, "fee": 50.0, "currency": "EUR",
     }
     r = requests.post(f"{API}/orders/express", headers={"Authorization": f"Bearer {customer_token}"}, json=payload)
@@ -94,7 +99,8 @@ def test_assign_nearest_and_history(admin_token, near_rider, express_order):
     h = {"Authorization": f"Bearer {admin_token}"}
     oid = express_order["id"]
 
-    r = requests.post(f"{API}/orders/{oid}/assign-nearest", headers=h, json={})
+    r = requests.post(f"{API}/orders/{oid}/assign-nearest", headers=h,
+                      json={"lat": PICKUP["lat"], "lng": PICKUP["lng"], "max_km": 50})
     assert r.status_code == 200, r.text
     assigned = r.json()
     assert assigned["driver"]["distance_km"] is not None

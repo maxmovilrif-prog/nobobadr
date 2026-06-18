@@ -1,0 +1,42 @@
+{
+  "summary": "Iter 8 — Validación end-to-end BLOQUE D (Contabilidad/Finanzas), Auto-Despacho exprés y Ficha de activación de Rider. Backend pytest: 81/82 GREEN (98.8%). El único fallo es FLAKY: tests/test_riders_and_lockout.py::TestBruteForceLockout::test_correct_login_before_lockout_clears_attempts — ConnectTimeout transitorio del ingress de K8s (HTTPSConnectionPool timeout=10s al 4o intento de POST /api/auth/login dentro del loop de 5+ requests rapid-fire). No es bug funcional ni regresión nueva; mismo issue de lockout-by-ingress-IP carry-over de iter5/6/7. Frontend: Login admin OK; /admin renderiza accounting-manager con TODOS los testids esperados (income/expense/net/pending-payroll, cash card+EUR+MAD+amount+currency+desc+in/out+closing CSV/PDF, payroll table con acct-pay-btn-*, txns table+export). Entrada de caja 100€ EUR registrada → toast verde 'Entrada de caja registrada' + saldo Caja EUR sube 1000€ → 1100€. RiderManager: alta rider TEST_UI_D_Rider_8150 (Moto, +212600111222, DNI X9876543, matrícula 1234-MOT) abre rider-qr-dialog mostrando rider-qr-image (PNG base64 642 bytes), rider-qr-code 'NUBO-NNW8' (formato NUBO-XXXX confirmado, 9 chars), rider-qr-vehicle badge 'Moto', botón rider-qr-print 'Imprimir ficha de activación' habilitado. Toast verde 'Rider dado de alta'. Mapa Google sigue mostrando InvalidKeyMapError (placeholder key) — ESPERADO, no es bug.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login (brute-force lockout)", "issue": "Flaky: 5 POSTs en <1s al endpoint via URL pública genera ocasionalmente ConnectTimeout (10s) en el ingress. Carry-over de iter5/6/7. Lockout sigue siendo IP-bound y bypassable por rotación del proxy K8s ingress."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard mapa", "issues": ["Google Maps InvalidKeyMapError por placeholder REACT_APP_GOOGLE_MAPS_API_KEY — ESPERADO, no es bug. Considerar fallback amigable cuando useJsApiLoader.loadError esté presente."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_finances_accounting.py",
+    "/app/backend/tests/test_auto_assign.py",
+    "/app/backend/tests/test_assignments_bloque_c.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(carry-over HIGH security) Hacer /api/auth/login brute-force lockout K8s-ingress-aware (X-Forwarded-For) — sigue siendo bypassable y además causa flakes ocasionales (ConnectTimeout en ingress) en el test test_correct_login_before_lockout_clears_attempts cuando se hacen 5 POSTs rapid-fire.",
+    "(LOW cosmetic) Reemplazar el overlay 'Oops/InvalidKeyMapError' de Google Maps con un placeholder de marca cuando la API key esté ausente.",
+    "(LOW UX) Login admin redirige a /dashboard en vez de /admin (observación menor; el usuario admin tiene que navegar manualmente a /admin)."
+  ],
+  "critical_code_review_comments": [
+    "AccountingManager.jsx: estructura limpia, todos los data-testid clave presentes. Tarjetas resumen + control de caja (EUR/MAD) + nóminas + libro completo en una sola vista. Buen uso de fetchAll tras cada acción para refrescar estado.",
+    "RiderManager.jsx (línea 153-260): dialog QR con rider-qr-image (data URL PNG), rider-qr-code (NUBO-XXXX 9-char), rider-qr-vehicle (badge VLABEL), rider-qr-print. printQr abre window.open con ficha profesional — verificado solo presencia del botón habilitado.",
+    "Backend accounting.py + routes/accounting.py: tests cubren cash_in/out con validación saldo (400), daily-closing con todas las claves (opening/movements/closing/income/expenses/net), manual txn con tipo inválido (400) y descripción <2 chars (422 via Pydantic), summary, export CSV, flujo entrega→ingreso idempotente (PATCH /orders/{id}/status delivered registra income con reference_id=order_id; segunda entrega NO duplica), comisión 10% en /admin/finances/summary y /accounting/payroll, payroll/pay crea payout y marca pagado (segundo pay → 400). Control de acceso cliente 403 verificado.",
+    "Backend routes/orders.py create_express_order → auto_assign_order: test_express_order_auto_dispatches_to_nearest verifica que un rider posicionado a 0.0008° del PICKUP (lat/lng aleatorios aislados) recibe el pedido automáticamente al crearse (status=accepted, driver_name no nulo, historial con reason='auto_dispatch'). PASA EN VERDE.",
+    "Único flake: test_correct_login_before_lockout_clears_attempts hace 5 POSTs rapid-fire a /api/auth/login a través de ingress K8s — ocasionalmente el 4o request hace ConnectTimeout (10s). Sugerencia: aumentar timeout a 15s y/o añadir backoff entre intentos, o (mejor) implementar X-Forwarded-For en el lockout y reescribir el test."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "98.8% (81/82 pytest; 1 flaky timeout en test de lockout)", "frontend": "100% (accounting-manager render + cash IN 100€ EUR → toast + saldo 1000→1100€; rider QR dialog con QR PNG + código NUBO-NNW8 + badge Moto + botón imprimir habilitado)"},
+  "test_credentials": "admin@nubo.com / Admin1234! ; qa_customer@nubo.com / Test1234!",
+  "seed_data_creation": "TEST_UI_D_Rider_8150 (NUBO-NNW8, Moto, +212600111222) creado vía UI. Cash IN de 100€ EUR (concepto 'TEST_UI_D entrada caja') registrado. Tests pytest también crearon riders TEST_D_* y TEST_AUTO_* con pedidos express en lat/lng aleatorios aislados. Todos con prefijo TEST_ para limpieza segura.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Para regression rápida: `cd /app/backend && export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2) && python3 -m pytest tests/ -q` → 81 passed, 1 flaky (test_correct_login_before_lockout_clears_attempts — ignore o retry). UI testing: login en /auth → navigate manual a /admin (no redirect automático). AccountingManager testids: acct-{income,expense,net,pending-payroll}-card, acct-cash-{card,eur,mad,amount,currency,desc,in-btn,out-btn}, acct-closing-{csv,pdf}, acct-payroll-{card,table,export}, acct-pay-btn-<courierId>, acct-txns-{card,table,export}. RiderManager: rider-{name,phone,vehicle-select,dni,plate}-input + rider-add-btn → rider-qr-dialog con rider-qr-{image,code,vehicle,print}. Vehicle-select VALORES VÁLIDOS: bicycle/motorcycle/car/truck (NO 'motorbike'). Pedidos express se auto-asignan al crearse a riders cercanos disponibles — usar PICKUP aleatorio en tests para evitar colisiones con riders previos persistidos.",
+  "rca of the issue": "No hay bugs nuevos. Flujos BLOQUE D + Auto-despacho + Ficha rider operan correctamente end-to-end. El único fallo intermitente es el test test_correct_login_before_lockout_clears_attempts que hace 5 POSTs sincrónicos a /api/auth/login a través del ingress K8s; el ConnectTimeout de 10s se supera ocasionalmente cuando el ingress está bajo carga. Mitigación: subir timeout a 15-20s o añadir 100ms de sleep entre intentos. RCA real del lockout-bypass-by-ingress-IP sigue siendo carry-over: usar X-Forwarded-For (primer hop) en lugar de request.client.host para identificar al cliente real detrás del proxy K8s."
+}

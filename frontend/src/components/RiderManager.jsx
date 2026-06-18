@@ -38,7 +38,10 @@ export const RiderManager = ({ API, token }) => {
     try {
       const res = await axios.post(`${API}/admin/riders`, { ...form, name: form.name.trim(), phone: form.phone.trim() }, auth);
       toast.success('Rider dado de alta');
-      setQrModal({ name: res.data.name, code: res.data.activation_code, qr: res.data.qr_data_url });
+      setQrModal({
+        name: res.data.name, code: res.data.activation_code, qr: res.data.qr_data_url,
+        vehicle_type: res.data.vehicle_type, phone: res.data.phone, dni: res.data.dni, license_plate: res.data.license_plate,
+      });
       setForm(EMPTY);
       fetchRiders();
     } catch (err) {
@@ -60,7 +63,10 @@ export const RiderManager = ({ API, token }) => {
   const showQr = async (rider) => {
     try {
       const res = await axios.get(`${API}/admin/riders/${rider.id}/qr`, auth);
-      setQrModal({ name: rider.name, code: res.data.activation_code, qr: res.data.qr_data_url });
+      setQrModal({
+        name: rider.name, code: res.data.activation_code, qr: res.data.qr_data_url,
+        vehicle_type: rider.vehicle_type, phone: rider.phone, dni: rider.dni, license_plate: rider.license_plate,
+      });
     } catch (e) { toast.error('No se pudo cargar el QR'); }
   };
 
@@ -68,23 +74,79 @@ export const RiderManager = ({ API, token }) => {
     try {
       const res = await axios.post(`${API}/admin/riders/${rider.id}/regenerate-code`, {}, auth);
       toast.success('Código regenerado');
-      setQrModal({ name: rider.name, code: res.data.activation_code, qr: res.data.qr_data_url });
+      setQrModal({
+        name: rider.name, code: res.data.activation_code, qr: res.data.qr_data_url,
+        vehicle_type: rider.vehicle_type, phone: rider.phone, dni: rider.dni, license_plate: rider.license_plate,
+      });
       fetchRiders();
     } catch (e) { toast.error('No se pudo regenerar'); }
   };
 
   const printQr = () => {
     if (!qrModal) return;
+    const vlabel = VLABEL[qrModal.vehicle_type] || qrModal.vehicle_type || '—';
+    const row = (label, value) => value
+      ? `<tr><td style="padding:6px 14px;color:#6b7280;font-size:13px">${label}</td><td style="padding:6px 14px;font-weight:600;color:#111827">${value}</td></tr>`
+      : '';
     const w = window.open('', '_blank');
-    w.document.write(`<html><head><title>${qrModal.name} - ${qrModal.code}</title></head>
-      <body style="text-align:center;font-family:sans-serif;padding:40px">
-      <h2>🐝 Nubo Rider</h2><h3>${qrModal.name}</h3>
-      <img src="${qrModal.qr}" style="width:280px"/>
-      <p style="font-size:28px;letter-spacing:4px;font-weight:bold">${qrModal.code}</p>
+    w.document.write(`<html><head><title>Ficha de activación · ${qrModal.name} · ${qrModal.code}</title>
+      <meta charset="utf-8"/>
+      <style>
+        @page { margin: 18mm; }
+        body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; color:#111827; margin:0; }
+        .sheet { max-width: 620px; margin: 0 auto; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; }
+        .head { background:#047857; color:#fff; padding:22px 28px; display:flex; align-items:center; gap:12px; }
+        .head h1 { font-size:22px; margin:0; letter-spacing:.5px; }
+        .head p { margin:2px 0 0; font-size:13px; opacity:.85; }
+        .body { padding:28px; display:flex; gap:28px; align-items:flex-start; }
+        .qrbox { text-align:center; }
+        .qrbox img { width:220px; height:220px; border:8px solid #ecfdf5; border-radius:12px; }
+        .code { margin-top:10px; font-size:26px; font-weight:800; letter-spacing:6px; color:#047857; font-family:monospace; }
+        table { border-collapse:collapse; width:100%; }
+        .name { font-size:20px; font-weight:800; margin:0 0 4px; }
+        .badge { display:inline-block; background:#ecfdf5; color:#047857; border-radius:999px; padding:4px 12px; font-size:13px; font-weight:700; margin-bottom:14px; }
+        .steps { margin:24px 28px 28px; background:#f9fafb; border-radius:12px; padding:18px 22px; }
+        .steps h3 { margin:0 0 8px; font-size:14px; color:#047857; }
+        .steps ol { margin:0; padding-left:20px; color:#374151; font-size:13px; line-height:1.7; }
+        .foot { text-align:center; color:#9ca3af; font-size:11px; padding:0 28px 22px; }
+      </style></head>
+      <body>
+        <div class="sheet">
+          <div class="head">
+            <div style="font-size:30px">🐝</div>
+            <div><h1>Nubo Express</h1><p>Hoja de activación de conductor (Abeja)</p></div>
+          </div>
+          <div class="body">
+            <div class="qrbox">
+              <img src="${qrModal.qr}" alt="QR"/>
+              <div class="code">${qrModal.code}</div>
+            </div>
+            <div style="flex:1">
+              <p class="name">${qrModal.name}</p>
+              <span class="badge">${vlabel}</span>
+              <table>
+                ${row('ID único', qrModal.code)}
+                ${row('Vehículo', vlabel)}
+                ${row('Teléfono', qrModal.phone)}
+                ${row('DNI/ID', qrModal.dni)}
+                ${row('Matrícula', qrModal.license_plate)}
+              </table>
+            </div>
+          </div>
+          <div class="steps">
+            <h3>Cómo activar la app</h3>
+            <ol>
+              <li>Descarga la app <b>Nubo Riders</b> en tu móvil.</li>
+              <li>Pulsa <b>"Escanear QR"</b> y apunta a este código.</li>
+              <li>La app se configurará con tu nombre, perfil y vehículo automáticamente.</li>
+              <li>Si no puedes escanear, escribe el código <b>${qrModal.code}</b> manualmente.</li>
+            </ol>
+          </div>
+          <div class="foot">Documento generado por Nubo Express · Conserva esta hoja. El código es personal e intransferible.</div>
+        </div>
+        <script>window.onload = function(){ window.focus(); window.print(); }</script>
       </body></html>`);
     w.document.close();
-    w.focus();
-    w.print();
   };
 
   return (
@@ -189,9 +251,12 @@ export const RiderManager = ({ API, token }) => {
           {qrModal && (
             <div className="text-center space-y-3">
               <p className="font-medium text-gray-900">{qrModal.name}</p>
+              {qrModal.vehicle_type && (
+                <Badge className="bg-emerald-100 text-emerald-700" data-testid="rider-qr-vehicle">{VLABEL[qrModal.vehicle_type] || qrModal.vehicle_type}</Badge>
+              )}
               <img src={qrModal.qr} alt="QR" className="w-48 h-48 mx-auto rounded-lg border" data-testid="rider-qr-image" />
               <p className="text-2xl font-mono font-bold tracking-widest text-emerald-700" data-testid="rider-qr-code">{qrModal.code}</p>
-              <Button onClick={printQr} variant="outline" className="w-full" data-testid="rider-qr-print">Imprimir ficha</Button>
+              <Button onClick={printQr} variant="outline" className="w-full" data-testid="rider-qr-print">Imprimir ficha de activación</Button>
             </div>
           )}
         </DialogContent>

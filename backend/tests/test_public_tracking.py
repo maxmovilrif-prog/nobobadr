@@ -31,8 +31,8 @@ def express_order(customer_token):
     payload = {
         "vehicle_type": "moto",
         "origin_name": "TEST_ORIGIN Madrid",
-        "origin_lat": 40.4168,
-        "origin_lng": -3.7038,
+        "origin_lat": 4.5,
+        "origin_lng": 4.5,
         "destination_name": "TEST_DEST Tanger",
         "destination_lat": 35.7595,
         "destination_lng": -5.834,
@@ -80,8 +80,8 @@ def test_tracking_returns_full_payload(express_order):
     assert data["currency"] == "EUR"
 
     # Origin / destination shape
-    assert data["origin"]["lat"] == 40.4168
-    assert data["origin"]["lng"] == -3.7038
+    assert data["origin"]["lat"] == 4.5
+    assert data["origin"]["lng"] == 4.5
     assert data["origin"]["label"] == "TEST_ORIGIN Madrid"
     assert data["destination"]["lat"] == 35.7595
     assert data["destination"]["lng"] == -5.834

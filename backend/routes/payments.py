@@ -6,6 +6,7 @@ from emergentintegrations.payments.stripe.checkout import StripeCheckout, Checko
 
 from core import db, get_current_user, STRIPE_API_KEY
 from models import PaymentTransaction
+from assignments import auto_assign_order
 
 router = APIRouter()
 
@@ -80,6 +81,10 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
             {'id': transaction['order_id']},
             {'$set': {'payment_status': 'paid'}}
         )
+        try:
+            await auto_assign_order(transaction['order_id'])
+        except Exception:
+            pass
     return {
         'session_id': session_id,
         'payment_status': status.payment_status,
@@ -109,6 +114,10 @@ async def stripe_webhook(request: Request):
                     {'id': transaction['order_id']},
                     {'$set': {'payment_status': 'paid'}}
                 )
+                try:
+                    await auto_assign_order(transaction['order_id'])
+                except Exception:
+                    pass
         return {'status': 'success'}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
