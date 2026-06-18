@@ -1,0 +1,47 @@
+{
+  "summary": "Full e2e test of MoboExpress delivery + accounting integration. Backend: 15/15 pytest tests pass covering auth (login/me/register/duplicate), riders listing & auth-required, currency assignment (MAD for Tanger/Morocco, EUR for Algeciras/Spain), distance_km haversine, RBAC (rider 403 on POST /api/assignments, rider GET /api/orders filtered to own), COD_cash->delivered auto-creates 'entrada' in cash closing (correct method=efectivo, currency, order_id, amount, paid=true, cash_movement_id set), card delivered does NOT create entry, EUR COD cash flow creates EUR entry. Frontend: Login admin->/ works, WS badge 'Tiempo real activo' shown, order creation form (Tanger/Morocco/COD/333.33) works, rider assignment via select works, advance-button drives status through assigned->picked_up->in_transit->delivered, navigation to /contabilidad shows the auto-generated COD entry in movements (table contains 'Pedido ORD-xxxx (COD efectivo)').",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/register", "issue": "Backend correctly lowercases email; tests must use lowercase prefix (already fixed in test). Not a bug — informational."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "WebSocket initial connection", "issue": "Transient warning 'WebSocket is closed before the connection is established' appears once on first navigation right after login; badge subsequently shows 'Tiempo real activo' so reconnect succeeds. Not blocking but worth a small reconnect-on-mount delay or single retry.", "affected_selectors": ["[data-testid=ws-status]"]}
+    ],
+    "design_issues": [
+      {"screen": "Contabilidad / arqueo", "issues": ["Default currency tab is 'EUR' on /contabilidad even when most operations are MAD-region; consider defaulting to MAD or remembering last currency."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_moboexpress_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: smooth out the first-load WebSocket reconnect to avoid the transient console warning.",
+    "OPTIONAL: default Contabilidad currency tab based on the most-used currency for the day instead of EUR.",
+    "OPTIONAL: test data is accumulating in the riders dropdown (multiple 'Test Rider' entries from /api/auth/register tests). Consider a cleanup endpoint or filter inactive=true for production data hygiene."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 549 lines; getting heavy. Consider extracting accounting/* router into /app/backend/accounting.py to mirror the modular pattern already used for auth/orders/assignments/riders.",
+    "orders.py update_status: COD->cash entry creation is idempotent against re-delivery only because of the 'paid' guard inside _create_cod_cash_entry. Good. However, if status is set to 'delivered' twice and the order had paid=False initially (e.g., status was set to delivered manually without going through the helper before), a second call would not duplicate because paid is now True — verified.",
+    "auth.py _set_cookies uses secure=False; acceptable in dev/preview but should be driven by env (e.g., SECURE_COOKIES=true) before production.",
+    "No rate limiting / brute force lockout on /api/auth/login (playbook mentions lockout after 5 fails). Not implemented — acceptable for MVP but a known gap.",
+    "geo.py defaults non-Moroccan-non-EU countries to EUR; document this assumption or restrict to a known list.",
+    "MongoDB ObjectId is properly excluded via projection {'_id': 0} — good.",
+    "All interactive elements have data-testid attributes — excellent testability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_moboexpress_api.py (new)",
+    "/app/test_reports/iteration_1.json (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% of critical flows (login, order create, assign, advance to delivered, COD->cash visible in /contabilidad, WS realtime badge)"},
+  "test_credentials": "admin@moboexpress.com/admin123 (admin), rider@moboexpress.com/rider123 (rider). Confirmed working.",
+  "seed_data_creation": "Tests create TEST_* prefixed orders and several test_rider_* users via /api/auth/register. No teardown implemented (data accumulates in test_database). Add a cleanup fixture for next iteration if needed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test file at /app/backend/tests/test_moboexpress_api.py covers all critical paths. Run: cd /app && pytest backend/tests/test_moboexpress_api.py -v. Frontend Playwright sequence: login -> fill order form (Tanger/Morocco/cod_cash) -> select rider from assign-select-<code> -> click advance-<code> 3x -> verify /contabilidad shows 'Pedido ORD-...' in movements table. Backend uses Bearer token in Authorization header (also sets httpOnly cookies). WS at wss://<host>/api/ws?token=<access_token>. DB_NAME=test_database. Google Maps key intentionally empty (LiveMap shows dev fallback, not a bug).",
+  "rca of the issue": "No bugs found. The single test failure on first run was a test-side issue (uppercase TEST_ prefix vs backend lowercasing email). Fixed in test; all 15 backend tests now pass and frontend e2e is fully green."
+}

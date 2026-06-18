@@ -18,13 +18,18 @@ from fpdf import FPDF
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# Shared MongoDB connection
+from database import db, client
+
+# Feature routers
+from auth import router as auth_router, seed_admin, ensure_indexes
+from orders import router as orders_router
+from assignments import router as assignments_router
+from riders import router as riders_router
+from realtime import ws_router
 
 # Create the main app without a prefix
-app = FastAPI(title="MoboExpress - Cierre de Caja")
+app = FastAPI(title="MoboExpress - Cierre de Caja & Delivery")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -58,6 +63,8 @@ class Movement(BaseModel):
     concept: str
     amount: float
     method: str = "efectivo"
+    currency: Optional[str] = None
+    order_id: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -509,6 +516,11 @@ async def seed_demo(date: Optional[str] = Query(default=None)):
 
 # Include the router in the main app
 app.include_router(api_router)
+app.include_router(auth_router)
+app.include_router(orders_router)
+app.include_router(assignments_router)
+app.include_router(riders_router)
+app.include_router(ws_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -523,6 +535,13 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def startup_event():
+    await ensure_indexes()
+    await seed_admin()
+    logger.info("MoboExpress backend ready: auth, orders, assignments, riders, realtime")
 
 
 @app.on_event("shutdown")
