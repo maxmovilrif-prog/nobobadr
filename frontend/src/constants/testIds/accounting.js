@@ -18,4 +18,12 @@ export const ACCOUNTING = {
         movType: 'accounting-mov-type',
         movMethod: 'accounting-mov-method',
         movAddBtn: 'accounting-mov-add-btn',
+        efectivoEsperado: 'accounting-efectivo-esperado',
+        cashCountSection: 'accounting-cash-count-section',
+        cashCountQty: 'accounting-cash-count-qty',
+        cashCountTotal: 'accounting-cash-count-total',
+        cashCountSaveBtn: 'accounting-cash-count-save-btn',
+        cashCountClearBtn: 'accounting-cash-count-clear-btn',
+        reconciliationBanner: 'accounting-reconciliation-banner',
+        reconciliationDiff: 'accounting-reconciliation-diff',
 };

@@ -66,18 +66,65 @@ class OpeningCreate(BaseModel):
     saldo_inicial: float = Field(..., ge=0)
 
 
+class CashCountSave(BaseModel):
+    date: str
+    counts: dict = Field(default_factory=dict, description="Mapa denominacion->cantidad, ej {'500': 2}")
+
+
+class Reconciliation(BaseModel):
+    efectivo_esperado: float
+    total_contado: float
+    diferencia: float
+    estado: Literal["cuadra", "faltante", "sobrante"]
+    counts: dict
+    desglose: List[dict]
+
+
 class CashClosingSummary(BaseModel):
     date: str
     saldo_inicial: float
     total_entradas: float
     total_salidas: float
     saldo_final_esperado: float
+    efectivo_esperado: float
     movimientos: List[Movement]
+    reconciliation: Optional[Reconciliation] = None
+
+
+# Denominaciones MXN (billetes y monedas)
+DENOMINATIONS = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5]
 
 
 # ----------------------------- Helpers -----------------------------
 def _today() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _build_reconciliation(efectivo_esperado: float, counts: dict) -> Reconciliation:
+    desglose = []
+    total = 0.0
+    for denom in DENOMINATIONS:
+        key = str(denom)
+        qty = int(counts.get(key, 0) or 0)
+        subtotal = round(denom * qty, 2)
+        total += subtotal
+        desglose.append({"denominacion": denom, "cantidad": qty, "subtotal": round(subtotal, 2)})
+    total = round(total, 2)
+    diferencia = round(total - efectivo_esperado, 2)
+    if abs(diferencia) < 0.005:
+        estado = "cuadra"
+    elif diferencia < 0:
+        estado = "faltante"
+    else:
+        estado = "sobrante"
+    return Reconciliation(
+        efectivo_esperado=round(efectivo_esperado, 2),
+        total_contado=total,
+        diferencia=diferencia,
+        estado=estado,
+        counts={str(d): int(counts.get(str(d), 0) or 0) for d in DENOMINATIONS},
+        desglose=desglose,
+    )
 
 
 async def _build_summary(target_date: str) -> CashClosingSummary:
@@ -92,13 +139,25 @@ async def _build_summary(target_date: str) -> CashClosingSummary:
     total_salidas = sum(m.amount for m in movimientos if m.type == "salida")
     saldo_final = saldo_inicial + total_entradas - total_salidas
 
+    # Efectivo esperado en caja: solo movimientos en efectivo + fondo inicial
+    efectivo_entradas = sum(m.amount for m in movimientos if m.type == "entrada" and m.method == "efectivo")
+    efectivo_salidas = sum(m.amount for m in movimientos if m.type == "salida" and m.method == "efectivo")
+    efectivo_esperado = saldo_inicial + efectivo_entradas - efectivo_salidas
+
+    reconciliation = None
+    count_doc = await db.cash_counts.find_one({"date": target_date}, {"_id": 0})
+    if count_doc and count_doc.get("counts"):
+        reconciliation = _build_reconciliation(efectivo_esperado, count_doc["counts"])
+
     return CashClosingSummary(
         date=target_date,
         saldo_inicial=round(saldo_inicial, 2),
         total_entradas=round(total_entradas, 2),
         total_salidas=round(total_salidas, 2),
         saldo_final_esperado=round(saldo_final, 2),
+        efectivo_esperado=round(efectivo_esperado, 2),
         movimientos=movimientos,
+        reconciliation=reconciliation,
     )
 
 
@@ -158,6 +217,23 @@ async def delete_movement(movement_id: str):
     return {"deleted": True, "id": movement_id}
 
 
+@api_router.get("/accounting/denominations")
+async def get_denominations():
+    return {"denominations": DENOMINATIONS}
+
+
+@api_router.post("/accounting/cash-count", response_model=CashClosingSummary)
+async def save_cash_count(payload: CashCountSave):
+    clean = {str(d): int(payload.counts.get(str(d), 0) or 0) for d in DENOMINATIONS}
+    await db.cash_counts.update_one(
+        {"date": payload.date},
+        {"$set": {"date": payload.date, "counts": clean,
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return await _build_summary(payload.date)
+
+
 @api_router.get("/accounting/cash-closing", response_model=CashClosingSummary)
 async def cash_closing(date: Optional[str] = Query(default=None)):
     target = date or _today()
@@ -183,6 +259,18 @@ async def export_cash_closing(
         writer.writerow(["Total entradas", f"{summary.total_entradas:.2f}"])
         writer.writerow(["Total salidas", f"{summary.total_salidas:.2f}"])
         writer.writerow(["Saldo final esperado", f"{summary.saldo_final_esperado:.2f}"])
+        writer.writerow(["Efectivo esperado en caja", f"{summary.efectivo_esperado:.2f}"])
+        if summary.reconciliation:
+            r = summary.reconciliation
+            writer.writerow([])
+            writer.writerow(["Conteo de efectivo fisico"])
+            writer.writerow(["Denominacion", "Cantidad", "Subtotal"])
+            for d in r.desglose:
+                if d["cantidad"]:
+                    writer.writerow([f"{d['denominacion']:.2f}", d["cantidad"], f"{d['subtotal']:.2f}"])
+            writer.writerow(["Total contado", "", f"{r.total_contado:.2f}"])
+            writer.writerow(["Diferencia", "", f"{r.diferencia:.2f}"])
+            writer.writerow(["Estado", "", r.estado.upper()])
         writer.writerow([])
         writer.writerow(["Hora", "Tipo", "Concepto", "Método", "Monto"])
         for m in summary.movimientos:
@@ -223,7 +311,34 @@ async def export_cash_closing(
     kv_row("Total entradas", summary.total_entradas, color=(22, 130, 70))
     kv_row("Total salidas", summary.total_salidas, color=(190, 40, 40))
     kv_row("Saldo final esperado", summary.saldo_final_esperado, bold=True)
+    kv_row("Efectivo esperado en caja", summary.efectivo_esperado)
     pdf.ln(5)
+
+    if summary.reconciliation:
+        r = summary.reconciliation
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 9, "Conteo de efectivo fisico", border=0, fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(60, 7, "Denominacion", border="B")
+        pdf.cell(40, 7, "Cantidad", border="B", align="R")
+        pdf.cell(0, 7, "Subtotal", border="B", align="R", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
+        for d in r.desglose:
+            if not d["cantidad"]:
+                continue
+            pdf.cell(60, 7, f"{d['denominacion']:,.2f}", border="B")
+            pdf.cell(40, 7, str(d["cantidad"]), border="B", align="R")
+            pdf.cell(0, 7, f"{d['subtotal']:,.2f}", border="B", align="R", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+        kv_row("Total contado", r.total_contado, bold=True)
+        estado_color = {"cuadra": (22, 130, 70), "faltante": (190, 40, 40), "sobrante": (200, 130, 0)}[r.estado]
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(*estado_color)
+        pdf.cell(120, 8, f"Diferencia ({r.estado.upper()})")
+        pdf.cell(0, 8, f"{r.diferencia:,.2f}", align="R", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
 
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 9, "Detalle de movimientos", border=0, fill=True, new_x="LMARGIN", new_y="NEXT")
@@ -267,6 +382,7 @@ async def seed_demo(date: Optional[str] = Query(default=None)):
     target = date or _today()
     await db.cash_openings.delete_many({"date": target})
     await db.cash_movements.delete_many({"date": target})
+    await db.cash_counts.delete_many({"date": target})
 
     await db.cash_openings.insert_one({"date": target, "saldo_inicial": 500.0})
     demo = [

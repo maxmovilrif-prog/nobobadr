@@ -34,3 +34,11 @@ Se implementó el feature completo (backend + frontend) en la rama `main`.
 - P1: Autenticación por usuario (cajero) y auditoría.
 - P2: Historial de cierres por rango de fechas y gráficas.
 - P2: Cierre "bloqueado" (no editable tras confirmar).
+
+## Update 2026-06-18 — Conteo de efectivo físico
+- Nuevo: captura manual de billetes y monedas (denominaciones MXN: 1000..0.50).
+- Cálculo automático: total contado vs efectivo_esperado (solo movimientos en efectivo + fondo inicial).
+- Estado: cuadra / faltante / sobrante con diferencia y banner visual.
+- Persistencia en colección cash_counts; incluido en export CSV y PDF.
+- Endpoints: POST /api/accounting/cash-count, GET /api/accounting/denominations.
+- Verificado end-to-end: cuadre exacto (dif 0.0), sobrante y faltante; exports 200.
