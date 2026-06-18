@@ -45,6 +45,13 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - ✅ 82/82 pytest + frontend e2e 100% (iteration_8.json). Tests nuevos: `test_finances_accounting.py`, `test_auto_assign.py`, `test_login_lockout_security.py`.
 - **Mejoras finales (2026-06-18)**: (a) **Doble QR** en la hoja de activación del rider — QR 1 descarga la app (PWA `/rider`) + QR 2 activación; onboarding en 2 escaneos. (b) **Selector de periodo** en `AccountingManager` (Desde/Hasta + presets Hoy/Semana/Mes/Todo) que filtra resumen, nóminas, libro y todos los exports (CSV/PDF). Filtrado por fecha verificado en backend.
 
+## Segregación de roles / RBAC (2026-06-18) ✅
+- 3 niveles: **Fundador** (`admin`) acceso total · **Gestor** (`manager`) solo Operaciones + tarifas · **Rider** (`driver`) app aislada.
+- Backend: nueva dependencia `get_current_manager_or_admin` (core.py). Operaciones (ops/orders, assign-nearest, nearest, return-to-queue, assignment-history, stats, active-drivers) permiten admin+manager. Finanzas/KPIs/Contabilidad/alta-Riders quedan **solo Fundador** (`get_current_admin`).
+- Endpoints Fundador para gestionar Gestores: `POST/GET /api/admin/managers`, `DELETE /api/admin/managers/{id}` (email+password bcrypt, sin sembrado por script).
+- Frontend: `AdminDashboard` renderiza condicional por `isFounder`. Gestor ve "Panel de Gestión" (stats + flota + Operaciones); KPIs/Contabilidad/Ciudades/Riders/Telegram/Gestores ocultos. Nuevo `ManagerManager.jsx` (tarjeta del Fundador). App.js permite rol `manager` en `/admin` y `/dashboard`.
+- ✅ 99/99 pytest (incl. `test_rbac_roles.py`, 15 casos) + verificación visual de ambas vistas (Fundador vs Gestor).
+
 ## Cuadro de mandos (KPIs) del Fundador (2026-06-18) ✅
 - Backend `GET /api/admin/kpis` (admin): pedidos hoy, serie de pedidos/entregas por día (7d), ingresos del mes (EUR, convierte MAD), entregas totales, **tiempo medio de entrega** (creación→entrega) y **ranking de Abejas más activas (30d)** con entregas e ingresos generados.
 - Frontend `KpiDashboard.jsx` en la portada del AdminDashboard: 4 tarjetas KPI, gráfico de barras de 7 días (entregados vs totales) y ranking con medallas. Auto-refresco cada 30s.

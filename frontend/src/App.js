@@ -85,11 +85,11 @@ function App() {
             user ? (
               user.role === 'customer' ? <CustomerDashboard /> :
               user.role === 'driver' ? <DriverDashboard /> :
-              user.role === 'admin' ? <AdminDashboard /> :
+              (user.role === 'admin' || user.role === 'manager') ? <AdminDashboard /> :
               <BusinessDashboard />
             ) : <Navigate to="/auth" />
           } />
-          <Route path="/admin" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/auth" />} />
+          <Route path="/admin" element={user && (user.role === 'admin' || user.role === 'manager') ? <AdminDashboard /> : <Navigate to="/auth" />} />
           <Route path="/presupuesto" element={<DeliveryQuote />} />
           <Route path="/rider" element={<RiderApp />} />
           <Route path="/track" element={<PublicTracking />} />

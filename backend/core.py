@@ -114,7 +114,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 async def get_current_admin(current_user: dict = Depends(get_current_user)):
     if current_user.get('role') != 'admin':
-        raise HTTPException(status_code=403, detail="Acceso solo para administradores")
+        raise HTTPException(status_code=403, detail="Acceso solo para el Fundador")
+    return current_user
+
+
+async def get_current_manager_or_admin(current_user: dict = Depends(get_current_user)):
+    """Permite acceso al Fundador (admin) y al equipo de Gestión (manager).
+    Para endpoints operativos (despacho, cola de pedidos, tarifas), NO financieros."""
+    if current_user.get('role') not in ('admin', 'manager'):
+        raise HTTPException(status_code=403, detail="Acceso solo para Fundador o Gestores")
     return current_user
 
 

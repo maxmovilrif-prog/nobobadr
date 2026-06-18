@@ -2,7 +2,14 @@
 
 ## QA accounts (created by agent, known passwords)
 - Customer: `qa_customer@nubo.com` / `Test1234!`
-- Admin: `admin@nubo.com` / `Admin1234!`  (role: admin, fleet dashboard at /admin)
+- Admin (Fundador): `admin@nubo.com` / `Admin1234!`  (role: admin → acceso TOTAL: KPIs, Contabilidad, Operaciones, Riders, Gestores)
+
+## Roles / RBAC (segregación)
+- `admin` (Fundador): acceso total al panel `/admin`.
+- `manager` (Gestor): login normal en `/auth` → `/admin` muestra SOLO Operaciones + flota + tarifas. Bloqueado (403) en KPIs, Contabilidad, alta de Riders y gestión de Gestores.
+  - Los Gestores los crea el Fundador desde el panel (tarjeta "Equipo de Gestión") con email+password. NO hay gestores sembrados por script (se limpian tras los tests).
+  - Para tests de RBAC se crean gestores efímeros vía `POST /api/admin/managers` (ver `tests/test_rbac_roles.py`).
+- `driver` (Rider): app aislada `/rider`, entra por código/QR (sin password).
 
 ## Notes
 - Other seeded accounts exist (cliente1@test.com, restaurante@test.com, repartidor@test.com, etc.) but their passwords are unknown.

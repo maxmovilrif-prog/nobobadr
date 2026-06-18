@@ -11,6 +11,7 @@ import RiderManager from '@/components/RiderManager';
 import OperationsManager from '@/components/OperationsManager';
 import AccountingManager from '@/components/AccountingManager';
 import KpiDashboard from '@/components/KpiDashboard';
+import ManagerManager from '@/components/ManagerManager';
 import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
@@ -40,6 +41,7 @@ const StatCard = ({ icon: Icon, label, value, color, testid }) => (
 
 export default function AdminDashboard() {
   const { user, token, logout, API } = useContext(AuthContext);
+  const isFounder = user?.role === 'admin';
   const [stats, setStats] = useState(null);
   const [fleet, setFleet] = useState({ count: 0, live_count: 0, available_count: 0, idle_count: 0, drivers: [] });
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -144,13 +146,14 @@ export default function AdminDashboard() {
     return () => clearInterval(intervalRef.current);
   }, []);
 
-  // Telegram config status
+  // Telegram config status (solo Fundador)
   useEffect(() => {
+    if (!isFounder) return;
     const headers = { Authorization: `Bearer ${token}` };
     axios.get(`${API}/admin/telegram/status`, { headers })
       .then(r => setTelegramConfigured(r.data.configured))
       .catch(() => setTelegramConfigured(false));
-  }, [API, token]);
+  }, [API, token, isFounder]);
 
   const testTelegram = async () => {
     setTelegramTesting(true);
@@ -183,8 +186,8 @@ export default function AdminDashboard() {
               <RadioTower className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Nubo Admin</h1>
-              <p className="text-sm text-gray-600">Panel de Control · {user?.name}</p>
+              <h1 className="text-xl font-bold text-gray-900">Nubo {isFounder ? 'Admin' : 'Operaciones'}</h1>
+              <p className="text-sm text-gray-600">{isFounder ? 'Panel del Fundador' : 'Panel de Gestión'} · {user?.name}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -209,10 +212,12 @@ export default function AdminDashboard() {
           <StatCard testid="stat-delivered" icon={CheckCircle2} label="Entregados" value={stats?.delivered ?? '—'} color="bg-blue-500" />
         </div>
 
-        {/* Cuadro de mandos (KPIs) del Fundador */}
-        <div className="mb-8">
-          <KpiDashboard API={API} token={token} />
-        </div>
+        {/* Cuadro de mandos (KPIs) — solo Fundador */}
+        {isFounder && (
+          <div className="mb-8">
+            <KpiDashboard API={API} token={token} />
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Map */}
@@ -280,7 +285,8 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
 
-            {/* Telegram alerts config */}
+            {/* Telegram alerts config — solo Fundador */}
+            {isFounder && (
             <Card data-testid="admin-telegram" className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -314,6 +320,7 @@ export default function AdminDashboard() {
                 )}
               </CardContent>
             </Card>
+            )}
 
             <Card className="border-0 shadow-lg">
               <CardHeader>
@@ -354,14 +361,22 @@ export default function AdminDashboard() {
         {/* Operaciones y Logística (Bloque C): despacho por proximidad + historial */}
         <OperationsManager API={API} token={token} />
 
-        {/* Contabilidad y Finanzas (Bloque D): caja, nóminas y libro contable */}
-        <AccountingManager API={API} token={token} />
+        {/* Secciones exclusivas del Fundador (CEO): finanzas, zonas, riders, gestores */}
+        {isFounder && (
+          <>
+            {/* Contabilidad y Finanzas (Bloque D): caja, nóminas y libro contable */}
+            <AccountingManager API={API} token={token} />
 
-        {/* Gestión de zonas operativas (ciudades) */}
-        <CityManager API={API} token={token} />
+            {/* Gestión de zonas operativas (ciudades) */}
+            <CityManager API={API} token={token} />
 
-        {/* Gestión de conductores (Riders) + códigos QR */}
-        <RiderManager API={API} token={token} />
+            {/* Gestión de Riders (Abejas) */}
+            <RiderManager API={API} token={token} />
+
+            {/* Equipo de Gestión (cuentas de Gestor) */}
+            <ManagerManager API={API} token={token} />
+          </>
+        )}
       </div>
     </div>
   );

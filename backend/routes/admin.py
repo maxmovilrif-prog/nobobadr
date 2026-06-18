@@ -1,13 +1,73 @@
 """Rutas de administración: tracking de flota y estadísticas."""
+import uuid
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr, Field
 
-from core import db, manager, get_current_admin
+from core import db, manager, get_current_admin, get_current_manager_or_admin, hash_password
 from accounting import ACCT_MAD_TO_EUR
 import telegram_alerts
 
 router = APIRouter()
+
+
+# =========================
+# GESTIÓN DE CUENTAS DE GESTOR (solo Fundador)
+# =========================
+
+class ManagerCreate(BaseModel):
+    name: str = Field(min_length=2)
+    email: EmailStr
+    password: str = Field(min_length=6)
+
+
+def _public_manager(u: dict) -> dict:
+    return {
+        'id': u['id'], 'name': u.get('name'), 'email': u.get('email'),
+        'role': u.get('role'), 'is_active': u.get('is_active', True),
+        'created_at': u.get('created_at'),
+    }
+
+
+@router.post("/admin/managers")
+async def create_manager(payload: ManagerCreate, current_user: dict = Depends(get_current_admin)):
+    """El Fundador crea una cuenta de Gestor (acceso solo a Operaciones)."""
+    email = payload.email.strip().lower()
+    existing = await db.users.find_one({'email': email}, {'_id': 0, 'id': 1})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
+    doc = {
+        'id': str(uuid.uuid4()),
+        'name': payload.name.strip(),
+        'email': email,
+        'role': 'manager',
+        'password_hash': hash_password(payload.password),
+        'is_active': True,
+        'created_by': current_user.get('id'),
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'is_available': False,
+        'vehicle_type': None,
+        'current_location': None,
+    }
+    await db.users.insert_one(doc)
+    return _public_manager(doc)
+
+
+@router.get("/admin/managers")
+async def list_managers(current_user: dict = Depends(get_current_admin)):
+    """Lista las cuentas de Gestor (solo Fundador)."""
+    rows = await db.users.find({'role': 'manager'}, {'_id': 0}).sort('created_at', -1).to_list(500)
+    return {'count': len(rows), 'managers': [_public_manager(u) for u in rows]}
+
+
+@router.delete("/admin/managers/{manager_id}")
+async def delete_manager(manager_id: str, current_user: dict = Depends(get_current_admin)):
+    """Elimina una cuenta de Gestor (solo Fundador)."""
+    res = await db.users.delete_one({'id': manager_id, 'role': 'manager'})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Gestor no encontrado")
+    return {'message': 'Gestor eliminado', 'id': manager_id}
 
 IDLE_THRESHOLD_SECONDS = 90
 
@@ -30,7 +90,7 @@ def _parse_iso(v):
 
 
 @router.get("/admin/active-drivers")
-async def admin_active_drivers(current_user: dict = Depends(get_current_admin)):
+async def admin_active_drivers(current_user: dict = Depends(get_current_manager_or_admin)):
     """
     Devuelve todas las 'Abejas' (conductores) activas en tiempo real.
     Combina las ubicaciones en vivo (WebSocket) con los conductores disponibles.
@@ -99,7 +159,7 @@ async def admin_active_drivers(current_user: dict = Depends(get_current_admin)):
 
 
 @router.get("/admin/stats")
-async def admin_stats(current_user: dict = Depends(get_current_admin)):
+async def admin_stats(current_user: dict = Depends(get_current_manager_or_admin)):
     total_orders = await db.orders.count_documents({})
     in_transit = await db.orders.count_documents({'status': 'in_transit'})
     delivered = await db.orders.count_documents({'status': 'delivered'})

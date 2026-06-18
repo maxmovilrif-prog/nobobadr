@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Response
 from pydantic import BaseModel
 
-from core import db, get_current_user, get_current_admin
+from core import db, get_current_user, get_current_admin, get_current_manager_or_admin
 from assignments import (
     atomic_claim_nearest, release_driver, log_assignment, history_query,
 )
@@ -19,7 +19,7 @@ router = APIRouter()
 async def nearest_drivers(lat: float, lng: float, max_km: Optional[float] = None,
                           limit: int = 5, current_user: dict = Depends(get_current_user)):
     """Repartidores disponibles más cercanos a un punto, ordenados por distancia (admin/business)."""
-    if current_user['role'] not in ('admin', 'business'):
+    if current_user['role'] not in ('admin', 'manager', 'business'):
         raise HTTPException(status_code=403, detail="Admin or business access required")
     geo_near = {
         'near': {'type': 'Point', 'coordinates': [lng, lat]},
@@ -59,7 +59,7 @@ async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
 
     Si no se indican lat/lng, usa el origen del pedido exprés o el centro de su ciudad.
     """
-    if current_user['role'] not in ('admin', 'business'):
+    if current_user['role'] not in ('admin', 'manager', 'business'):
         raise HTTPException(status_code=403, detail="Admin or business access required")
 
     order = await db.orders.find_one({'id': order_id}, {'_id': 0})
@@ -100,7 +100,7 @@ async def assign_nearest_driver(order_id: str, req: AssignNearestRequest,
 @router.post("/orders/{order_id}/return-to-queue")
 async def return_order_to_queue(order_id: str, current_user: dict = Depends(get_current_user)):
     """Devuelve manualmente un pedido asignado a la cola (admin/business)."""
-    if current_user['role'] not in ('admin', 'business'):
+    if current_user['role'] not in ('admin', 'manager', 'business'):
         raise HTTPException(status_code=403, detail="Admin or business access required")
     order = await db.orders.find_one({'id': order_id}, {'_id': 0})
     if not order:
@@ -120,7 +120,7 @@ async def return_order_to_queue(order_id: str, current_user: dict = Depends(get_
 
 
 @router.get("/admin/ops/orders")
-async def ops_orders(current_user: dict = Depends(get_current_admin)):
+async def ops_orders(current_user: dict = Depends(get_current_manager_or_admin)):
     """Cola de operaciones (admin): pedidos pendientes sin Abeja y pedidos activos asignados."""
     pending = await db.orders.find(
         {'driver_id': None, 'status': {'$in': ['pending', 'assigned']}},
@@ -175,9 +175,9 @@ async def get_assignment_history(
     driver_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_manager_or_admin),
 ):
-    """Historial de asignaciones para trazabilidad total (admin). Soporta filtros."""
+    """Historial de asignaciones para trazabilidad total (Fundador/Gestor). Soporta filtros."""
     query = history_query(action, driver_id, date_from, date_to)
     events = await db.assignment_history.find(query, {'_id': 0}).sort('created_at', -1).to_list(max(1, min(limit, 500)))
     raw = await db.assignment_history.find({}, {'_id': 0, 'driver_id': 1, 'driver_name': 1}).to_list(2000)
