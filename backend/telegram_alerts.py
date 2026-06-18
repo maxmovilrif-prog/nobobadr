@@ -21,14 +21,15 @@ def is_configured() -> bool:
     return bool(core.TELEGRAM_BOT_TOKEN and core.TELEGRAM_ADMIN_CHAT_ID)
 
 
-async def send_telegram_message(text: str) -> bool:
-    """Envía un mensaje al chat del administrador. No-op si no está configurado."""
-    if not is_configured():
+async def send_telegram_message(text: str, chat_id=None) -> bool:
+    """Envía un mensaje. Usa chat_id explícito o el del admin (.env). No-op si falta token/destino."""
+    target = chat_id or core.TELEGRAM_ADMIN_CHAT_ID
+    if not core.TELEGRAM_BOT_TOKEN or not target:
         logger.info("Telegram no configurado; se omite el envío de alerta.")
         return False
     url = f"https://api.telegram.org/bot{core.TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": core.TELEGRAM_ADMIN_CHAT_ID,
+        "chat_id": target,
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
@@ -107,25 +108,89 @@ async def idle_monitor_loop() -> None:
 
 
 async def get_recent_chats() -> list:
-    """Lee getUpdates para ayudar al admin a encontrar su chat_id tras escribir al bot."""
-    if not core.TELEGRAM_BOT_TOKEN:
-        return []
-    url = f"https://api.telegram.org/bot{core.TELEGRAM_BOT_TOKEN}/getUpdates"
-    try:
-        async with httpx.AsyncClient(timeout=10) as http:
-            resp = await http.get(url)
-            data = resp.json()
-            chats = {}
+    """Devuelve los chats que han escrito al bot (capturados por el listener de comandos)."""
+    return list(_seen_chats.values())
+
+
+_seen_chats: dict = {}
+
+
+async def build_fleet_summary() -> str:
+    """Construye un resumen de la flota para el comando /flota."""
+    now = datetime.now(timezone.utc)
+    in_transit = await core.db.orders.count_documents({'status': 'in_transit'})
+    pending = await core.db.orders.count_documents({'status': 'pending'})
+    available = await core.db.users.count_documents({'role': 'driver', 'is_available': True})
+    live = len(core.manager.driver_locations)
+    idle = 0
+    for loc in core.manager.driver_locations.values():
+        ts = loc.get("timestamp")
+        if not ts:
+            continue
+        try:
+            last_seen = datetime.fromisoformat(ts)
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            if int((now - last_seen).total_seconds()) > IDLE_THRESHOLD_SECONDS:
+                idle += 1
+        except (ValueError, TypeError):
+            pass
+    return (
+        "🐝 <b>Estado de la flota Nubo</b>\n"
+        f"📡 Abejas en vivo: {live}\n"
+        f"⚠️ Abejas paradas: {idle}\n"
+        f"✅ Conductores disponibles: {available}\n"
+        f"🚚 Pedidos en reparto: {in_transit}\n"
+        f"🕐 Pedidos pendientes: {pending}"
+    )
+
+
+_command_offset = 0
+
+
+async def command_listener_loop() -> None:
+    """Escucha comandos entrantes (/flota, /start, /help) vía long polling de getUpdates."""
+    global _command_offset
+    while True:
+        try:
+            if not core.TELEGRAM_BOT_TOKEN:
+                await asyncio.sleep(5)
+                continue
+            url = f"https://api.telegram.org/bot{core.TELEGRAM_BOT_TOKEN}/getUpdates"
+            params = {"timeout": 25, "offset": _command_offset}
+            async with httpx.AsyncClient(timeout=35) as http:
+                resp = await http.get(url, params=params)
+                data = resp.json()
+            if not data.get("ok"):
+                await asyncio.sleep(5)
+                continue
             for upd in data.get("result", []):
+                _command_offset = upd["update_id"] + 1
                 msg = upd.get("message") or upd.get("edited_message") or {}
-                chat = msg.get("chat")
-                if chat:
-                    chats[chat["id"]] = {
-                        "chat_id": chat["id"],
-                        "name": chat.get("first_name") or chat.get("title") or "",
-                        "username": chat.get("username", ""),
-                    }
-            return list(chats.values())
-    except Exception as e:
-        logger.error(f"get_recent_chats error: {e}")
-        return []
+                text = (msg.get("text") or "").strip().lower()
+                chat = msg.get("chat") or {}
+                chat_id = chat.get("id")
+                if not chat_id or not text:
+                    continue
+                _seen_chats[chat_id] = {
+                    "chat_id": chat_id,
+                    "name": chat.get("first_name") or chat.get("title") or "",
+                    "username": chat.get("username", ""),
+                }
+                if text.startswith("/flota"):
+                    await send_telegram_message(await build_fleet_summary(), chat_id=chat_id)
+                elif text.startswith("/start") or text.startswith("/help"):
+                    await send_telegram_message(
+                        "👋 <b>Bot de alertas de Nubo</b>\n"
+                        f"Tu chat_id es: <code>{chat_id}</code>\n\n"
+                        "Comandos disponibles:\n"
+                        "/flota — resumen de Abejas y pedidos\n"
+                        "/help — esta ayuda\n\n"
+                        "Recibirás avisos de pedidos nuevos y Abejas paradas.",
+                        chat_id=chat_id,
+                    )
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"command_listener_loop error: {e}")
+            await asyncio.sleep(5)

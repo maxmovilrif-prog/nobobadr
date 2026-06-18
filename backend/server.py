@@ -75,14 +75,16 @@ import asyncio
 
 @app.on_event("startup")
 async def start_background_tasks():
-    """Arranca el monitor de Abejas paradas (alertas Telegram con panel cerrado)."""
+    """Arranca el monitor de Abejas paradas y el listener de comandos de Telegram."""
     app.state.idle_monitor_task = asyncio.create_task(telegram_alerts.idle_monitor_loop())
-    logger.info("Idle monitor task started")
+    app.state.telegram_listener_task = asyncio.create_task(telegram_alerts.command_listener_loop())
+    logger.info("Background tasks started (idle monitor + telegram listener)")
 
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    task = getattr(app.state, "idle_monitor_task", None)
-    if task:
-        task.cancel()
+    for attr in ("idle_monitor_task", "telegram_listener_task"):
+        task = getattr(app.state, attr, None)
+        if task:
+            task.cancel()
     client.close()
