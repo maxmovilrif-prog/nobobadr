@@ -16,10 +16,12 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - Contacto global: exprenobo@hotmail.com / +34 654 24 20 92.
 
 ## Implementado en esta sesión (2026-06-18)
-- **Búsqueda con IA (lenguaje natural)** — `POST /api/search/smart`. Interpreta consultas como "tengo hambre" con `gpt-5.4-mini` (Emergent LLM Key) y devuelve negocios + productos relevantes. UI en CustomerDashboard (tab Negocios). ✅ Testeado (10/10 backend, frontend OK).
-- **Panel de Admin con Mapa de Flota en tiempo real** — `AdminDashboard.js`, ruta `/admin` y redirección por rol admin desde `/dashboard`. Endpoints `GET /api/admin/active-drivers` y `GET /api/admin/stats` (protegidos, solo rol admin → 403 si no). Muestra estadísticas, lista de "Abejas" activas y mapa con marcadores verdes. ✅ Testeado.
+- **Búsqueda con IA (lenguaje natural)** — `POST /api/search/smart`. Interpreta consultas como "tengo hambre" con `gpt-5.4-mini` (Emergent LLM Key) y devuelve negocios + productos relevantes. UI en CustomerDashboard (tab Negocios). ✅ Testeado.
+- **Panel de Admin con Mapa de Flota en tiempo real** — `AdminDashboard.js`, ruta `/admin` y redirección por rol admin desde `/dashboard`. Endpoints `GET /api/admin/active-drivers` y `GET /api/admin/stats` (protegidos, solo rol admin → 403). ✅ Testeado.
 - Guard de seguridad: `POST /api/auth/register` rechaza rol `admin` (400).
 - Cuenta admin sembrada: `admin@nubo.com / Admin1234!` (script `/app/backend/seed_admin.py`).
+- **Alertas en tiempo real (Admin)** — sonido (Web Audio API, sin assets) + toast + feed "Alertas recientes". Detecta: pedido nuevo (incremento de pedidos) y "Abeja parada" (backend marca `idle`/`idle_seconds` si una Abeja en vivo no envía señal en >90s; `idle_count` en la respuesta). Botón "Activar alertas". ✅ Testeado (pedido nuevo end-to-end).
+- **Modularización de `server.py`** (1178 → 74 líneas): `core.py` (db, config, auth, ConnectionManager), `models.py`, y `routes/` (auth, businesses, search, orders, drivers, messages, payments, dropshipping, affiliate, tracking, admin). Sin cambios en contratos de API. ✅ 32/32 pytest, sin regresiones.
 
 ## Pendiente / Backlog
 - **P0/Infra**: Dominio personalizado **nuboexpress.com** (bloqueado, requiere acción del usuario en UI de Emergent o soporte). Contraseña "Emergent Code Server" ($PASSWORD vacío en entorno — es tema de plataforma).
