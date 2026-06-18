@@ -10,6 +10,7 @@ import CityManager from '@/components/CityManager';
 import RiderManager from '@/components/RiderManager';
 import OperationsManager from '@/components/OperationsManager';
 import AccountingManager from '@/components/AccountingManager';
+import KpiDashboard from '@/components/KpiDashboard';
 import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
@@ -206,6 +207,11 @@ export default function AdminDashboard() {
           <StatCard testid="stat-live-drivers" icon={Activity} label="Abejas en vivo" value={fleet.live_count} color="bg-emerald-500" />
           <StatCard testid="stat-available-drivers" icon={Users} label="Conductores disponibles" value={stats?.available_drivers ?? '—'} color="bg-teal-500" />
           <StatCard testid="stat-delivered" icon={CheckCircle2} label="Entregados" value={stats?.delivered ?? '—'} color="bg-blue-500" />
+        </div>
+
+        {/* Cuadro de mandos (KPIs) del Fundador */}
+        <div className="mb-8">
+          <KpiDashboard API={API} token={token} />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">

@@ -1,14 +1,32 @@
 """Rutas de administración: tracking de flota y estadísticas."""
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends
 
 from core import db, manager, get_current_admin
+from accounting import ACCT_MAD_TO_EUR
 import telegram_alerts
 
 router = APIRouter()
 
 IDLE_THRESHOLD_SECONDS = 90
+
+
+def _to_eur(amount, currency):
+    amount = float(amount or 0)
+    return round(amount * ACCT_MAD_TO_EUR, 2) if currency == 'MAD' else round(amount, 2)
+
+
+def _parse_iso(v):
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    try:
+        d = datetime.fromisoformat(v)
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
 
 
 @router.get("/admin/active-drivers")
@@ -96,6 +114,83 @@ async def admin_stats(current_user: dict = Depends(get_current_admin)):
         "available_drivers": available_drivers,
         "total_businesses": total_businesses,
         "live_drivers": len(manager.driver_locations),
+    }
+
+
+@router.get("/admin/kpis")
+async def admin_kpis(current_user: dict = Depends(get_current_admin)):
+    """Cuadro de mandos del Fundador: pedidos/día (7d), ingresos del mes,
+    tiempo medio de entrega y ranking de Abejas más activas (30d)."""
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    month_start = today.replace(day=1)
+    last_30 = now - timedelta(days=30)
+
+    orders = await db.orders.find(
+        {}, {'_id': 0, 'status': 1, 'total_amount': 1, 'currency': 1,
+             'created_at': 1, 'delivered_at': 1, 'driver_id': 1}
+    ).to_list(50000)
+
+    # Serie de pedidos por día (últimos 7 días)
+    days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
+    series = {d.isoformat(): {'date': d.isoformat(), 'orders': 0, 'delivered': 0} for d in days}
+    orders_today = 0
+    revenue_month_eur = 0.0
+    delivered_total = 0
+    delivery_durations = []
+    bees = {}
+
+    for o in orders:
+        created = _parse_iso(o.get('created_at'))
+        status = o.get('status')
+        if created:
+            ckey = created.date().isoformat()
+            if ckey in series:
+                series[ckey]['orders'] += 1
+            if created.date() == today:
+                orders_today += 1
+        if status == 'delivered':
+            delivered_total += 1
+            delivered = _parse_iso(o.get('delivered_at'))
+            # Ingresos del mes (pedidos entregados este mes)
+            eff = delivered or created
+            if eff and eff.date() >= month_start:
+                revenue_month_eur += _to_eur(o.get('total_amount'), o.get('currency'))
+            if delivered and delivered.date().isoformat() in series:
+                series[delivered.date().isoformat()]['delivered'] += 1
+            # Tiempo de entrega
+            if created and delivered and delivered > created:
+                mins = (delivered - created).total_seconds() / 60.0
+                if 0 < mins < 60 * 24 * 7:  # descarta valores absurdos
+                    delivery_durations.append(mins)
+            # Ranking de Abejas (últimos 30 días)
+            did = o.get('driver_id')
+            if did and (delivered or created) and (delivered or created) >= last_30:
+                b = bees.setdefault(did, {'driver_id': did, 'deliveries': 0, 'revenue_eur': 0.0})
+                b['deliveries'] += 1
+                b['revenue_eur'] = round(b['revenue_eur'] + _to_eur(o.get('total_amount'), o.get('currency')), 2)
+
+    # Nombres de las Abejas del ranking
+    top = sorted(bees.values(), key=lambda x: -x['deliveries'])[:5]
+    if top:
+        names = {}
+        async for u in db.users.find({'id': {'$in': [b['driver_id'] for b in top]}}, {'_id': 0, 'id': 1, 'name': 1, 'vehicle_type': 1}):
+            names[u['id']] = u
+        for b in top:
+            u = names.get(b['driver_id'], {})
+            b['driver_name'] = u.get('name', 'Abeja')
+            b['vehicle_type'] = u.get('vehicle_type')
+
+    avg_delivery = round(sum(delivery_durations) / len(delivery_durations), 1) if delivery_durations else None
+
+    return {
+        'orders_today': orders_today,
+        'orders_per_day': list(series.values()),
+        'revenue_month_eur': round(revenue_month_eur, 2),
+        'delivered_total': delivered_total,
+        'avg_delivery_mins': avg_delivery,
+        'top_bees': top,
+        'as_of': now.isoformat(),
     }
 
 

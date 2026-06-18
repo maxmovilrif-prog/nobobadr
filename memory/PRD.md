@@ -45,6 +45,11 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - ✅ 82/82 pytest + frontend e2e 100% (iteration_8.json). Tests nuevos: `test_finances_accounting.py`, `test_auto_assign.py`, `test_login_lockout_security.py`.
 - **Mejoras finales (2026-06-18)**: (a) **Doble QR** en la hoja de activación del rider — QR 1 descarga la app (PWA `/rider`) + QR 2 activación; onboarding en 2 escaneos. (b) **Selector de periodo** en `AccountingManager` (Desde/Hasta + presets Hoy/Semana/Mes/Todo) que filtra resumen, nóminas, libro y todos los exports (CSV/PDF). Filtrado por fecha verificado en backend.
 
+## Cuadro de mandos (KPIs) del Fundador (2026-06-18) ✅
+- Backend `GET /api/admin/kpis` (admin): pedidos hoy, serie de pedidos/entregas por día (7d), ingresos del mes (EUR, convierte MAD), entregas totales, **tiempo medio de entrega** (creación→entrega) y **ranking de Abejas más activas (30d)** con entregas e ingresos generados.
+- Frontend `KpiDashboard.jsx` en la portada del AdminDashboard: 4 tarjetas KPI, gráfico de barras de 7 días (entregados vs totales) y ranking con medallas. Auto-refresco cada 30s.
+- ✅ 84/84 pytest (`test_kpis.py`) + smoke e2e OK. Cierra la fase de desarrollo interno (Bloques A–D + KPIs).
+
 ## Bloque C — Operaciones y Logística + QR seguimiento (2026-06-18) ✅
 - **Asignación por proximidad** (`assignments.py` + `routes/assignments.py`): reclamo atómico del repartidor más cercano vía MongoDB `$geoNear` sobre índice **2dsphere** (`users.geo_location`, creado al arrancar), hasta 3 intentos anti condición de carrera, geofencing por ciudad (radio 10 km). `/rider/location` ahora guarda `geo_location` GeoJSON.
 - **Endpoints**: `GET /api/drivers/nearest`, `POST /api/orders/{id}/assign-nearest` (admin/business; si no pasas lat/lng usa origen exprés o centro de ciudad), `POST /api/orders/{id}/return-to-queue`, `GET /api/admin/ops/orders` (cola pendientes + activos), `GET /api/admin/assignment-history` (filtros action/driver/fecha) y `/export` CSV. Control de acceso: cliente 403, pedido inexistente 404.
