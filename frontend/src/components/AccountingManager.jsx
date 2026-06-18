@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
   Wallet, TrendingUp, TrendingDown, Banknote, Download, Loader2, ArrowDownCircle,
-  ArrowUpCircle, Receipt, Users, FileText, RefreshCw,
+  ArrowUpCircle, Receipt, Users, FileText, RefreshCw, CalendarRange,
 } from 'lucide-react';
 
 const eur = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n || 0);
@@ -31,19 +31,49 @@ export const AccountingManager = ({ API, token }) => {
   const [cashForm, setCashForm] = useState({ amount: '', currency: 'EUR', description: '' });
   const [busy, setBusy] = useState(false);
   const [payingId, setPayingId] = useState(null);
+  const [period, setPeriod] = useState({ from: '', to: '' });
+
+  const periodQS = () => {
+    const p = new URLSearchParams();
+    if (period.from) p.set('date_from', period.from);
+    if (period.to) p.set('date_to', period.to);
+    return p.toString();
+  };
+  // finanzas/nóminas usan start_date/end_date
+  const payrollQS = () => {
+    const p = new URLSearchParams();
+    if (period.from) p.set('start_date', period.from);
+    if (period.to) p.set('end_date', period.to);
+    return p.toString();
+  };
+
+  const applyPreset = (preset) => {
+    const today = new Date();
+    const iso = (d) => d.toISOString().slice(0, 10);
+    if (preset === 'today') setPeriod({ from: iso(today), to: iso(today) });
+    else if (preset === 'week') {
+      const d = new Date(today); d.setDate(d.getDate() - 6);
+      setPeriod({ from: iso(d), to: iso(today) });
+    } else if (preset === 'month') {
+      const d = new Date(today.getFullYear(), today.getMonth(), 1);
+      setPeriod({ from: iso(d), to: iso(today) });
+    } else setPeriod({ from: '', to: '' });
+  };
 
   const fetchAll = useCallback(async () => {
     try {
+      const pqs = periodQS();
+      const yqs = payrollQS();
       const [s, c, p, t] = await Promise.all([
-        axios.get(`${API}/accounting/transactions/summary`, auth),
+        axios.get(`${API}/accounting/transactions/summary?${pqs}`, auth),
         axios.get(`${API}/accounting/cash/balance`, auth),
-        axios.get(`${API}/accounting/payroll`, auth),
-        axios.get(`${API}/accounting/transactions?per_page=12`, auth),
+        axios.get(`${API}/accounting/payroll?${yqs}`, auth),
+        axios.get(`${API}/accounting/transactions?per_page=12&${pqs}`, auth),
       ]);
       setSummary(s.data); setCash(c.data); setPayroll(p.data); setTxns(t.data);
     } catch (e) { /* noop */ }
     // eslint-disable-next-line
-  }, [API, token]);
+  }, [API, token, period]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -67,7 +97,10 @@ export const AccountingManager = ({ API, token }) => {
   const payPayroll = async (courierId) => {
     setPayingId(courierId);
     try {
-      const res = await axios.post(`${API}/accounting/payroll/pay`, { courier_id: courierId }, auth);
+      const body = { courier_id: courierId };
+      if (period.from) body.start_date = period.from;
+      if (period.to) body.end_date = period.to;
+      const res = await axios.post(`${API}/accounting/payroll/pay`, body, auth);
       toast.success(`Nómina pagada: ${eur(res.data.amount_eur)}`);
       fetchAll();
     } catch (err) {
@@ -97,6 +130,32 @@ export const AccountingManager = ({ API, token }) => {
           <RefreshCw className="w-4 h-4 mr-1" /> Actualizar
         </Button>
       </div>
+
+      {/* Selector de periodo */}
+      <Card className="border-0 shadow-lg" data-testid="acct-period-bar">
+        <CardContent className="p-4 flex flex-wrap items-end gap-3">
+          <div className="flex items-center gap-2 text-gray-700 mr-2">
+            <CalendarRange className="w-5 h-5 text-emerald-600" />
+            <span className="text-sm font-medium">Periodo</span>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Desde</label>
+            <Input data-testid="acct-period-from" type="date" value={period.from}
+              onChange={(e) => setPeriod({ ...period, from: e.target.value })} className="h-9 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Hasta</label>
+            <Input data-testid="acct-period-to" type="date" value={period.to}
+              onChange={(e) => setPeriod({ ...period, to: e.target.value })} className="h-9 text-sm" />
+          </div>
+          <div className="flex gap-2">
+            <Button data-testid="acct-preset-today" size="sm" variant="outline" onClick={() => applyPreset('today')}>Hoy</Button>
+            <Button data-testid="acct-preset-week" size="sm" variant="outline" onClick={() => applyPreset('week')}>Semana</Button>
+            <Button data-testid="acct-preset-month" size="sm" variant="outline" onClick={() => applyPreset('month')}>Mes</Button>
+            <Button data-testid="acct-preset-all" size="sm" variant="ghost" onClick={() => applyPreset('all')}>Todo</Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Resumen financiero */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -138,11 +197,11 @@ export const AccountingManager = ({ API, token }) => {
               <span className="flex items-center gap-2"><Banknote className="w-5 h-5 text-emerald-600" /> Control de caja</span>
               <div className="flex gap-2">
                 <Button data-testid="acct-closing-csv" size="sm" variant="outline"
-                  onClick={() => download(`${API}/accounting/cash/closing/export?format=csv`, 'arqueo.csv')}>
+                  onClick={() => download(`${API}/accounting/cash/closing/export?format=csv${period.to ? `&date=${period.to}` : ''}`, 'arqueo.csv')}>
                   <Download className="w-4 h-4 mr-1" /> Arqueo CSV
                 </Button>
                 <Button data-testid="acct-closing-pdf" size="sm" className="bg-emerald-600 hover:bg-emerald-700"
-                  onClick={() => download(`${API}/accounting/cash/closing/export?format=pdf`, 'arqueo.pdf')}>
+                  onClick={() => download(`${API}/accounting/cash/closing/export?format=pdf${period.to ? `&date=${period.to}` : ''}`, 'arqueo.pdf')}>
                   <FileText className="w-4 h-4 mr-1" /> PDF
                 </Button>
               </div>
@@ -198,7 +257,7 @@ export const AccountingManager = ({ API, token }) => {
             <CardTitle className="flex items-center justify-between text-base">
               <span className="flex items-center gap-2"><Users className="w-5 h-5 text-emerald-600" /> Nóminas de Abejas</span>
               <Button data-testid="acct-payroll-export" size="sm" variant="outline"
-                onClick={() => download(`${API}/admin/finances/export`, 'pagos_repartidores.csv')}>
+                onClick={() => download(`${API}/admin/finances/export?${payrollQS()}`, 'pagos_repartidores.csv')}>
                 <Download className="w-4 h-4 mr-1" /> CSV
               </Button>
             </CardTitle>
@@ -243,7 +302,7 @@ export const AccountingManager = ({ API, token }) => {
           <CardTitle className="flex items-center justify-between text-base">
             <span className="flex items-center gap-2"><Receipt className="w-5 h-5 text-emerald-600" /> Libro de transacciones ({txns.total})</span>
             <Button data-testid="acct-txns-export" size="sm" className="bg-teal-600 hover:bg-teal-700"
-              onClick={() => download(`${API}/accounting/export/transactions`, 'transacciones.csv')}>
+              onClick={() => download(`${API}/accounting/export/transactions?${periodQS()}`, 'transacciones.csv')}>
               <Download className="w-4 h-4 mr-1" /> CSV
             </Button>
           </CardTitle>

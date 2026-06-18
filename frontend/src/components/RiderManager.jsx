@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { QRCodeCanvas } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,8 @@ export const RiderManager = ({ API, token }) => {
   const [form, setForm] = useState(EMPTY);
   const [creating, setCreating] = useState(false);
   const [qrModal, setQrModal] = useState(null); // {name, code, qr}
+  const downloadQrRef = useRef(null);
+  const APP_DOWNLOAD_URL = `${window.location.origin}/rider`;
   const auth = { headers: { Authorization: `Bearer ${token}` } };
 
   const fetchRiders = async () => {
@@ -85,6 +88,8 @@ export const RiderManager = ({ API, token }) => {
   const printQr = () => {
     if (!qrModal) return;
     const vlabel = VLABEL[qrModal.vehicle_type] || qrModal.vehicle_type || '—';
+    let downloadQr = '';
+    try { downloadQr = downloadQrRef.current?.toDataURL('image/png') || ''; } catch (e) { /* noop */ }
     const row = (label, value) => value
       ? `<tr><td style="padding:6px 14px;color:#6b7280;font-size:13px">${label}</td><td style="padding:6px 14px;font-weight:600;color:#111827">${value}</td></tr>`
       : '';
@@ -92,20 +97,24 @@ export const RiderManager = ({ API, token }) => {
     w.document.write(`<html><head><title>Ficha de activación · ${qrModal.name} · ${qrModal.code}</title>
       <meta charset="utf-8"/>
       <style>
-        @page { margin: 18mm; }
+        @page { margin: 16mm; }
         body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; color:#111827; margin:0; }
-        .sheet { max-width: 620px; margin: 0 auto; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; }
+        .sheet { max-width: 660px; margin: 0 auto; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; }
         .head { background:#047857; color:#fff; padding:22px 28px; display:flex; align-items:center; gap:12px; }
         .head h1 { font-size:22px; margin:0; letter-spacing:.5px; }
         .head p { margin:2px 0 0; font-size:13px; opacity:.85; }
-        .body { padding:28px; display:flex; gap:28px; align-items:flex-start; }
-        .qrbox { text-align:center; }
-        .qrbox img { width:220px; height:220px; border:8px solid #ecfdf5; border-radius:12px; }
-        .code { margin-top:10px; font-size:26px; font-weight:800; letter-spacing:6px; color:#047857; font-family:monospace; }
+        .body { padding:24px 28px; display:flex; gap:24px; align-items:flex-start; }
+        .info { flex:1; }
         table { border-collapse:collapse; width:100%; }
         .name { font-size:20px; font-weight:800; margin:0 0 4px; }
-        .badge { display:inline-block; background:#ecfdf5; color:#047857; border-radius:999px; padding:4px 12px; font-size:13px; font-weight:700; margin-bottom:14px; }
-        .steps { margin:24px 28px 28px; background:#f9fafb; border-radius:12px; padding:18px 22px; }
+        .badge { display:inline-block; background:#ecfdf5; color:#047857; border-radius:999px; padding:4px 12px; font-size:13px; font-weight:700; margin-bottom:12px; }
+        .qrs { display:flex; gap:18px; padding:0 28px 8px; }
+        .qrcard { flex:1; text-align:center; border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
+        .qrcard h4 { margin:0 0 8px; font-size:13px; color:#047857; }
+        .qrcard img { width:170px; height:170px; }
+        .qrcard .num { margin-top:8px; font-size:13px; color:#6b7280; }
+        .code { font-size:22px; font-weight:800; letter-spacing:5px; color:#047857; font-family:monospace; }
+        .steps { margin:18px 28px 24px; background:#f9fafb; border-radius:12px; padding:16px 22px; }
         .steps h3 { margin:0 0 8px; font-size:14px; color:#047857; }
         .steps ol { margin:0; padding-left:20px; color:#374151; font-size:13px; line-height:1.7; }
         .foot { text-align:center; color:#9ca3af; font-size:11px; padding:0 28px 22px; }
@@ -117,11 +126,7 @@ export const RiderManager = ({ API, token }) => {
             <div><h1>Nubo Express</h1><p>Hoja de activación de conductor (Abeja)</p></div>
           </div>
           <div class="body">
-            <div class="qrbox">
-              <img src="${qrModal.qr}" alt="QR"/>
-              <div class="code">${qrModal.code}</div>
-            </div>
-            <div style="flex:1">
+            <div class="info">
               <p class="name">${qrModal.name}</p>
               <span class="badge">${vlabel}</span>
               <table>
@@ -133,11 +138,23 @@ export const RiderManager = ({ API, token }) => {
               </table>
             </div>
           </div>
+          <div class="qrs">
+            <div class="qrcard">
+              <h4>1 · Descarga la app</h4>
+              ${downloadQr ? `<img src="${downloadQr}" alt="Descargar app"/>` : ''}
+              <div class="num">Abre Nubo Riders</div>
+            </div>
+            <div class="qrcard">
+              <h4>2 · Activa tu cuenta</h4>
+              <img src="${qrModal.qr}" alt="Activación"/>
+              <div class="code">${qrModal.code}</div>
+            </div>
+          </div>
           <div class="steps">
-            <h3>Cómo activar la app</h3>
+            <h3>Cómo empezar (2 escaneos)</h3>
             <ol>
-              <li>Descarga la app <b>Nubo Riders</b> en tu móvil.</li>
-              <li>Pulsa <b>"Escanear QR"</b> y apunta a este código.</li>
+              <li>Escanea el <b>QR 1</b> para abrir e instalar la app <b>Nubo Riders</b> en tu móvil.</li>
+              <li>Dentro de la app, pulsa <b>"Escanear QR"</b> y apunta al <b>QR 2</b>.</li>
               <li>La app se configurará con tu nombre, perfil y vehículo automáticamente.</li>
               <li>Si no puedes escanear, escribe el código <b>${qrModal.code}</b> manualmente.</li>
             </ol>
@@ -254,7 +271,18 @@ export const RiderManager = ({ API, token }) => {
               {qrModal.vehicle_type && (
                 <Badge className="bg-emerald-100 text-emerald-700" data-testid="rider-qr-vehicle">{VLABEL[qrModal.vehicle_type] || qrModal.vehicle_type}</Badge>
               )}
-              <img src={qrModal.qr} alt="QR" className="w-48 h-48 mx-auto rounded-lg border" data-testid="rider-qr-image" />
+              <div className="flex items-start justify-center gap-4">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">1 · Descargar app</p>
+                  <div className="p-2 bg-white border rounded-lg inline-block" data-testid="rider-download-qr">
+                    <QRCodeCanvas ref={downloadQrRef} value={APP_DOWNLOAD_URL} size={120} fgColor="#047857" level="M" includeMargin={false} />
+                  </div>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">2 · Activar cuenta</p>
+                  <img src={qrModal.qr} alt="QR activación" className="w-[136px] h-[136px] mx-auto rounded-lg border" data-testid="rider-qr-image" />
+                </div>
+              </div>
               <p className="text-2xl font-mono font-bold tracking-widest text-emerald-700" data-testid="rider-qr-code">{qrModal.code}</p>
               <Button onClick={printQr} variant="outline" className="w-full" data-testid="rider-qr-print">Imprimir ficha de activación</Button>
             </div>
