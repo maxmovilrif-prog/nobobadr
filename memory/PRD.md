@@ -36,6 +36,14 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Gestión de riders en panel** `RiderManager.jsx` (alta + QR imprimible + suspender + regenerar). ✅ 58/58 pytest + frontend e2e 100%.
 - **Escáner QR de cámara** en la app del rider (`html5-qrcode`): botón "Escanear QR" + overlay, además del código manual. ✅
 
+## Bloque C — Operaciones y Logística + QR seguimiento (2026-06-18) ✅
+- **Asignación por proximidad** (`assignments.py` + `routes/assignments.py`): reclamo atómico del repartidor más cercano vía MongoDB `$geoNear` sobre índice **2dsphere** (`users.geo_location`, creado al arrancar), hasta 3 intentos anti condición de carrera, geofencing por ciudad (radio 10 km). `/rider/location` ahora guarda `geo_location` GeoJSON.
+- **Endpoints**: `GET /api/drivers/nearest`, `POST /api/orders/{id}/assign-nearest` (admin/business; si no pasas lat/lng usa origen exprés o centro de ciudad), `POST /api/orders/{id}/return-to-queue`, `GET /api/admin/ops/orders` (cola pendientes + activos), `GET /api/admin/assignment-history` (filtros action/driver/fecha) y `/export` CSV. Control de acceso: cliente 403, pedido inexistente 404.
+- **Historial de asignaciones** (`assignment_history`): trazabilidad total (assigned/returned/auto_returned, distancia km, actor).
+- **Panel de Operaciones** (`OperationsManager.jsx` en AdminDashboard): cola de despacho con botón "Asignar cercana", pedidos en reparto con "Devolver", e historial con filtros + export CSV.
+- **QR en seguimiento público** (`PublicTracking.js`): tarjeta con QR (`qrcode.react`) que codifica `…/track?order=<id>` para escanear/compartir desde el móvil.
+- **Seguridad**: confirmado que el bloqueo anti-fuerza-bruta del login es efectivo a través del ingress de K8s (usa `X-Forwarded-For`); blindado con test `test_login_lockout_security.py`. ✅ 71/71 pytest + frontend e2e 100% (iteration_7.json).
+
 ## Bloque B — Seguimiento público de pedidos (2026-06-18) ✅
 - Backend `GET /api/public/orders/{id}/tracking` (público): estado, ruta origen/destino, precio €/MAD, repartidor y ubicación (en vivo por WebSocket si existe).
 - Frontend `PublicTracking.js` (`/track`, público): búsqueda por nº de pedido, mapa con ruta, switch €/MAD, compartir por WhatsApp, demos `ORD-4821`/`ORD-4823`, auto-refresco cada 15s, deep-link `?order=`. Botón "Seguir mi pedido" en CustomerDashboard. ✅ 62/62 pytest + frontend e2e 100%.
