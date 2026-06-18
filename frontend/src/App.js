@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import Login from "@/pages/Login";
 import Operations from "@/pages/Operations";
+import Analytics from "@/pages/Analytics";
 import AccountingPanel from "@/components/AccountingPanel";
 import { Loader2 } from "lucide-react";
 
@@ -45,6 +46,14 @@ function App() {
               element={
                 <Protected>
                   <AccountingPanel />
+                </Protected>
+              }
+            />
+            <Route
+              path="/rentabilidad"
+              element={
+                <Protected>
+                  <Analytics />
                 </Protected>
               }
             />

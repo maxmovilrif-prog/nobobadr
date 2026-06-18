@@ -26,6 +26,7 @@ from auth import router as auth_router, seed_admin, ensure_indexes
 from orders import router as orders_router
 from assignments import router as assignments_router
 from riders import router as riders_router
+from analytics import router as analytics_router
 from realtime import ws_router
 
 # Create the main app without a prefix
@@ -520,6 +521,7 @@ app.include_router(auth_router)
 app.include_router(orders_router)
 app.include_router(assignments_router)
 app.include_router(riders_router)
+app.include_router(analytics_router)
 app.include_router(ws_router)
 
 app.add_middleware(

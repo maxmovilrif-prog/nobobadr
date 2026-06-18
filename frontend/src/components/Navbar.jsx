@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Wallet, LayoutDashboard, Calculator, LogOut } from "lucide-react";
+import { Wallet, LayoutDashboard, Calculator, LogOut, TrendingUp } from "lucide-react";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -32,6 +32,7 @@ export default function Navbar() {
         </div>
         <nav className="flex items-center gap-1">
           {link("/", <LayoutDashboard className="h-4 w-4" />, "Operaciones", "nav-operaciones")}
+          {link("/rentabilidad", <TrendingUp className="h-4 w-4" />, "Rentabilidad", "nav-rentabilidad")}
           {link("/contabilidad", <Calculator className="h-4 w-4" />, "Contabilidad", "nav-contabilidad")}
         </nav>
         <div className="ml-auto flex items-center gap-3">

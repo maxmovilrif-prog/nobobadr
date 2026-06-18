@@ -70,3 +70,9 @@ Se implementó el feature completo (backend + frontend) en la rama `main`.
 - Frontend: AuthContext + login, navbar (Operaciones/Contabilidad), dashboard Operaciones (pedidos, crear, asignar, avanzar estado, stats, mapa con fallback si no hay GOOGLE_MAPS key), badge tiempo real.
 - Testing: 15/15 backend + 100% flujos críticos frontend (iteration_1.json). Sin bugs bloqueantes.
 - PENDIENTE: REACT_APP_GOOGLE_MAPS_API_KEY (mapa en modo dev). App móvil nativa (consume esta API) = próxima fase.
+
+## Update 2026-06-18 (e) — Panel Rentabilidad & Auditoría COD
+- Endpoint GET /api/analytics/profitability?start=&end= (RBAC admin/dispatcher).
+  -> totals, by_rider, by_city (revenue y cod_cash por moneda MAD/EUR), cash_audit (cod_expected vs cod_registered con estado ok/fuga/exceso).
+- UI /rentabilidad: totales, auditoría COD por moneda (anti-fuga), tablas por repartidor (tasa entrega, km prom, COD) y por ciudad.
+- Nav link "Rentabilidad". Build verde.
