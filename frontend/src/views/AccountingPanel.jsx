@@ -536,6 +536,135 @@ function PayrollTable({ payroll, onPay, payingId, loading }) {
 //  SECCIÓN 4: EXPORTACIÓN
 // ─────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────
+//  SECCIÓN: CIERRE DE CAJA DIARIO (arqueo MAD/EUR + CSV/PDF)
+// ─────────────────────────────────────────────────────────────────
+
+function ClosingRow({ label, mad, eur, bold = false, accent }) {
+  const cls = bold ? "font-bold text-white" : "text-slate-300";
+  const madCls = accent === "in" ? "text-emerald-400" : accent === "out" ? "text-orange-400" : "";
+  return (
+    <div className="grid grid-cols-3 gap-2 py-2 border-b border-slate-700/40 last:border-0">
+      <span className={`text-sm ${cls}`}>{label}</span>
+      <span className={`text-sm text-right tabular-nums ${bold ? "font-bold text-white" : "text-slate-200"} ${madCls}`}>{fmt(mad, 2)} <span className="text-[11px] text-slate-500">MAD</span></span>
+      <span className={`text-sm text-right tabular-nums ${bold ? "font-bold text-white" : "text-slate-200"} ${madCls}`}>{fmt(eur, 2)} <span className="text-[11px] text-slate-500">EUR</span></span>
+    </div>
+  );
+}
+
+function DailyClosingSection() {
+  const { API, token } = useContext(AuthContext);
+  const auth = { headers: { Authorization: `Bearer ${token}` } };
+  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [dl, setDl] = useState({ csv: false, pdf: false });
+  const [error, setError] = useState(null);
+
+  const generate = async () => {
+    setLoading(true); setError(null);
+    try {
+      const r = await axios.get(`${API}/accounting/cash/daily-closing`, { params: { date }, ...auth });
+      setData(r.data);
+    } catch (e) {
+      setError(e?.response?.data?.detail || "No se pudo generar el arqueo");
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadFile = async (format) => {
+    setDl((s) => ({ ...s, [format]: true })); setError(null);
+    try {
+      const r = await axios.get(`${API}/accounting/cash/closing/export`, {
+        params: { date, format }, ...auth, responseType: "blob",
+      });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = `arqueo_${date}.${format}`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Arqueo ${format.toUpperCase()} descargado`);
+    } catch (e) {
+      setError(`No se pudo descargar el ${format.toUpperCase()}`);
+    } finally {
+      setDl((s) => ({ ...s, [format]: false }));
+    }
+  };
+
+  return (
+    <Card title="Cierre de caja diario" subtitle="Arqueo de efectivo MAD/EUR del día — saldo inicial, movimientos y cierre esperado" icon={Icon.Scale} accentColor="violet">
+      <div className="p-5 space-y-5">
+        <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl bg-slate-900/50 border border-slate-700/40">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-slate-400">Fecha del arqueo</label>
+            <input type="date" data-testid="acct-closing-date" value={date} onChange={(e) => setDate(e.target.value)}
+              className="bg-slate-700/60 border border-slate-600/50 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+          </div>
+          <button data-testid="acct-closing-generate" onClick={generate} disabled={loading}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/30 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+            {loading ? <Icon.Spinner /> : <Icon.Scale />}<span>Generar arqueo</span>
+          </button>
+        </div>
+
+        {data && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5" data-testid="acct-closing-summary">
+            {/* Efectivo en caja */}
+            <div className="rounded-xl bg-slate-900/50 border border-slate-700/40 p-5">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">Efectivo en caja</h3>
+              <div className="grid grid-cols-3 gap-2 pb-1 mb-1 border-b border-slate-600/50">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Concepto</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">MAD</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">EUR</span>
+              </div>
+              <ClosingRow label="Saldo inicial" mad={data.opening.cash_mad} eur={data.opening.cash_eur} />
+              <ClosingRow label="(+) Entradas de caja" mad={data.movements.cash_mad.in} eur={data.movements.cash_eur.in} accent="in" />
+              <ClosingRow label="(−) Salidas de caja" mad={data.movements.cash_mad.out} eur={data.movements.cash_eur.out} accent="out" />
+              <div className="mt-2 pt-2 rounded-lg bg-emerald-500/10 px-3 py-2" data-testid="acct-closing-expected">
+                <ClosingRow label="Saldo final esperado" mad={data.closing.cash_mad} eur={data.closing.cash_eur} bold />
+              </div>
+            </div>
+
+            {/* Resultado del día */}
+            <div className="rounded-xl bg-slate-900/50 border border-slate-700/40 p-5">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-3">Resultado del día</h3>
+              <div className="grid grid-cols-3 gap-2 pb-1 mb-1 border-b border-slate-600/50">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Concepto</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">MAD</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">EUR</span>
+              </div>
+              <ClosingRow label="Ingresos del día" mad={data.income.MAD} eur={data.income.EUR} accent="in" />
+              <ClosingRow label="Gastos del día" mad={data.expenses.MAD} eur={data.expenses.EUR} accent="out" />
+              <div className="mt-2 pt-2 rounded-lg bg-violet-500/10 px-3 py-2">
+                <ClosingRow label="Balance neto del día" mad={data.net.MAD} eur={data.net.EUR} bold />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-3" data-testid="acct-closing-meta">
+                {data.transactions_count} transacción(es) · Generado {timeAgo(data.generated_at)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {data && (
+          <div className="flex flex-wrap gap-3">
+            <ExportButton testid="acct-closing-csv" label="Descargar CSV" sublabel="Compatible con Excel y Sheets" icon={Icon.Excel} variant="primary"
+              loading={dl.csv} onClick={() => downloadFile("csv")} />
+            <ExportButton testid="acct-closing-pdf" label="Descargar PDF" sublabel="Informe con identidad Nubo Express" icon={Icon.Download} variant="outline"
+              loading={dl.pdf} onClick={() => downloadFile("pdf")} />
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs" data-testid="acct-closing-error">
+            <svg className="w-4 h-4 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M10 2L2 17h16L10 2z" /><path d="M10 8v4M10 14.5h.01" /></svg>
+            <span>{error}</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function ExportSection({ onExportTx, onExportPayroll, onExportReport, mutationState }) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split("T")[0]);
@@ -704,6 +833,7 @@ export default function AccountingPanel() {
         <CashRow cash={cash} summary={summary} onRefresh={fetchCash} loading={loading} />
         <TransactionsTable transactions={txns} loading={loading} />
         <PayrollTable payroll={payroll} onPay={handlePay} payingId={payingId} loading={loading} />
+        <DailyClosingSection />
         <ExportSection onExportTx={exportTx} onExportPayroll={exportPayroll} onExportReport={exportReport} mutationState={exportState} />
       </div>
     </div>
