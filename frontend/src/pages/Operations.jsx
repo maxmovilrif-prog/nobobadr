@@ -77,7 +77,13 @@ export default function Operations() {
         }
       } catch (_) {}
     };
-    return () => ws.close();
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      } else {
+        ws.onopen = () => ws.close();
+      }
+    };
   }, [fetchAll]);
 
   const createOrder = async (e) => {
