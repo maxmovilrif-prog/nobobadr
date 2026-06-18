@@ -16,6 +16,10 @@ const ACTION_CLASS = {
   returned: 'bg-amber-100 text-amber-700',
   auto_returned: 'bg-gray-100 text-gray-600',
 };
+const ACTOR_ROLE = {
+  admin: { label: 'Fundador', cls: 'bg-purple-100 text-purple-700' },
+  manager: { label: 'Gestor', cls: 'bg-blue-100 text-blue-700' },
+};
 
 const fmtMoney = (amt, cur) => {
   if (amt == null) return '—';
@@ -242,7 +246,7 @@ export const OperationsManager = ({ API, token }) => {
                   <tr className="text-left text-xs text-gray-400 border-b">
                     <th className="py-2 pr-3">Fecha</th><th className="py-2 pr-3">Acción</th>
                     <th className="py-2 pr-3">Abeja</th><th className="py-2 pr-3">Pedido</th>
-                    <th className="py-2 pr-3">Dist.</th><th className="py-2 pr-3">Por</th>
+                    <th className="py-2 pr-3">Dist.</th><th className="py-2 pr-3">Realizado por</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -253,7 +257,18 @@ export const OperationsManager = ({ API, token }) => {
                       <td className="py-2 pr-3 truncate max-w-[120px]">{e.driver_name || '—'}</td>
                       <td className="py-2 pr-3 font-mono text-xs">{(e.order_id || '').slice(0, 8)}</td>
                       <td className="py-2 pr-3">{e.distance_km != null ? `${e.distance_km} km` : '—'}</td>
-                      <td className="py-2 pr-3 text-xs text-gray-500">{e.actor_name || (e.reason === 'auto_dispatch' ? 'Auto' : '—')}</td>
+                      <td className="py-2 pr-3" data-testid={`ops-history-actor-${e.id}`}>
+                        {e.actor_name ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-gray-700 truncate max-w-[110px]">{e.actor_name}</span>
+                            {ACTOR_ROLE[e.actor_role] && (
+                              <Badge className={`${ACTOR_ROLE[e.actor_role].cls} text-[10px] px-1.5 py-0`}>{ACTOR_ROLE[e.actor_role].label}</Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge className="bg-gray-100 text-gray-500 text-[10px] px-1.5 py-0">{e.reason === 'auto_dispatch' ? '🤖 Auto-despacho' : '—'}</Badge>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
