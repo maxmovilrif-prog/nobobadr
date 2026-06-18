@@ -8,7 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import LanguageSelector from '@/components/LanguageSelector';
-import { Search, MapPin, Flag, Truck, Clock, Route as RouteIcon, ArrowLeft, Loader2, Share2 } from 'lucide-react';
+import { Search, MapPin, Flag, Truck, Clock, Route as RouteIcon, ArrowLeft, Loader2, Share2, QrCode } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 const EXCHANGE_RATE_MAD_EUR = 0.092;
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -298,6 +299,29 @@ export default function PublicTracking() {
                 <Button data-testid="tracking-share-btn" onClick={handleShare} className="w-full bg-[#25D366] hover:bg-[#1ebe5b] text-white gap-2">
                   <Share2 className="w-4 h-4" /> {S.share}
                 </Button>
+
+                <Card className="border-0 shadow-lg" data-testid="tracking-qr-card">
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className="bg-white p-2 rounded-lg border border-gray-100 shrink-0">
+                      <QRCodeCanvas
+                        data-testid="tracking-qr-code"
+                        value={`${window.location.origin}/track?order=${order.order_id}`}
+                        size={92}
+                        fgColor="#047857"
+                        level="M"
+                        includeMargin={false}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 flex items-center gap-1">
+                        <QrCode className="w-4 h-4 text-emerald-600" /> Escanea para seguir
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Apunta con la cámara del móvil para abrir el seguimiento en vivo de este pedido.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <Card className="border-0 shadow-lg">
                   <CardContent className="p-4 space-y-3">

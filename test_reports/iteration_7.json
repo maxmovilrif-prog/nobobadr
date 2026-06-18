@@ -1,0 +1,48 @@
+{
+  "summary": "BLOQUE C — Operaciones y Logística (asignación por proximidad via $geoNear + historial + export CSV) + QR card en /track validados end-to-end. Backend pytest 70/70 GREEN (8 nuevos tests en /app/backend/tests/test_assignments_bloque_c.py + 62 previos). UI: /track?order=ORD-4821 muestra tracking-qr-card con QR canvas 92x92 (codifica la URL pública). Login admin (admin@nubo.com / Admin1234!) en /auth — auth redirige a /dashboard pero el usuario admin puede acceder a /admin (no es bug, las cards de admin son visibles desde /admin). AdminDashboard renderiza operations-manager con todos los testids: ops-pending-card (con ops-pending-count, 46-47 sin asignar), ops-active-card (con ops-active-count), ops-history-card (con ops-filter-action, ops-filter-driver, ops-filter-from, ops-filter-to, ops-history-export, ops-history-refresh, ops-history-table). Flujo e2e despacho por proximidad: 1) creado rider TEST_UI_C2 vía POST /api/admin/riders, activado (POST /api/rider/activate con NUBO-CB18), puesto disponible (PATCH /api/rider/availability?is_available=true), posicionado a 0.001 lat/lng del PICKUP Madrid (POST /api/rider/location) → ~0.14km del origen. 2) Customer (qa_customer@nubo.com) creó pedido express id=fade9020-... (TEST_UI_C2_Origin → TEST_UI_C2_Dest, 55€). 3) En el panel, ops-assign-btn-fade9020-... visible, click → toast verde 'Asignado a TEST_C_Rider_f567f (0.14 km)', pedido aparece en En reparto (ops-active-fade9020-...) con ops-return-btn-fade9020-.... 4) Click Devolver → pedido vuelve a Cola de despacho (ops-pending-fade9020-... reaparece). 5) ops-history-table muestra eventos Asignado y Devuelto (10 filas). 6) Filtro action=assigned reduce a 5 filas. Control de acceso (cubierto por pytest): cliente 403 en assign-nearest y /admin/ops/orders; pedido inexistente 404 en assign-nearest. Export CSV: header 'fecha,accion,pedido_id' confirmado por pytest test_history_export_csv. Mapa Google muestra 'Oops' (clave placeholder) — ESPERADO, no es bug.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login (brute-force lockout)", "issue": "Carry-over de iter5/iter6 — lockout usa request.client.host (IP del proxy de K8s ingress) y es bypassable a través de la URL pública. Sin cambios."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard / PublicTracking mapa", "issues": ["Google Maps muestra 'Oops! Something went wrong' por clave placeholder REACT_APP_GOOGLE_MAPS_API_KEY=YOUR_API_KEY_HERE — ESPERADO. Considerar fallback amigable cuando useJsApiLoader.loadError esté presente."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_assignments_bloque_c.py",
+    "/app/backend/tests/test_public_tracking.py",
+    "/app/backend/tests/test_riders_and_lockout.py",
+    "/app/backend/tests/test_nubo_features.py",
+    "/app/backend/tests/test_regression_modularization.py",
+    "/app/backend/tests/test_bloque_a_cities_delivery.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(carry-over HIGH security) Hacer /api/auth/login brute-force lockout K8s-ingress-aware (X-Forwarded-For).",
+    "(LOW cosmetic) Reemplazar el overlay 'Oops' de Google Maps con un placeholder de marca cuando la API key esté ausente (useJsApiLoader.loadError → short-circuit del componente Map).",
+    "(LOW UX, observación menor) En el toast verde de asignación, además del nombre del rider y la distancia, sería útil mostrar el order_id (8 chars) para correlacionar visualmente con la cola."
+  ],
+  "critical_code_review_comments": [
+    "OperationsManager.jsx (263 líneas) — bien estructurado, dentro del límite de 700 líneas. Polling cada 12s en fetchOps es razonable. Buen uso de useCallback con deps correctas.",
+    "OperationsManager.jsx línea 38-45: el catch silencia errores (/* noop */) en fetchOps. Considerar al menos un console.warn para diagnosticar 401/403 en el futuro. Mismo patrón en fetchHistory (línea 46-57). Aceptable pero no ideal.",
+    "OperationsManager.jsx línea 28: el header de auth se construye una sola vez en el render — si el token cambia mid-session no se refresca hasta el siguiente remount. Hoy no es problema porque el token persiste; mencionar como nota.",
+    "Backend assignments.py atomic_claim_nearest: uso correcto de $geoNear con maxDistance + findOneAndUpdate para reclamo atómico — previene race conditions. Validado por pytest test_nearest_finds_available_rider (distance_km < 1.0 con rider a 0.001° offset).",
+    "Backend routes/assignments.py: control de acceso (admin/business) probado en 403; 404 para pedido inexistente; export CSV con encabezado correcto (fecha,accion,pedido_id) — todo verde.",
+    "Backend routes/riders.py /rider/location guarda geo_location GeoJSON Point — verificado por el flujo e2e (rider detectado a 0.14 km via $geoNear).",
+    "PublicTracking.js: tarjeta QR (qrcode.react) renderiza correctamente con canvas 92x92 y codifica la URL pública (verificable visualmente, el QR es escaneable). data-testid=tracking-qr-card y tracking-qr-code presentes. Buena UX (escanea para seguir con móvil).",
+    "Pequeña observación: tras login admin en /auth, el frontend hace navigate('/dashboard') en lugar de '/admin'. El admin entonces tiene que navegar manualmente a /admin (o vía link en /dashboard). No es bug funcional (la sesión es válida en ambas rutas) pero mejoraría UX redirigir directamente a /admin si role='admin'."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (70/70 pytest, incl. 8 nuevos de Bloque C)", "frontend": "100% (QR canvas en /track + operations-manager completo + asignar cercana → toast + En reparto + Devolver → vuelta a cola + filtro action=assigned + history-table con eventos Asignado/Devuelto)"},
+  "test_credentials": "admin@nubo.com / Admin1234! ; qa_customer@nubo.com / Test1234! ; riders TEST_C_Rider_f567f, TEST_Ops_Rider y otros creados via /api/admin/riders (códigos efímeros, ya consumidos).",
+  "seed_data_creation": "Creados 2 riders TEST_UI_C* (NUBO-0TWS, NUBO-CB18), activados y posicionados cerca de Madrid (40.4178, -3.6928). Creados 2 pedidos express (id 7ee5fa04-..., fade9020-...) con origen Madrid → destino Tánger (42€ y 55€ EUR). El segundo fue asignado y devuelto durante el flujo e2e — terminó en estado pending. Todos con prefijo TEST_ para limpieza segura.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: `cd /app/backend && export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2) && python3 -m pytest tests/ -q` → 70 passed. Login admin redirige a /dashboard (no a /admin directamente) — para tests UI navegar a /admin manualmente después del login. data-testids dinámicos en operations panel usan order.id COMPLETO (no slice): ops-assign-btn-<full-uuid>, ops-pending-<full-uuid>, ops-active-<full-uuid>, ops-return-btn-<full-uuid>. QR card en /track usa qrcode.react que renderiza CANVAS (no IMG). Google Maps 'Oops' por placeholder key sigue siendo ESPERADO. Brute-force lockout sigue siendo bypassable por ingress (sin cambios).",
+  "rca of the issue": "Sin bugs nuevos en BLOQUE C. El flujo completo (creación de pedido → asignación atómica $geoNear → toast UI → cambio de columna pending→active → devolución → cambio active→pending → historial registrando ambos eventos → filtro por acción) opera correctamente en producción. Pequeña fricción UX (login admin → /dashboard en vez de /admin) y carry-over de lockout-by-ingress-IP siguen sin resolverse."
+}

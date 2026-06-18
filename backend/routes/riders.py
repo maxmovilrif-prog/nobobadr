@@ -167,7 +167,11 @@ async def rider_availability(is_available: bool, current_user: dict = Depends(ge
 async def rider_location(loc: RiderLocation, current_user: dict = Depends(get_current_rider)):
     await db.users.update_one(
         {"id": current_user["id"]},
-        {"$set": {"current_location": {"lat": loc.lat, "lng": loc.lng,
-                                       "updated_at": datetime.now(timezone.utc).isoformat()}}},
+        {"$set": {
+            "current_location": {"lat": loc.lat, "lng": loc.lng,
+                                 "updated_at": datetime.now(timezone.utc).isoformat()},
+            # GeoJSON para consultas de proximidad ($geoNear sobre índice 2dsphere)
+            "geo_location": {"type": "Point", "coordinates": [loc.lng, loc.lat]},
+        }},
     )
     return {"ok": True}

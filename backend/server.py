@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
 from starlette.middleware.cors import CORSMiddleware
 
-from core import client, manager, logger
+from core import client, manager, logger, db
 import telegram_alerts
 from routes import (
     auth, businesses, search, orders, drivers,
-    messages, payments, dropshipping, affiliate, tracking, admin, cities, riders,
+    messages, payments, dropshipping, affiliate, tracking, admin, cities, riders, assignments,
 )
 
 app = FastAPI(title="Nubo API")
@@ -17,7 +17,7 @@ api_router = APIRouter(prefix="/api")
 
 # Montar todos los routers bajo /api
 for module in (auth, businesses, search, orders, drivers, messages,
-               payments, dropshipping, affiliate, tracking, admin, cities, riders):
+               payments, dropshipping, affiliate, tracking, admin, cities, riders, assignments):
     api_router.include_router(module.router)
 
 
@@ -75,7 +75,13 @@ import asyncio
 
 @app.on_event("startup")
 async def start_background_tasks():
-    """Arranca el monitor de Abejas paradas y el listener de comandos de Telegram."""
+    """Crea índices geoespaciales y arranca el monitor de Abejas + listener de Telegram."""
+    # Índice 2dsphere para la asignación por proximidad ($geoNear)
+    try:
+        await db.users.create_index([("geo_location", "2dsphere")])
+        logger.info("2dsphere index ensured on users.geo_location")
+    except Exception as e:
+        logger.error(f"Could not create 2dsphere index: {e}")
     app.state.idle_monitor_task = asyncio.create_task(telegram_alerts.idle_monitor_loop())
     app.state.telegram_listener_task = asyncio.create_task(telegram_alerts.command_listener_loop())
     logger.info("Background tasks started (idle monitor + telegram listener)")
