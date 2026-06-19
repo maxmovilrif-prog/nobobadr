@@ -16,6 +16,7 @@ logger = logging.getLogger("nubo.email")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
 SENDER_NAME = os.environ.get("SENDER_NAME", "Nubo Express")
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://noboexpress.com").rstrip("/")
 
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
@@ -49,8 +50,9 @@ def _wrap(title: str, body_html: str) -> str:
     """
 
 
-async def send_email(to: str, subject: str, html: str, wrap: bool = True) -> dict:
-    """Envía un email transaccional. No lanza excepción: degrada con {'sent': False}."""
+async def send_email(to: str, subject: str, html: str, wrap: bool = True, attachments: list = None) -> dict:
+    """Envía un email transaccional. No lanza excepción: degrada con {'sent': False}.
+    `attachments`: lista opcional de adjuntos Resend (soporta inline vía content_id)."""
     if not is_configured():
         return {"sent": False, "reason": "not_configured"}
     params = {
@@ -59,6 +61,8 @@ async def send_email(to: str, subject: str, html: str, wrap: bool = True) -> dic
         "subject": subject,
         "html": _wrap(subject, html) if wrap else html,
     }
+    if attachments:
+        params["attachments"] = attachments
     try:
         result = await asyncio.to_thread(resend.Emails.send, params)
         return {"sent": True, "id": result.get("id") if isinstance(result, dict) else getattr(result, "id", None)}
@@ -74,8 +78,20 @@ def _money(amount, currency) -> str:
 
 
 async def send_order_confirmation(to: str, order: dict) -> dict:
-    """Notificación automática: confirmación de pedido al cliente."""
-    oid = str(order.get("id", ""))[:8]
+    """Notificación automática: confirmación de pedido al cliente, con QR de seguimiento embebido."""
+    from core import generate_qr_base64
+    order_id = str(order.get("id", ""))
+    oid = order_id[:8]
+    tracking_url = f"{APP_BASE_URL}/track?order={order_id}"
+
+    qr_b64 = generate_qr_base64(tracking_url)
+    attachments = [{
+        "filename": "seguimiento-nubo.png",
+        "content": qr_b64,
+        "content_type": "image/png",
+        "content_id": "trackingqr",
+    }]
+
     body = f"""
       <p>¡Hemos recibido tu pedido! 🎉</p>
       <table style="width:100%;border-collapse:collapse;margin-top:8px;">
@@ -84,9 +100,18 @@ async def send_order_confirmation(to: str, order: dict) -> dict:
         <tr><td style="padding:6px 0;color:#6b7280;">Entrega</td><td style="padding:6px 0;text-align:right;">{order.get('destination_name') or order.get('delivery_address') or '—'}</td></tr>
         <tr><td style="padding:6px 0;color:#6b7280;">Importe</td><td style="padding:6px 0;text-align:right;font-weight:bold;color:#047857;">{_money(order.get('total_amount'), order.get('currency'))}</td></tr>
       </table>
-      <p style="margin-top:16px;">Puedes seguir tu pedido en vivo desde tu enlace de seguimiento.</p>
+      <div style="margin-top:24px;text-align:center;background:#f9fafb;border-radius:12px;padding:20px;">
+        <p style="margin:0 0 12px;font-weight:bold;color:#047857;">Sigue tu pedido en vivo 📍</p>
+        <a href="{tracking_url}" style="text-decoration:none;">
+          <img src="cid:trackingqr" alt="QR de seguimiento" width="180" height="180" style="border:8px solid #ecfdf5;border-radius:12px;display:block;margin:0 auto;" />
+        </a>
+        <p style="margin:12px 0 0;font-size:12px;color:#6b7280;">Escanea el código o pulsa el botón</p>
+        <a href="{tracking_url}" style="display:inline-block;margin-top:12px;background:#047857;color:#ffffff;text-decoration:none;padding:10px 22px;border-radius:999px;font-weight:bold;font-size:14px;">Ver seguimiento en vivo</a>
+      </div>
     """
-    return await send_email(to, f"Confirmación de pedido #{oid} · Nubo Express", body)
+    return await send_email(
+        to, f"Confirmación de pedido #{oid} · Nubo Express", body, attachments=attachments
+    )
 
 
 async def send_order_delivered(to: str, order: dict) -> dict:

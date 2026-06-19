@@ -138,15 +138,20 @@ async def get_current_rider(current_user: dict = Depends(get_current_user)):
     return current_user
 
 
-def generate_qr_data_url(text: str) -> str:
-    """Genera un QR como data URL PNG base64 (para mostrar/imprimir en la ficha del rider)."""
+def generate_qr_base64(text: str) -> str:
+    """Genera un QR como PNG en base64 puro (sin prefijo data:), para adjuntos inline de email."""
     import io
     import base64
     import qrcode
     img = qrcode.make(text)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def generate_qr_data_url(text: str) -> str:
+    """Genera un QR como data URL PNG base64 (para mostrar/imprimir en la ficha del rider)."""
+    return "data:image/png;base64," + generate_qr_base64(text)
 
 
 # =========================
