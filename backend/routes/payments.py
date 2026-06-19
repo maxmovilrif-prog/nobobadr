@@ -4,11 +4,22 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Request
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
 
-from core import db, get_current_user, STRIPE_API_KEY
+from core import db, get_current_user, get_current_admin, STRIPE_API_KEY, STRIPE_MODE
 from models import PaymentTransaction
 from assignments import auto_assign_order
 
 router = APIRouter()
+
+
+@router.get("/admin/payments/status")
+async def payments_status(current_user: dict = Depends(get_current_admin)):
+    """Estado de Stripe (solo Fundador): modo test/live, sin exponer la clave."""
+    key = STRIPE_API_KEY or ''
+    return {
+        "mode": STRIPE_MODE,
+        "live": STRIPE_MODE == "live",
+        "key_prefix": (key[:8] + "…") if key else None,
+    }
 
 
 @router.post("/payments/create-checkout")

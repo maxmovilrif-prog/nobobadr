@@ -30,7 +30,10 @@ JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24
 
 # Stripe Configuration
-STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
+# Stripe: prioriza la clave LIVE propia del usuario (STRIPE_LIVE_KEY) si está definida;
+# si no, usa la STRIPE_API_KEY gestionada por la plataforma (test por defecto).
+STRIPE_API_KEY = os.environ.get('STRIPE_LIVE_KEY') or os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
+STRIPE_MODE = 'live' if (os.environ.get('STRIPE_LIVE_KEY') or '').startswith('sk_live_') else 'test'
 
 # LLM Configuration (Emergent Universal Key)
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
