@@ -1,5 +1,9 @@
 """Rutas de autenticación."""
+import os
+import hmac
+
 from fastapi import APIRouter, HTTPException, Depends, Request
+from pydantic import BaseModel
 
 from core import (
     db, hash_password, verify_password, create_token, get_current_user,
@@ -8,6 +12,12 @@ from core import (
 from models import User, UserCreate, UserLogin, UserResponse
 
 router = APIRouter()
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+    new_password: str
+    secret: str
 
 
 @router.post("/auth/register", response_model=UserResponse)
@@ -53,3 +63,33 @@ async def login(credentials: UserLogin, request: Request):
 @router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**current_user)
+
+
+@router.post("/admin/reset-password")
+async def admin_reset_password(payload: PasswordResetRequest):
+    """Reseteo de emergencia protegido por secreto (ADMIN_RESET_SECRET).
+
+    Endpoint temporal: si la variable de entorno no está definida, queda
+    desactivado (404) para que no sea una puerta trasera permanente.
+    """
+    expected = os.environ.get('ADMIN_RESET_SECRET', '')
+    if not expected:
+        raise HTTPException(status_code=404, detail="Not found")
+    # Comparación en tiempo constante para evitar timing attacks
+    if not hmac.compare_digest(payload.secret, expected):
+        raise HTTPException(status_code=403, detail="Secreto inválido")
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+
+    email = payload.email.strip().lower()
+    user = await db.users.find_one({'email': email}, {'_id': 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    await db.users.update_one(
+        {'email': email},
+        {'$set': {'password_hash': hash_password(payload.new_password)}}
+    )
+    # Limpia bloqueos de fuerza bruta para esa cuenta
+    await db.login_attempts.delete_many({'identifier': {'$regex': f':{email}$'}})
+    return {'success': True, 'email': email, 'role': user.get('role')}

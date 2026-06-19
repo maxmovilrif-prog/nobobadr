@@ -15,3 +15,10 @@
 - Other seeded accounts exist (cliente1@test.com, restaurante@test.com, repartidor@test.com, etc.) but their passwords are unknown.
 - Register endpoint: POST /api/auth/register
 - AI Smart Search endpoint: POST /api/search/smart  body: {"query": "tengo hambre"}
+
+## Reseteo de emergencia (endpoint protegido)
+- Endpoint: `POST /api/admin/reset-password`  body: `{"email","new_password","secret"}`
+- Guardado por env `ADMIN_RESET_SECRET`. Si la env NO está definida → 404 (desactivado).
+- PREVIEW secret: `nubo-preview-reset-7K9mQ2xP` (definido en backend/.env de preview).
+- PRODUCCIÓN: el usuario debe definir su propio `ADMIN_RESET_SECRET` en los Secrets de producción y redeployar.
+- Comparación de secreto en tiempo constante (hmac.compare_digest). Min 8 chars en nueva password.
