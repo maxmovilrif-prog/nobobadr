@@ -12,7 +12,7 @@ import OperationsManager from '@/components/OperationsManager';
 import AccountingManager from '@/components/AccountingManager';
 import KpiDashboard from '@/components/KpiDashboard';
 import ManagerManager from '@/components/ManagerManager';
-import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send } from 'lucide-react';
+import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send, CreditCard, RefreshCw } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
 
@@ -48,6 +48,8 @@ export default function AdminDashboard() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [alerts, setAlerts] = useState([]); // recent alert feed
   const [telegramConfigured, setTelegramConfigured] = useState(null);
+  const [stripeStatus, setStripeStatus] = useState(null);
+  const [stripeChecking, setStripeChecking] = useState(false);
   const [telegramTesting, setTelegramTesting] = useState(false);
   const intervalRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -153,6 +155,25 @@ export default function AdminDashboard() {
     axios.get(`${API}/admin/telegram/status`, { headers })
       .then(r => setTelegramConfigured(r.data.configured))
       .catch(() => setTelegramConfigured(false));
+  }, [API, token, isFounder]);
+
+  // Estado de Stripe (solo Fundador)
+  const fetchStripeStatus = async () => {
+    setStripeChecking(true);
+    try {
+      const r = await axios.get(`${API}/admin/payments/status`, { headers: { Authorization: `Bearer ${token}` } });
+      setStripeStatus(r.data);
+    } catch (e) {
+      setStripeStatus(null);
+      toast.error('No se pudo comprobar el estado de Stripe');
+    } finally {
+      setStripeChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isFounder) return;
+    fetchStripeStatus();
   }, [API, token, isFounder]);
 
   const testTelegram = async () => {
@@ -284,6 +305,59 @@ export default function AdminDashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Estado de pagos Stripe — solo Fundador */}
+            {isFounder && (
+            <Card data-testid="admin-stripe" className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-indigo-600" />
+                    Pagos · Stripe
+                  </span>
+                  <Badge
+                    data-testid="stripe-status-badge"
+                    className={
+                      stripeStatus == null
+                        ? 'bg-gray-100 text-gray-600'
+                        : stripeStatus.live
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }
+                  >
+                    {stripeStatus == null ? '...' : stripeStatus.live ? '🟢 LIVE' : '🟡 TEST'}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600 mb-1">
+                  {stripeStatus?.live
+                    ? 'Cobros reales activados. La pasarela está en producción.'
+                    : 'Modo prueba. Define el secreto STRIPE_LIVE_KEY (sk_live_…) en producción para cobros reales.'}
+                </p>
+                {stripeStatus?.key_prefix && (
+                  <p className="text-xs text-gray-400 mb-3" data-testid="stripe-key-prefix">
+                    Clave activa: <code>{stripeStatus.key_prefix}</code>
+                  </p>
+                )}
+                <Button
+                  data-testid="stripe-verify-btn"
+                  onClick={fetchStripeStatus}
+                  disabled={stripeChecking}
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${stripeChecking ? 'animate-spin' : ''}`} />
+                  {stripeChecking ? 'Comprobando...' : 'Verificar estado'}
+                </Button>
+                {stripeStatus && !stripeStatus.live && (
+                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Aún en TEST: crea STRIPE_LIVE_KEY en producción y redespliega.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+            )}
 
             {/* Telegram alerts config — solo Fundador */}
             {isFounder && (
