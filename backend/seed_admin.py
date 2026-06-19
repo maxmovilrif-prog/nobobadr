@@ -8,7 +8,7 @@ import bcrypt
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-ADMIN_EMAIL = "admin@nubo.com"
+ADMIN_EMAIL = "badarbox1756@gmail.com"
 ADMIN_PASSWORD = "Admin1234!"
 
 

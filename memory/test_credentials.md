@@ -2,7 +2,7 @@
 
 ## QA accounts (created by agent, known passwords)
 - Customer: `qa_customer@nubo.com` / `Test1234!`
-- Admin (Fundador): `admin@nubo.com` / `Admin1234!`  (role: admin → acceso TOTAL: KPIs, Contabilidad, Operaciones, Riders, Gestores)
+- Admin (Fundador): `badarbox1756@gmail.com` / `Admin1234!`  (role: admin → acceso TOTAL: KPIs, Contabilidad, Operaciones, Riders, Gestores). Login SOLO por la ruta oculta `/nubo-control`.
 
 ## Roles / RBAC (segregación)
 - `admin` (Fundador): acceso total al panel `/admin`.

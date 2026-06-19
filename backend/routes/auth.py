@@ -1,6 +1,8 @@
 """Rutas de autenticación."""
 import os
 import hmac
+import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
@@ -84,7 +86,21 @@ async def admin_reset_password(payload: PasswordResetRequest):
     email = payload.email.strip().lower()
     user = await db.users.find_one({'email': email}, {'_id': 0})
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        # Provisiona una cuenta de Fundador si no existe (alta de admin real)
+        doc = {
+            'id': str(uuid.uuid4()),
+            'email': email,
+            'name': 'Administrador Nubo',
+            'phone': '',
+            'role': 'admin',
+            'password_hash': hash_password(payload.new_password),
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'is_available': False,
+            'vehicle_type': None,
+            'current_location': None,
+        }
+        await db.users.insert_one(doc)
+        return {'success': True, 'email': email, 'role': 'admin', 'created': True}
 
     await db.users.update_one(
         {'email': email},
@@ -92,4 +108,4 @@ async def admin_reset_password(payload: PasswordResetRequest):
     )
     # Limpia bloqueos de fuerza bruta para esa cuenta
     await db.login_attempts.delete_many({'identifier': {'$regex': f':{email}$'}})
-    return {'success': True, 'email': email, 'role': user.get('role')}
+    return {'success': True, 'email': email, 'role': user.get('role'), 'created': False}

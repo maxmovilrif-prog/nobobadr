@@ -71,12 +71,20 @@ export default function Landing() {
             </div>
             <div className="flex items-center gap-3">
               <LanguageSelector variant="outline" />
-              <Button 
-                data-testid="nav-login-btn"
-                onClick={() => navigate('/auth')}
+              <Button
+                data-testid="nav-track-btn"
+                variant="outline"
+                onClick={() => navigate('/track')}
+                className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-5"
+              >
+                Seguir pedido
+              </Button>
+              <Button
+                data-testid="nav-quote-btn"
+                onClick={() => navigate('/presupuesto')}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-6"
               >
-                {t('common.login')}
+                Calcular precio
               </Button>
             </div>
           </div>
@@ -97,19 +105,19 @@ export default function Landing() {
                 <Button 
                   data-testid="hero-cta-btn"
                   size="lg" 
-                  onClick={() => navigate('/auth')}
+                  onClick={() => navigate('/presupuesto')}
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-8 py-6 text-lg rounded-2xl shadow-lg hover:shadow-xl"
                 >
-                  {t('landing.cta_customer')}
+                  Calcular presupuesto
                 </Button>
                 <Button 
-                  data-testid="partner-cta-btn"
+                  data-testid="hero-track-btn"
                   size="lg" 
                   variant="outline"
-                  onClick={() => navigate('/auth?role=business')}
+                  onClick={() => navigate('/track')}
                   className="border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-8 py-6 text-lg rounded-2xl"
                 >
-                  {t('landing.cta_business')}
+                  Seguir mi pedido
                 </Button>
               </div>
             </div>
@@ -160,15 +168,15 @@ export default function Landing() {
       {/* CTA Section */}
       <div className="py-20 px-6 bg-gradient-to-br from-emerald-600 to-teal-700">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">¿Listo para empezar?</h2>
-          <p className="text-xl text-emerald-50 mb-8">Únete a miles de usuarios en España</p>
+          <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">¿Listo para enviar?</h2>
+          <p className="text-xl text-emerald-50 mb-8">Calcula tu envío al instante en España, Europa y Marruecos</p>
           <Button 
             data-testid="footer-cta-btn"
             size="lg" 
-            onClick={() => navigate('/auth')}
+            onClick={() => navigate('/presupuesto')}
             className="bg-white text-emerald-700 hover:bg-gray-100 px-8 py-6 text-lg rounded-2xl shadow-xl"
           >
-            Crear Cuenta Gratis
+            Calcular presupuesto
           </Button>
         </div>
       </div>

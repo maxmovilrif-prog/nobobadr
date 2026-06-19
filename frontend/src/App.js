@@ -8,6 +8,7 @@ import CustomerDashboard from '@/pages/CustomerDashboard';
 import DriverDashboard from '@/pages/DriverDashboard';
 import BusinessDashboard from '@/pages/BusinessDashboard';
 import AdminDashboard from '@/pages/AdminDashboard';
+import AdminLogin from '@/pages/AdminLogin';
 import DeliveryQuote from '@/pages/DeliveryQuote';
 import RiderApp from '@/rider/RiderApp';
 import PublicTracking from '@/pages/PublicTracking';
@@ -79,17 +80,20 @@ function App() {
     <AuthContext.Provider value={{ user, token, login, logout, API }}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={!user ? <Landing /> : <Navigate to="/dashboard" />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/auth" element={!user ? <Auth /> : <Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={
             user ? (
               user.role === 'customer' ? <CustomerDashboard /> :
               user.role === 'driver' ? <DriverDashboard /> :
-              (user.role === 'admin' || user.role === 'manager') ? <AdminDashboard /> :
+              (user.role === 'admin' || user.role === 'manager') ? <Navigate to="/nubo-control" /> :
               <BusinessDashboard />
             ) : <Navigate to="/auth" />
           } />
-          <Route path="/admin" element={user && (user.role === 'admin' || user.role === 'manager') ? <AdminDashboard /> : <Navigate to="/auth" />} />
+          <Route path="/nubo-control" element={
+            user && (user.role === 'admin' || user.role === 'manager') ? <AdminDashboard /> : <AdminLogin />
+          } />
+          <Route path="/admin" element={<Navigate to="/nubo-control" replace />} />
           <Route path="/presupuesto" element={<DeliveryQuote />} />
           <Route path="/rider" element={<RiderApp />} />
           <Route path="/track" element={<PublicTracking />} />
