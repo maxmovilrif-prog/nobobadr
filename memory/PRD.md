@@ -45,6 +45,12 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - ✅ 82/82 pytest + frontend e2e 100% (iteration_8.json). Tests nuevos: `test_finances_accounting.py`, `test_auto_assign.py`, `test_login_lockout_security.py`.
 - **Mejoras finales (2026-06-18)**: (a) **Doble QR** en la hoja de activación del rider — QR 1 descarga la app (PWA `/rider`) + QR 2 activación; onboarding en 2 escaneos. (b) **Selector de periodo** en `AccountingManager` (Desde/Hasta + presets Hoy/Semana/Mes/Todo) que filtra resumen, nóminas, libro y todos los exports (CSV/PDF). Filtrado por fecha verificado en backend.
 
+## Comunicaciones: Email (Resend) + WhatsApp + Telegram (2026-06-18) ✅/⏳
+- **Email transaccional (Resend)** ✅ construido: `email_service.py` (envío async-safe vía `asyncio.to_thread`, plantilla HTML, degradación elegante si falta `RESEND_API_KEY`). Endpoints Fundador: `GET /api/admin/email/status`, `POST /api/admin/email/test`. Notificaciones automáticas: confirmación al crear pedido exprés y aviso al entregar (best-effort, no bloqueante). Env: `RESEND_API_KEY` (pendiente clave real), `SENDER_EMAIL`, `SENDER_NAME`. Tests: `test_email_resend.py`.
+- **WhatsApp** ✅ botón click-to-chat actualizado a `+34654232573` (configurable por `REACT_APP_WHATSAPP_NUMBER`).
+- **Telegram** ⏳ código listo (bot HTTP API: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ADMIN_CHAT_ID`); el usuario aún no facilitó el token real de @BotFather (pegó texto de ejemplo). Nota: `api_id/api_hash` NO sirven para el bot actual.
+- ✅ 103/103 pytest verdes.
+
 ## Segregación de roles / RBAC (2026-06-18) ✅
 - 3 niveles: **Fundador** (`admin`) acceso total · **Gestor** (`manager`) solo Operaciones + tarifas · **Rider** (`driver`) app aislada.
 - Backend: nueva dependencia `get_current_manager_or_admin` (core.py). Operaciones (ops/orders, assign-nearest, nearest, return-to-queue, assignment-history, stats, active-drivers) permiten admin+manager. Finanzas/KPIs/Contabilidad/alta-Riders quedan **solo Fundador** (`get_current_admin`).

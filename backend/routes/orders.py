@@ -1,4 +1,5 @@
 """Rutas de pedidos."""
+import asyncio
 from datetime import datetime, timezone
 from typing import List
 
@@ -7,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, manager
 from models import Order, OrderCreate, OrderStatusUpdate, ExpressOrderCreate
 import telegram_alerts
+import email_service
 from assignments import auto_assign_order, release_driver
 from accounting import record_order_income
 
@@ -129,6 +131,9 @@ async def create_express_order(order_data: ExpressOrderCreate, current_user: dic
         await auto_assign_order(order.id)
     except Exception:
         pass
+    # Notificación automática de confirmación al cliente (best-effort, no bloqueante)
+    if current_user.get('email'):
+        asyncio.create_task(email_service.send_order_confirmation(current_user['email'], doc))
     return order
 
 
@@ -179,6 +184,10 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
     # Al entregar: registra el ingreso en contabilidad (idempotente) y libera la Abeja
     if status_update.status == 'delivered':
         await record_order_income({**order, **update_fields})
+        # Notificación automática de entrega al cliente (best-effort)
+        customer = await db.users.find_one({'id': order.get('customer_id')}, {'_id': 0, 'email': 1})
+        if customer and customer.get('email'):
+            asyncio.create_task(email_service.send_order_delivered(customer['email'], {**order, **update_fields}))
     if status_update.status in ('delivered', 'cancelled') and order.get('driver_id'):
         await release_driver(order.get('driver_id'))
 
