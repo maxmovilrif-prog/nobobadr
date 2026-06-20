@@ -16,7 +16,7 @@ import pytest
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL, ADMIN_PASS = "admin@nubo.com", "Admin1234!"
+ADMIN_EMAIL, ADMIN_PASS = "badarbox1756@gmail.com", "Admin1234!"
 CUSTOMER_EMAIL, CUSTOMER_PASS = "qa_customer@nubo.com", "Test1234!"
 
 PICKUP = {"lat": round(random.uniform(-55, 55), 4), "lng": round(random.uniform(-150, 150), 4)}  # aislado/aleatorio

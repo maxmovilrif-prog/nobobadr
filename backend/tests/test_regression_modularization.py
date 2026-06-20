@@ -10,7 +10,7 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 
-ADMIN_EMAIL = "admin@nubo.com"
+ADMIN_EMAIL = "badarbox1756@gmail.com"
 ADMIN_PASSWORD = "Admin1234!"
 CUSTOMER_EMAIL = "qa_customer@nubo.com"
 CUSTOMER_PASSWORD = "Test1234!"

@@ -1,0 +1,55 @@
+{
+  "summary": "Iter 9 — Validated TOTAL separation public web vs hidden /nubo-control admin panel + Stripe TEST + reset-password endpoint + email change to badarbox1756@gmail.com. Backend pytest: 113/114 (99.1%) GREEN. Only failure is the carry-over flaky lockout test (test_login_lockout_triggers_through_public_url) due to K8s ingress IP rotation — known issue from iter5-8. Frontend: 18/18 GREEN — Landing at '/' has no nav-login-btn but has nav-track-btn+nav-quote-btn; all CTAs route correctly (nav-quote/hero-cta/footer-cta → /presupuesto, nav-track/hero-track → /track); /nubo-control without session shows admin-login-page+admin-login-form; admin login with badarbox1756@gmail.com/Admin1234! lands on AdminDashboard with admin-stripe badge '🟡 TEST' and toast 'Acceso concedido', URL stays at /nubo-control; /admin redirects to /nubo-control; /dashboard as admin redirects to /nubo-control; customer at /nubo-control shows 'Acceso no autorizado' toast and stays on login. Backend endpoints: POST /api/admin/reset-password (403 wrong secret, success existing created:false, success new created:true with login working); GET /api/admin/payments/status returns mode='test' live=false; RBAC customer→/api/admin/kpis returns 403.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/reset-password", "issue": "Endpoint lowercases email before insert/update (line 86: email.strip().lower()) but POST /api/auth/login does case-sensitive lookup ({'email': credentials.email}). If admin is created or reset with a mixed-case email, the resulting account is stored lowercase and the user MUST login with lowercase. Recommendation: lowercase email on register/login too, or store original casing in reset-password."},
+      {"endpoint": "POST /api/auth/login (brute-force lockout via ingress)", "issue": "FLAKY carry-over from iter5-8: test_login_lockout_triggers_through_public_url got 401 instead of 429 on the 6th attempt. Lockout key uses x-forwarded-for first hop, but K8s ingress sometimes rotates the visible IP between requests, so the same client appears as different identifiers and lockout doesn't trigger reliably."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard map", "issues": ["Google Maps InvalidKeyMapError (placeholder REACT_APP_GOOGLE_MAPS_API_KEY) renders 'Oops! Something went wrong.' overlay inside the dashboard. Cosmetic — expected in preview, but consider a branded placeholder when key is missing."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_separation_iter9.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(LOW consistency) Lowercase email in /api/auth/login and /api/auth/register to match the lowercasing already done in /api/admin/reset-password — prevents case-mismatch login 401 for newly created/reset admins.",
+    "(carry-over HIGH security) Make brute-force lockout K8s-ingress-aware in a robust way (e.g., trust full XFF chain or use a session cookie/device fingerprint) — current x-forwarded-for first-hop is still bypassable when ingress rotates source IP, and causes the test_login_lockout_triggers_through_public_url flake.",
+    "(LOW cosmetic) Replace Google Maps 'Oops/InvalidKeyMapError' overlay in AdminDashboard with a branded placeholder when REACT_APP_GOOGLE_MAPS_API_KEY is the placeholder."
+  ],
+  "critical_code_review_comments": [
+    "App.js routes (lines 82-108) are clean: '/' always renders <Landing/> (no auth check), '/nubo-control' branches on user.role admin|manager → AdminDashboard else AdminLogin, '/admin' Navigate to '/nubo-control', '/dashboard' for admin/manager Navigate to '/nubo-control'. Matches the spec.",
+    "AdminLogin.js (lines 18-37): correctly POSTs /auth/login, validates role admin|manager BEFORE calling login(), shows 'Acceso no autorizado' toast and DOES NOT set token for non-admins. All required data-testids present (admin-login-page, admin-login-form, admin-login-email, admin-login-password, admin-login-submit).",
+    "Landing.js: nav-track-btn (line 75) → /track, nav-quote-btn (line 83) → /presupuesto, hero-cta-btn (106) → /presupuesto, hero-track-btn (114) → /track, footer-cta-btn (174) → /presupuesto. NO nav-login-btn anywhere. Spec satisfied.",
+    "routes/auth.py:70-111 reset-password: hmac.compare_digest for secret, 403 on mismatch, 404 if ADMIN_RESET_SECRET env unset (correct kill-switch behavior), min 8-char password (400), idempotent create-or-update with created:true|false. Bug: lowercases email but the rest of the auth code is case-sensitive — see action_items.",
+    "Backend test suite updated en masse: replaced admin@nubo.com → badarbox1756@gmail.com across 11 test files to align with the new founder email. After replacement, full suite went from many 429/auth errors (cascade from missing user) to 113/114 GREEN."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_separation_iter9.py (NEW)",
+    "/app/backend/tests/test_assignments_bloque_c.py (sed admin@nubo.com → badarbox1756@gmail.com)",
+    "/app/backend/tests/test_auto_assign.py (sed)",
+    "/app/backend/tests/test_bloque_a_cities_delivery.py (sed)",
+    "/app/backend/tests/test_email_resend.py (sed)",
+    "/app/backend/tests/test_finances_accounting.py (sed)",
+    "/app/backend/tests/test_kpis.py (sed)",
+    "/app/backend/tests/test_login_lockout_security.py (sed)",
+    "/app/backend/tests/test_nubo_features.py (sed)",
+    "/app/backend/tests/test_rbac_roles.py (sed)",
+    "/app/backend/tests/test_regression_modularization.py (sed)",
+    "/app/backend/tests/test_riders_and_lockout.py (sed)",
+    "/app/backend/tests/test_stripe_mode.py (sed)"
+  ],
+  "success_rate": {"backend": "99.1% (113/114 pytest; 1 flaky lockout test — K8s ingress IP rotation, known carry-over)", "frontend": "100% (18/18 — landing routes, admin login page, admin dashboard with TEST badge, /admin and /dashboard redirects to /nubo-control, customer RBAC block all GREEN)"},
+  "test_credentials": "Admin: badarbox1756@gmail.com / Admin1234! (login SOLO por /nubo-control). Customer test: registrar nuevo cliente con role=customer vía POST /api/auth/register. ADMIN_RESET_SECRET (preview): nubo-preview-reset-7K9mQ2xP.",
+  "seed_data_creation": "Reset admin badarbox1756@gmail.com password to Admin1234! via /api/admin/reset-password (idempotent). Created test customer qa_cust_iter9_<timestamp>@nubo-qa.com used to verify RBAC block at /nubo-control. Created test admin via reset-password endpoint with new email test_reset_<timestamp>@nubo-qa.com (created:true) to validate auto-provisioning path. All test data prefixed with TEST_ / qa_ / test_ for safe cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Founder email is now badarbox1756@gmail.com (NOT admin@nubo.com). All 13 backend test files were updated. To run regression: `cd /app/backend && export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2) && python3 -m pytest tests/ -q` → 113 passed, 1 flaky lockout (ignore/retry). Admin login ONLY through /nubo-control (no other admin route exists). The existing /auth page is for customer/driver/business roles only — if admin/manager hits /auth+ /dashboard they get redirected to /nubo-control. Reset-password endpoint lowercases email on storage; new test admins must login with lowercase email. Stripe stays in TEST mode (sk_test_emergent in backend/.env) → '🟡 TEST' badge on dashboard.",
+  "rca of the issue": "No new bugs in iter 9. Two minor pre-existing issues surfaced: (1) Email-case mismatch between /admin/reset-password (lowercases) and /auth/login (case-sensitive) — currently harmless because the canonical admin email is already lowercase, but bites tests that use mixed-case emails. Fix: lowercase email everywhere in auth.py. (2) Pre-existing test suite hard-coded the old admin@nubo.com — replaced with badarbox1756@gmail.com via sed, suite now 113/114 GREEN. The 1 remaining failure is the K8s-ingress-IP-rotation lockout flake known since iter5."
+}

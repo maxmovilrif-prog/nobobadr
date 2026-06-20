@@ -9,7 +9,7 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 assert BASE_URL, "REACT_APP_BACKEND_URL must be set"
 
-ADMIN_EMAIL = "admin@nubo.com"
+ADMIN_EMAIL = "badarbox1756@gmail.com"
 ADMIN_PASS = "Admin1234!"
 CUSTOMER_EMAIL = "qa_customer@nubo.com"
 CUSTOMER_PASS = "Test1234!"

@@ -4,7 +4,7 @@ import requests
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL, ADMIN_PASS = "admin@nubo.com", "Admin1234!"
+ADMIN_EMAIL, ADMIN_PASS = "badarbox1756@gmail.com", "Admin1234!"
 CUSTOMER_EMAIL, CUSTOMER_PASS = "qa_customer@nubo.com", "Test1234!"
 
 
