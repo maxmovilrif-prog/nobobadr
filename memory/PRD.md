@@ -15,6 +15,22 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - WebSocket tracking en vivo (`/ws/tracking/{order_id}`), marcador "Abeja" 🐝 en el mapa.
 - Contacto global: exprenobo@hotmail.com / +34 654 24 20 92.
 
+## Implementado en esta sesión (2026-06-19/20) — Arquitectura multi-app + Regional
+- **Separación total web pública / panel oculto**: `/` siempre Landing pública (sin login); panel admin oculto en `/nubo-control` con login propio (`AdminLogin.js`). `/admin` y `/dashboard` (admin) → `/nubo-control`. Web pública solo informativa con acceso discreto "Área de clientes" (navbar + footer) → `/auth`.
+- **Sesiones aisladas**: `AdminAuthContext` (token `nubo_admin_token`) independiente del cliente (`token`) y del rider (`nubo_rider_token`). Resuelve fuga de sesión entre cliente/admin.
+- **Enrutado por subdominio (1 despliegue)**: `frontend/src/lib/portal.js` → `director.noboexpress.com` (Fundador, role admin), `delegacion.noboexpress.com` (Gestores, role manager), `noboexpress.com` (clientes). Rutas ocultas como fallback. DNS lo gestiona el usuario con Soporte.
+- **Arquitectura REGIONAL multi-tenant** (`routes/regions.py`, `core.get_scope_city_ids`): Delegaciones (`regions`: name + city_ids) creadas por el Fundador (`RegionManager.jsx`). Gestores (`manager`) vinculados a UNA región (`ManagerManager.jsx` con selector). Aislamiento estricto: gestor solo ve pedidos/riders/ops/stats de SU región; 403 en KPIs/Contabilidad/regiones/alta-gestores. Riders con `region_id`; Fundador o Gestor regional ven/regeneran código/QR (`routes/riders.py`, scoping `_get_rider_in_scope`).
+- **Reset de contraseña por email** (Fundador + Gestores): `POST /api/auth/forgot-password` + `/auth/reset-password` (token sha256, TTL 1h, un solo uso, anti-enumeración) vía Resend. UI: "¿Olvidaste tu contraseña?" en login admin + `/nubo-control/recuperar`. Riders no usan email → recuperación por regeneración de código/QR.
+- **Reseteo de emergencia** `POST /api/admin/reset-password` (guardado por `ADMIN_RESET_SECRET`, crea admin si no existe) + formulario web `/nubo-control/reset` con ojo 👁️.
+- **Stripe**: override `STRIPE_LIVE_KEY` + badge LIVE/TEST en panel. **MongoDB Atlas** producción: override `MONGO_URL_OVERRIDE`/`DB_NAME_OVERRIDE` (core.py), seed `seed_atlas.py` (16 ciudades + Fundador).
+- ✅ Testeado: **140/140 pytest** + frontend e2e (iteration_10.json). Email Login normaliza a minúsculas.
+
+## Pendiente / Backlog
+- DNS de subdominios (director./delegacion.) → usuario + Soporte Emergent.
+- Producción: añadir secrets `MONGO_URL_OVERRIDE`, `DB_NAME_OVERRIDE`, `STRIPE_LIVE_KEY`, `RESEND_API_KEY`, `ADMIN_RESET_SECRET`, `REACT_APP_GOOGLE_MAPS_API_KEY` (vía Soporte si la UI los bloquea).
+- (P2) Auto-despacho restringido a la región del pedido (riders de la misma delegación). (P2) Cron nocturno KPIs por email. (P3) Apps nativas store (React Native/Capacitor).
+
+
 ## Implementado en esta sesión (2026-06-18)
 - **Búsqueda con IA (lenguaje natural)** — `POST /api/search/smart`. Interpreta consultas como "tengo hambre" con `gpt-5.4-mini` (Emergent LLM Key) y devuelve negocios + productos relevantes. UI en CustomerDashboard (tab Negocios). ✅ Testeado.
 - **Panel de Admin con Mapa de Flota en tiempo real** — `AdminDashboard.js`, ruta `/admin` y redirección por rol admin desde `/dashboard`. Endpoints `GET /api/admin/active-drivers` y `GET /api/admin/stats` (protegidos, solo rol admin → 403). ✅ Testeado.
