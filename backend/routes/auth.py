@@ -77,11 +77,11 @@ async def admin_reset_password(payload: PasswordResetRequest):
     Endpoint temporal: si la variable de entorno no está definida, queda
     desactivado (404) para que no sea una puerta trasera permanente.
     """
-    expected = os.environ.get('ADMIN_RESET_SECRET', '')
+    expected = os.environ.get('ADMIN_RESET_SECRET', '').strip()
     if not expected:
         raise HTTPException(status_code=404, detail="Not found")
-    # Comparación en tiempo constante para evitar timing attacks
-    if not hmac.compare_digest(payload.secret, expected):
+    # Comparación en tiempo constante; recortamos espacios/saltos invisibles a ambos lados
+    if not hmac.compare_digest(payload.secret.strip(), expected):
         raise HTTPException(status_code=403, detail="Secreto inválido")
     if len(payload.new_password) < 8:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")

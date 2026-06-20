@@ -31,7 +31,7 @@ export default function AdminReset() {
       const r = await axios.post(`${API}/admin/reset-password`, {
         email: data.email.trim().toLowerCase(),
         new_password: data.new_password,
-        secret: data.secret,
+        secret: data.secret.trim(),
       });
       setDone(r.data);
       toast.success(r.data.created ? 'Cuenta de Fundador creada' : 'Contraseña actualizada');
