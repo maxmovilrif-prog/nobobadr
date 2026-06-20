@@ -27,11 +27,13 @@ async def register(user_data: UserCreate):
     # Public registration cannot create privileged accounts
     if user_data.role not in ('customer', 'driver', 'business'):
         raise HTTPException(status_code=400, detail="Rol no válido")
-    existing = await db.users.find_one({'email': user_data.email}, {'_id': 0})
+    email_norm = user_data.email.strip().lower()
+    existing = await db.users.find_one({'email': email_norm}, {'_id': 0})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user_dict = user_data.model_dump()
+    user_dict['email'] = user_dict['email'].strip().lower()
     password = user_dict.pop('password')
     user_dict['password_hash'] = hash_password(password)
 
@@ -48,10 +50,11 @@ async def login(credentials: UserLogin, request: Request):
     # Detrás del ingress de K8s, request.client.host es la IP del proxy; usar X-Forwarded-For
     fwd = request.headers.get('x-forwarded-for', '')
     ip = fwd.split(',')[0].strip() if fwd else (request.client.host if request.client else "unknown")
-    identifier = f"{ip}:{credentials.email.lower()}"
+    email_norm = credentials.email.strip().lower()
+    identifier = f"{ip}:{email_norm}"
     await check_login_lockout(identifier)
 
-    user = await db.users.find_one({'email': credentials.email}, {'_id': 0})
+    user = await db.users.find_one({'email': email_norm}, {'_id': 0})
     if not user or not verify_password(credentials.password, user['password_hash']):
         await register_failed_login(identifier)
         raise HTTPException(status_code=401, detail="Invalid credentials")

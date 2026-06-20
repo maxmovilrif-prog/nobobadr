@@ -64,8 +64,8 @@ class TestAuth:
         r = api.post(f"{BASE_URL}/api/auth/register", json=payload, timeout=30)
         assert r.status_code == 200, r.text
         data = r.json()
-        # Register returns UserResponse (no token by contract)
-        assert data["email"] == payload["email"]
+        # Register returns UserResponse (no token by contract). Email is normalised to lowercase.
+        assert data["email"] == payload["email"].lower()
         assert data["role"] == "customer"
         assert "id" in data
 

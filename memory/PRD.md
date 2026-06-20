@@ -88,3 +88,13 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 ## Notas
 - App usa MongoDB (NO PostgreSQL).
 - Tests: `/app/backend/tests/test_nubo_features.py`. Credenciales: `/app/memory/test_credentials.md`.
+
+## Separación total: Web pública vs Panel oculto (2026-06-19) ✅
+- **Web pública** en `/` (`Landing.js`): SIEMPRE informativa, sin login (aunque haya sesión). Navbar con "Seguir pedido" (`/track`) y "Calcular precio" (`/presupuesto`); se quitó el botón de login/registro de clientes. CTAs del hero/footer → `/presupuesto` y `/track`.
+- **Panel de administración oculto** en `/nubo-control` (no enlazado desde la web pública): login dedicado `AdminLogin.js` (marca "Nubo Control · Acceso restringido", tema oscuro glass). Valida rol admin/manager ANTES de iniciar sesión; cliente → "Acceso no autorizado". Tras login → `AdminDashboard`.
+- `/admin` redirige a `/nubo-control`; `/dashboard` para admin/manager redirige a `/nubo-control`. `/auth` (login/registro de clientes) sigue existiendo pero NO enlazado en público.
+- **Email del Fundador** cambiado a `badarbox1756@gmail.com` (en preview; en prod se provisiona vía endpoint de reseteo).
+- **Normalización de email**: `register` y `login` ahora hacen `.strip().lower()` (coherente con el endpoint de reseteo) → evita fallos de login por mayúsculas.
+- **Stripe**: badge 🟢 LIVE / 🟡 TEST + botón "Verificar estado" en el panel del Fundador (`GET /api/admin/payments/status`). En preview → TEST.
+- **Reseteo de emergencia**: `POST /api/admin/reset-password` (guardado por `ADMIN_RESET_SECRET`, hmac.compare_digest, 404 si la env no existe). Crea la cuenta de admin si no existe (`created:true`) → permite provisionar el Fundador real en producción.
+- ✅ 114/114 pytest + frontend e2e 18/18 (iteration_9.json).
