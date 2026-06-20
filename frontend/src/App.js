@@ -11,6 +11,7 @@ import AdminDashboard from '@/pages/AdminDashboard';
 import AdminLogin from '@/pages/AdminLogin';
 import AdminReset from '@/pages/AdminReset';
 import AdminPasswordReset from '@/pages/AdminPasswordReset';
+import { getPortal } from '@/lib/portal';
 import DeliveryQuote from '@/pages/DeliveryQuote';
 import RiderApp from '@/rider/RiderApp';
 import PublicTracking from '@/pages/PublicTracking';
@@ -124,12 +125,19 @@ function App() {
     );
   }
 
+  // Enrutado por subdominio: cada portal muestra solo su app.
+  const portal = getPortal();
+  const adminAllowed = adminUser && (adminUser.role === 'admin' || adminUser.role === 'manager');
+  const rootElement = portal === 'client'
+    ? <Landing />
+    : (adminAllowed ? <AdminDashboard /> : <AdminLogin portal={portal} />);
+
   return (
     <AuthContext.Provider value={{ user, token, login, logout, API }}>
     <AdminAuthContext.Provider value={{ adminUser, adminToken, adminLogin, adminLogout, API }}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={rootElement} />
           <Route path="/auth" element={!user ? <Auth /> : <Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={
             user ? (
@@ -140,7 +148,7 @@ function App() {
             ) : <Navigate to="/auth" />
           } />
           <Route path="/nubo-control" element={
-            adminUser && (adminUser.role === 'admin' || adminUser.role === 'manager') ? <AdminDashboard /> : <AdminLogin />
+            adminAllowed ? <AdminDashboard /> : <AdminLogin portal={portal} />
           } />
           <Route path="/nubo-control/reset" element={<AdminReset />} />
           <Route path="/nubo-control/recuperar" element={<AdminPasswordReset />} />

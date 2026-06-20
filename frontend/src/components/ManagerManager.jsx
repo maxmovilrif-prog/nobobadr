@@ -10,14 +10,19 @@ import { ShieldCheck, UserPlus, Trash2, Loader2, Mail } from 'lucide-react';
 export const ManagerManager = ({ API, token }) => {
   const auth = { headers: { Authorization: `Bearer ${token}` } };
   const [managers, setManagers] = useState([]);
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [regions, setRegions] = useState([]);
+  const [form, setForm] = useState({ name: '', email: '', password: '', region_id: '' });
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
   const fetchManagers = useCallback(async () => {
     try {
-      const res = await axios.get(`${API}/admin/managers`, auth);
-      setManagers(res.data.managers || []);
+      const [mRes, rRes] = await Promise.all([
+        axios.get(`${API}/admin/managers`, auth),
+        axios.get(`${API}/admin/regions`, auth),
+      ]);
+      setManagers(mRes.data.managers || []);
+      setRegions(rRes.data.regions || []);
     } catch (e) { /* noop */ }
     // eslint-disable-next-line
   }, [API, token]);
@@ -28,13 +33,15 @@ export const ManagerManager = ({ API, token }) => {
     if (form.name.trim().length < 2 || !form.email.trim() || form.password.length < 6) {
       toast.error('Nombre, email válido y contraseña (mín. 6 caracteres)'); return;
     }
+    if (!form.region_id) { toast.error('Selecciona la delegación del gestor'); return; }
     setCreating(true);
     try {
       await axios.post(`${API}/admin/managers`, {
         name: form.name.trim(), email: form.email.trim().toLowerCase(), password: form.password,
+        region_id: form.region_id,
       }, auth);
       toast.success('Cuenta de Gestor creada');
-      setForm({ name: '', email: '', password: '' });
+      setForm({ name: '', email: '', password: '', region_id: '' });
       fetchManagers();
     } catch (err) {
       const d = err?.response?.data?.detail;
@@ -62,9 +69,9 @@ export const ManagerManager = ({ API, token }) => {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs text-gray-500">
-          Los Gestores acceden <b>solo a Operaciones</b> (ver pedidos, tarifas por distancia y despachar). No ven KPIs ni Contabilidad.
+          Los Gestores acceden <b>solo a su delegación</b> (pedidos, riders y despacho de su región). No ven KPIs, Contabilidad ni otras regiones.
         </p>
-        <div className="grid sm:grid-cols-4 gap-2 items-end">
+        <div className="grid sm:grid-cols-5 gap-2 items-end">
           <div>
             <label className="text-xs text-gray-500">Nombre</label>
             <Input data-testid="manager-name-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-9" placeholder="Ej. María Gestora" />
@@ -77,11 +84,22 @@ export const ManagerManager = ({ API, token }) => {
             <label className="text-xs text-gray-500">Contraseña</label>
             <Input data-testid="manager-password-input" type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="h-9" placeholder="mín. 6 caracteres" />
           </div>
+          <div>
+            <label className="text-xs text-gray-500">Delegación</label>
+            <select data-testid="manager-region-select" value={form.region_id} onChange={(e) => setForm({ ...form, region_id: e.target.value })}
+              className="h-9 w-full rounded-md border border-gray-200 px-2 text-sm bg-white">
+              <option value="">Selecciona…</option>
+              {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
           <Button data-testid="manager-add-btn" onClick={createManager} disabled={creating} className="bg-emerald-600 hover:bg-emerald-700">
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4 mr-1" />}
             {creating ? '' : 'Crear Gestor'}
           </Button>
         </div>
+        {regions.length === 0 && (
+          <p className="text-xs text-amber-600">⚠️ Crea primero una <b>Delegación</b> (arriba) para poder asignar gestores.</p>
+        )}
 
         {managers.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-6">Aún no hay gestores. Crea la primera cuenta de tu equipo.</p>
@@ -96,7 +114,7 @@ export const ManagerManager = ({ API, token }) => {
                   <p className="font-medium text-gray-900 truncate">{m.name}</p>
                   <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><Mail className="w-3 h-3" /> {m.email}</p>
                 </div>
-                <Badge className="bg-blue-100 text-blue-700">Gestor</Badge>
+                <Badge className="bg-blue-100 text-blue-700">{m.region_name || 'Sin región'}</Badge>
                 <Button data-testid={`manager-delete-${m.id}`} onClick={() => removeManager(m.id)} disabled={deletingId === m.id}
                   size="icon" variant="ghost" className="text-rose-500 hover:bg-rose-50">
                   {deletingId === m.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}

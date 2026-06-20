@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 
 from core import (
-    db, get_current_admin, get_current_rider,
+    db, get_current_admin, get_current_manager_or_admin, get_current_rider,
     create_rider_token, generate_qr_data_url,
 )
 from models import RiderCreate, RiderUpdate, RiderActivate, RiderLocation
@@ -27,6 +27,8 @@ def _public_rider(u: dict) -> dict:
         "dni": u.get("dni"),
         "license_plate": u.get("license_plate"),
         "city_id": u.get("city_id"),
+        "region_id": u.get("region_id"),
+        "region_name": u.get("region_name"),
         "activation_code": u.get("activation_code"),
         "activated": u.get("activated", False),
         "activated_at": u.get("activated_at"),
@@ -35,6 +37,22 @@ def _public_rider(u: dict) -> dict:
         "current_location": u.get("current_location"),
         "created_at": u.get("created_at"),
     }
+
+
+def _manager_region_id(current_user: dict):
+    """Región del Gestor (None si es Fundador → acceso global)."""
+    return current_user.get("region_id") if current_user.get("role") == "manager" else None
+
+
+async def _get_rider_in_scope(rider_id: str, current_user: dict) -> dict:
+    """Obtiene un rider verificando el aislamiento regional del Gestor."""
+    rider = await db.users.find_one({"id": rider_id, "role": "driver"}, {"_id": 0})
+    if not rider:
+        raise HTTPException(status_code=404, detail="Rider no encontrado")
+    region_id = _manager_region_id(current_user)
+    if region_id is not None and rider.get("region_id") != region_id:
+        raise HTTPException(status_code=403, detail="Este rider no pertenece a tu delegación")
+    return rider
 
 
 async def _generate_unique_code() -> str:
@@ -53,9 +71,18 @@ async def _generate_unique_code() -> str:
 # =========================
 
 @router.post("/admin/riders")
-async def admin_create_rider(data: RiderCreate, current_user: dict = Depends(get_current_admin)):
+async def admin_create_rider(data: RiderCreate, current_user: dict = Depends(get_current_manager_or_admin)):
     if data.vehicle_type not in VALID_VEHICLES:
         raise HTTPException(status_code=400, detail="Tipo de vehículo no válido")
+    # Aislamiento regional: el Gestor solo crea riders en SU delegación; el Fundador elige.
+    mgr_region = _manager_region_id(current_user)
+    region_id = mgr_region if mgr_region is not None else data.region_id
+    region_name = None
+    if region_id:
+        region = await db.regions.find_one({"id": region_id}, {"_id": 0, "name": 1})
+        if not region:
+            raise HTTPException(status_code=400, detail="Región/delegación no válida")
+        region_name = region.get("name")
     code = await _generate_unique_code()
     rider = {
         "id": str(uuid.uuid4()),
@@ -68,6 +95,8 @@ async def admin_create_rider(data: RiderCreate, current_user: dict = Depends(get
         "dni": data.dni,
         "license_plate": data.license_plate,
         "city_id": data.city_id,
+        "region_id": region_id,
+        "region_name": region_name,
         "activation_code": code,
         "activated": False,
         "activated_at": None,
@@ -83,16 +112,18 @@ async def admin_create_rider(data: RiderCreate, current_user: dict = Depends(get
 
 
 @router.get("/admin/riders")
-async def admin_list_riders(current_user: dict = Depends(get_current_admin)):
-    riders = await db.users.find({"role": "driver"}, {"_id": 0, "password_hash": 0}).to_list(1000)
+async def admin_list_riders(current_user: dict = Depends(get_current_manager_or_admin)):
+    query = {"role": "driver"}
+    region_id = _manager_region_id(current_user)
+    if region_id is not None:
+        query["region_id"] = region_id  # Gestor: solo SU delegación
+    riders = await db.users.find(query, {"_id": 0, "password_hash": 0}).to_list(1000)
     return {"riders": [_public_rider(r) for r in riders], "count": len(riders)}
 
 
 @router.get("/admin/riders/{rider_id}/qr")
-async def admin_rider_qr(rider_id: str, current_user: dict = Depends(get_current_admin)):
-    rider = await db.users.find_one({"id": rider_id, "role": "driver"}, {"_id": 0})
-    if not rider:
-        raise HTTPException(status_code=404, detail="Rider no encontrado")
+async def admin_rider_qr(rider_id: str, current_user: dict = Depends(get_current_manager_or_admin)):
+    rider = await _get_rider_in_scope(rider_id, current_user)
     return {
         "activation_code": rider.get("activation_code"),
         "qr_data_url": generate_qr_data_url(rider.get("activation_code", "")),
@@ -100,15 +131,21 @@ async def admin_rider_qr(rider_id: str, current_user: dict = Depends(get_current
 
 
 @router.patch("/admin/riders/{rider_id}")
-async def admin_update_rider(rider_id: str, data: RiderUpdate, current_user: dict = Depends(get_current_admin)):
-    rider = await db.users.find_one({"id": rider_id, "role": "driver"}, {"_id": 0})
-    if not rider:
-        raise HTTPException(status_code=404, detail="Rider no encontrado")
+async def admin_update_rider(rider_id: str, data: RiderUpdate, current_user: dict = Depends(get_current_manager_or_admin)):
+    rider = await _get_rider_in_scope(rider_id, current_user)
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if "vehicle_type" in updates and updates["vehicle_type"] not in VALID_VEHICLES:
         raise HTTPException(status_code=400, detail="Tipo de vehículo no válido")
     if "contract_status" in updates and updates["contract_status"] not in ("active", "suspended"):
         raise HTTPException(status_code=400, detail="Estado de contrato no válido")
+    # Un Gestor no puede mover un rider a otra delegación
+    if _manager_region_id(current_user) is not None:
+        updates.pop("region_id", None)
+    elif "region_id" in updates:
+        region = await db.regions.find_one({"id": updates["region_id"]}, {"_id": 0, "name": 1})
+        if not region:
+            raise HTTPException(status_code=400, detail="Región/delegación no válida")
+        updates["region_name"] = region.get("name")
     if updates:
         await db.users.update_one({"id": rider_id}, {"$set": updates})
     rider.update(updates)
@@ -116,10 +153,8 @@ async def admin_update_rider(rider_id: str, data: RiderUpdate, current_user: dic
 
 
 @router.post("/admin/riders/{rider_id}/regenerate-code")
-async def admin_regenerate_code(rider_id: str, current_user: dict = Depends(get_current_admin)):
-    rider = await db.users.find_one({"id": rider_id, "role": "driver"}, {"_id": 0})
-    if not rider:
-        raise HTTPException(status_code=404, detail="Rider no encontrado")
+async def admin_regenerate_code(rider_id: str, current_user: dict = Depends(get_current_manager_or_admin)):
+    rider = await _get_rider_in_scope(rider_id, current_user)
     code = await _generate_unique_code()
     await db.users.update_one({"id": rider_id}, {"$set": {"activation_code": code, "activated": False, "activated_at": None}})
     return {"activation_code": code, "qr_data_url": generate_qr_data_url(code)}

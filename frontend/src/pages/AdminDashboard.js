@@ -12,6 +12,7 @@ import OperationsManager from '@/components/OperationsManager';
 import AccountingManager from '@/components/AccountingManager';
 import KpiDashboard from '@/components/KpiDashboard';
 import ManagerManager from '@/components/ManagerManager';
+import RegionManager from '@/components/RegionManager';
 import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send, CreditCard, RefreshCw } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
@@ -446,6 +447,9 @@ export default function AdminDashboard() {
 
             {/* Gestión de Riders (Abejas) */}
             <RiderManager API={API} token={token} />
+
+            {/* Delegaciones (administraciones regionales) */}
+            <RegionManager API={API} token={token} />
 
             {/* Equipo de Gestión (cuentas de Gestor) */}
             <ManagerManager API={API} token={token} />

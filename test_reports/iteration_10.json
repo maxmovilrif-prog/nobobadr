@@ -1,0 +1,46 @@
+{
+  "summary": "Iter 10 — Validated the NEW multi-tenant regional architecture (Delegaciones), Regional Managers (Gestores) with strict RBAC, password reset via email (forgot/reset token one-shot), and admin/customer session isolation. Backend: 140/140 pytest GREEN (NEW file test_regional_multitenant.py with 26 tests covering regions CRUD, manager creation, manager 403 on KPIs/regions/managers, regions/mine for both admin and manager, riders scoped by region with regenerate-code, forgot/reset password full flow with one-shot token reuse rejection). Frontend: all required flows GREEN — admin login at /nubo-control with badarbox1756@gmail.com / Admin1234! lands on AdminDashboard which renders both region-manager-card (Delegaciones) and manager-manager-card (Equipo de Gestión); admin-forgot-link toggles admin-forgot-form, admin-forgot-submit shows generic message; region creation via UI (region-name-input + region-city-* + region-add-btn) appears as region-row-<id> with city badges and 0/0 counters; manager creation via UI (manager-name/email/password/region-select + manager-add-btn) appears in the list with its region badge (verified in screenshot — 'QA Gestor' linked to 'QA Región 68802c'). Manager login at /nubo-control routes to Operations view with header 'Nubo Operaciones · Panel de Gestión · <name>' — DOES NOT render region-manager-card, manager-manager-card, nor 'Contabilidad' (UI RBAC strictly enforced). Customer regression: qa_customer@nubo.com / Test1234! at /auth → /dashboard. Session isolation: landing nav-client-login-btn → /auth (NOT to admin); clean storage on /nubo-control → admin-login-form visible.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/forgot-password", "issue": "Anti-enumeration: returns generic message in 100% of cases (good). Confirmed token is created ONLY for admin/manager roles, NOT for customer or unknown emails — DB-level assertion in test."},
+      {"endpoint": "/api/auth/reset-password", "issue": "One-shot enforced (used:True flag, second use → 400). Token TTL 1h works. Short password <8 → 400. Invalid/unknown token → 400. All verified."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard map", "issues": ["Carry-over from iter9: Google Maps InvalidKeyMapError (placeholder REACT_APP_GOOGLE_MAPS_API_KEY) shows 'Oops!' overlay. Cosmetic, preview-only."]},
+      {"screen": "Manager dashboard (Nubo Operaciones)", "issues": ["Console shows two 401s when manager loads dashboard — these are RBAC-protected endpoints (KPIs/finance) that the dashboard component still attempts to call before checking role. Functional impact: NONE (UI hides those sections). Suggest gating the fetch calls by role to avoid noisy console errors."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_regional_multitenant.py",
+    "/app/test_reports/pytest/iter10_regional.xml",
+    "/app/test_reports/pytest/iter10_full.xml"
+  ],
+  "action_items": [
+    "(LOW noise) In AdminDashboard / Operations view, gate /api/admin/kpis and /api/admin/finances/* fetches by role so manager sessions don't generate 401s in the browser console.",
+    "(carry-over LOW cosmetic) Replace Google Maps 'Oops/InvalidKeyMapError' overlay with a branded placeholder when REACT_APP_GOOGLE_MAPS_API_KEY is missing/placeholder.",
+    "(carry-over from iter9) Consider lowercasing email in /auth/login and /auth/register for consistency with /admin/reset-password (already lowercases). Currently harmless because canonical admin email is lowercase, but bites mixed-case test inputs."
+  ],
+  "critical_code_review_comments": [
+    "core.py get_scope_city_ids is the right single source of truth: admin → None (global), manager → his region.city_ids, manager-without-region → [] (sees nothing). Used uniformly in admin_active_drivers, admin_stats, and riders list/get/regenerate.",
+    "routes/regions.py: name uniqueness enforced (400 on clash both on create and update). Delete blocked when managers attached (400). region/mine endpoint returns is_founder:true for admin (no region needed) and the full region+cities+counts for manager — clean.",
+    "routes/auth.py forgot/reset-password: anti-enumeration generic response, token sha256-hashed in DB (never stored raw), TTL 1h enforced with timezone-aware comparison, one-shot via used flag, login_attempts cleared after reset (best-effort). Robust.",
+    "routes/admin.py ManagerCreate requires region_id (Pydantic min_length=1); admin_active_drivers/admin_stats apply scope_city_ids; route handlers explicitly depend on get_current_admin where management is admin-only.",
+    "routes/riders.py: _manager_region_id helper + _get_rider_in_scope correctly enforce: (a) on POST /admin/riders a manager can only create riders in his OWN region (region_id from his session, not from payload); (b) regenerate-code by foreign manager → 404 'Rider no encontrado' (verified). Activation_code is regenerated cryptographically and qr_data_url returned inline.",
+    "Frontend RegionManager.jsx + ManagerManager.jsx are admin-only cards rendered inside AdminDashboard (NOT inside the Operations view). Manager logging in gets a different layout (Nubo Operaciones · Panel de Gestión), so the cards are not even mounted — strongest possible UI isolation."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_regional_multitenant.py (NEW, 26 tests, 100% green)"
+  ],
+  "success_rate": {"backend": "100% (140/140 pytest, including new 26 regional tests)", "frontend": "100% on the required regional flows (admin dashboard cards, region creation UI, manager creation UI, manager login isolation, forgot-password UI, customer login regression, landing nav-client-login-btn → /auth)"},
+  "test_credentials": "Admin/Fundador: badarbox1756@gmail.com / Admin1234! (login SOLO por /nubo-control). Customer: qa_customer@nubo.com / Test1234! (en /auth). Managers: creados al vuelo por el test (qa_mgr_*_<runid>@nubo-qa.com / MgrPass123!). Token de reseteo: inyectado en DB con hash sha256 conocido para validar el flow de un solo uso.",
+  "seed_data_creation": "Per-run test data prefixed TEST_/qa_ with a random RUN_ID suffix. Cleanup test (test_zz_cleanup) deletes the created regions, managers, riders and password_reset_tokens at end of run. NOTE: previous frontend test runs left some 'TEST_FE_Reg_*' / 'TEST_UI_Reg_*' rows behind (visible in dashboard screenshots) — recommend a one-off cleanup query: db.regions.delete_many({name: /^TEST_/}), db.users.delete_many({email: /^qa_mgr_/}).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All regional multi-tenant features (delegaciones + gestores regionales + riders scoped + forgot/reset password + session isolation admin↔cliente) are verified end-to-end. Backend suite: cd /app/backend && export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2) && python3 -m pytest tests/ -q → 140 passed. To extend the regional tests use /app/backend/tests/test_regional_multitenant.py as template (uses module-level STATE dict for state-sharing between tests). Public cities endpoint is /api/public/cities (no auth). Valid vehicle_types for /api/admin/riders are STRICT: bicycle|motorcycle|car|truck (NOT 'moto'/'bici'). Forgot-password in preview does NOT send email (RESEND_API_KEY empty) but token IS created in db.password_reset_tokens — use sha256(token_raw) for direct DB verification. Manager view in UI is a separate page (Nubo Operaciones) without admin cards — region-manager-card and manager-manager-card are admin-only. The 401s in manager browser console come from dashboard fetches still calling protected endpoints — cosmetic only, no functional impact.",
+  "rca of the issue": "No bugs found in iteration 10. Only minor cleanups suggested: (a) gate role-restricted fetches in dashboard to avoid 401 console noise for managers; (b) carry-over Maps placeholder; (c) carry-over email-case consistency. Backend RBAC is correctly enforced at the route/dependency level (get_current_admin, get_current_manager_or_admin, get_scope_city_ids) and at the resource level (_get_rider_in_scope). Multi-tenant isolation is robust: a manager truly cannot read or write anything outside his region.city_ids, and admin endpoints (kpis, regions list, manager creation) are 403 for managers as required."
+}

@@ -9,13 +9,21 @@ import { toast } from 'sonner';
 import { AdminAuthContext } from '@/App';
 import { ShieldCheck, Lock } from 'lucide-react';
 
-export default function AdminLogin() {
+export default function AdminLogin({ portal = 'client' }) {
   const navigate = useNavigate();
   const { adminLogin, API } = useContext(AdminAuthContext);
   const [loading, setLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [data, setData] = useState({ email: '', password: '' });
+
+  const PORTALS = {
+    founder: { title: 'Panel del Director', subtitle: 'Acceso exclusivo · Director General', roles: ['admin'] },
+    delegacion: { title: 'Panel de Delegaciones', subtitle: 'Acceso · Gestor Regional', roles: ['manager'] },
+    client: { title: 'Nubo Control', subtitle: 'Acceso restringido · Panel de gestión', roles: ['admin', 'manager'] },
+  };
+  const cfg = PORTALS[portal] || PORTALS.client;
+  const homePath = portal === 'client' ? '/nubo-control' : '/';
 
   const handleForgot = async (e) => {
     e.preventDefault();
@@ -37,14 +45,14 @@ export default function AdminLogin() {
     try {
       const response = await axios.post(`${API}/auth/login`, data);
       const role = response.data?.user?.role;
-      if (role !== 'admin' && role !== 'manager') {
-        toast.error('Acceso no autorizado');
+      if (!cfg.roles.includes(role)) {
+        toast.error('Acceso no autorizado para este panel');
         setLoading(false);
         return;
       }
       adminLogin(response.data.token, response.data.user);
       toast.success('Acceso concedido');
-      navigate('/nubo-control');
+      navigate(homePath);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Credenciales no válidas');
     } finally {
@@ -63,8 +71,8 @@ export default function AdminLogin() {
           <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center mb-4">
             <ShieldCheck className="w-7 h-7 text-emerald-400" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Nubo Control</h1>
-          <p className="text-sm text-emerald-300/70 mt-1">Acceso restringido · Panel de gestión</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">{cfg.title}</h1>
+          <p className="text-sm text-emerald-300/70 mt-1">{cfg.subtitle}</p>
         </div>
 
         <Card className="border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl">

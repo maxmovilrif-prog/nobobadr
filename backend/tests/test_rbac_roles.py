@@ -28,16 +28,28 @@ def admin_h():
 
 
 @pytest.fixture(scope="module")
-def manager(admin_h):
+def region(admin_h):
+    cities = requests.get(f"{API}/public/cities").json()
+    cities = cities if isinstance(cities, list) else cities.get("cities", [])
+    city_ids = [c["id"] for c in cities[:2]]
+    r = requests.post(f"{API}/admin/regions", headers=admin_h,
+                      json={"name": f"QA Región {uuid.uuid4().hex[:6]}", "city_ids": city_ids})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@pytest.fixture(scope="module")
+def manager(admin_h, region):
     email = f"gestor_{uuid.uuid4().hex[:8]}@nubo.com"
     pwd = "Gestor1234"
     r = requests.post(f"{API}/admin/managers", headers=admin_h,
-                      json={"name": "QA Gestor", "email": email, "password": pwd})
+                      json={"name": "QA Gestor", "email": email, "password": pwd, "region_id": region["id"]})
     assert r.status_code == 200, r.text
     assert r.json()["role"] == "manager"
+    assert r.json()["region_id"] == region["id"]
     assert "password_hash" not in r.json()
     h = {"Authorization": f"Bearer {_token(email, pwd)}"}
-    return {"email": email, "id": r.json()["id"], "h": h}
+    return {"email": email, "id": r.json()["id"], "h": h, "region_id": region["id"]}
 
 
 def test_founder_creates_and_lists_manager(admin_h, manager):
@@ -46,9 +58,9 @@ def test_founder_creates_and_lists_manager(admin_h, manager):
     assert any(m["id"] == manager["id"] for m in r.json()["managers"])
 
 
-def test_duplicate_manager_email_rejected(admin_h, manager):
+def test_duplicate_manager_email_rejected(admin_h, manager, region):
     r = requests.post(f"{API}/admin/managers", headers=admin_h,
-                      json={"name": "Dup", "email": manager["email"], "password": "Otra1234"})
+                      json={"name": "Dup", "email": manager["email"], "password": "Otra1234", "region_id": region["id"]})
     assert r.status_code == 400
 
 
@@ -69,12 +81,15 @@ def test_manager_blocked_from_finance_and_admin(manager, path):
     assert r.status_code == 403, f"{path} -> {r.status_code} (debería ser 403)"
 
 
-def test_manager_cannot_create_riders_or_managers(manager):
+def test_manager_can_manage_own_riders_but_not_managers(manager):
+    # El Gestor SÍ puede crear riders en SU delegación (quedan vinculados a su región)
     r = requests.post(f"{API}/admin/riders", headers=manager["h"],
-                      json={"name": "x", "phone": "600000000", "vehicle_type": "car"})
-    assert r.status_code == 403
+                      json={"name": "Rider QA", "phone": "600000000", "vehicle_type": "car"})
+    assert r.status_code == 200, r.text
+    assert r.json()["region_id"] == manager["region_id"]
+    # Pero NO puede crear cuentas de Gestor (solo el Fundador)
     r = requests.post(f"{API}/admin/managers", headers=manager["h"],
-                      json={"name": "y", "email": "z@z.com", "password": "123456"})
+                      json={"name": "y", "email": "z@z.com", "password": "123456", "region_id": manager["region_id"]})
     assert r.status_code == 403
 
 
@@ -92,10 +107,10 @@ def test_customer_cannot_create_managers():
     assert r.status_code == 403
 
 
-def test_delete_manager(admin_h):
+def test_delete_manager(admin_h, region):
     email = f"gestor_del_{uuid.uuid4().hex[:8]}@nubo.com"
     r = requests.post(f"{API}/admin/managers", headers=admin_h,
-                      json={"name": "Para Borrar", "email": email, "password": "Borrar1234"})
+                      json={"name": "Para Borrar", "email": email, "password": "Borrar1234", "region_id": region["id"]})
     mid = r.json()["id"]
     r = requests.delete(f"{API}/admin/managers/{mid}", headers=admin_h)
     assert r.status_code == 200
