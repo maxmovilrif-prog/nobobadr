@@ -6,12 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { AuthContext } from '@/App';
+import { AdminAuthContext } from '@/App';
 import { ShieldCheck, Lock } from 'lucide-react';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { login, API } = useContext(AuthContext);
+  const { adminLogin, API } = useContext(AdminAuthContext);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState({ email: '', password: '' });
 
@@ -26,7 +26,7 @@ export default function AdminLogin() {
         setLoading(false);
         return;
       }
-      login(response.data.token, response.data.user);
+      adminLogin(response.data.token, response.data.user);
       toast.success('Acceso concedido');
       navigate('/nubo-control');
     } catch (error) {

@@ -28,19 +28,34 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 export const AuthContext = React.createContext();
+export const AdminAuthContext = React.createContext();
 
 function App() {
+  // --- Sesión de clientes / público (token compartido) ---
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingUser, setLoadingUser] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
+
+  // --- Sesión de administración (AISLADA, token propio) ---
+  const [adminUser, setAdminUser] = useState(null);
+  const [loadingAdmin, setLoadingAdmin] = useState(true);
+  const [adminToken, setAdminToken] = useState(localStorage.getItem('nubo_admin_token'));
 
   useEffect(() => {
     if (token) {
       fetchUser();
     } else {
-      setLoading(false);
+      setLoadingUser(false);
     }
   }, [token]);
+
+  useEffect(() => {
+    if (adminToken) {
+      fetchAdmin();
+    } else {
+      setLoadingAdmin(false);
+    }
+  }, [adminToken]);
 
   const fetchUser = async () => {
     try {
@@ -49,11 +64,30 @@ function App() {
       });
       setUser(response.data);
     } catch (error) {
-      console.error('Failed to fetch user:', error);
       localStorage.removeItem('token');
       setToken(null);
     } finally {
-      setLoading(false);
+      setLoadingUser(false);
+    }
+  };
+
+  const fetchAdmin = async () => {
+    try {
+      const response = await axios.get(`${API}/auth/me`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      const role = response.data?.role;
+      if (role === 'admin' || role === 'manager') {
+        setAdminUser(response.data);
+      } else {
+        localStorage.removeItem('nubo_admin_token');
+        setAdminToken(null);
+      }
+    } catch (error) {
+      localStorage.removeItem('nubo_admin_token');
+      setAdminToken(null);
+    } finally {
+      setLoadingAdmin(false);
     }
   };
 
@@ -69,7 +103,19 @@ function App() {
     setUser(null);
   };
 
-  if (loading) {
+  const adminLogin = (newToken, userData) => {
+    localStorage.setItem('nubo_admin_token', newToken);
+    setAdminToken(newToken);
+    setAdminUser(userData);
+  };
+
+  const adminLogout = () => {
+    localStorage.removeItem('nubo_admin_token');
+    setAdminToken(null);
+    setAdminUser(null);
+  };
+
+  if (loadingUser || loadingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
@@ -79,6 +125,7 @@ function App() {
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, API }}>
+    <AdminAuthContext.Provider value={{ adminUser, adminToken, adminLogin, adminLogout, API }}>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -92,7 +139,7 @@ function App() {
             ) : <Navigate to="/auth" />
           } />
           <Route path="/nubo-control" element={
-            user && (user.role === 'admin' || user.role === 'manager') ? <AdminDashboard /> : <AdminLogin />
+            adminUser && (adminUser.role === 'admin' || adminUser.role === 'manager') ? <AdminDashboard /> : <AdminLogin />
           } />
           <Route path="/nubo-control/reset" element={<AdminReset />} />
           <Route path="/admin" element={<Navigate to="/nubo-control" replace />} />
@@ -112,6 +159,7 @@ function App() {
         <WhatsAppButton phoneNumber="+34654242092" />
         <Toaster position="top-right" />
       </BrowserRouter>
+    </AdminAuthContext.Provider>
     </AuthContext.Provider>
   );
 }

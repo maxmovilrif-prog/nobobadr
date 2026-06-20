@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { AuthContext } from '@/App';
+import { AdminAuthContext } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +40,7 @@ const StatCard = ({ icon: Icon, label, value, color, testid }) => (
 );
 
 export default function AdminDashboard() {
-  const { user, token, logout, API } = useContext(AuthContext);
+  const { adminUser: user, adminToken: token, adminLogout: logout, API } = useContext(AdminAuthContext);
   const isFounder = user?.role === 'admin';
   const [stats, setStats] = useState(null);
   const [fleet, setFleet] = useState({ count: 0, live_count: 0, available_count: 0, idle_count: 0, drivers: [] });
