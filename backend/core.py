@@ -20,9 +20,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("nubo")
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+# Permite usar una base de datos propia del usuario (p.ej. MongoDB Atlas) mediante
+# MONGO_URL_OVERRIDE / DB_NAME_OVERRIDE, con prioridad sobre las variables
+# gestionadas por la plataforma (MONGO_URL / DB_NAME), que en producción están bloqueadas.
+mongo_url = os.environ.get('MONGO_URL_OVERRIDE') or os.environ['MONGO_URL']
+db_name = os.environ.get('DB_NAME_OVERRIDE') or os.environ['DB_NAME']
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[db_name]
+logger.info("MongoDB conectado · db=%s · override=%s", db_name, bool(os.environ.get('MONGO_URL_OVERRIDE')))
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
