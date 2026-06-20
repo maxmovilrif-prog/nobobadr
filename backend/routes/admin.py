@@ -280,6 +280,65 @@ async def admin_kpis(current_user: dict = Depends(get_current_admin)):
     }
 
 
+@router.get("/admin/my-region/kpis")
+async def my_region_kpis(current_user: dict = Depends(get_current_manager_or_admin)):
+    """Mini-cuadro de mandos LOCAL del Gestor Regional (aislado a su delegación).
+    No expone datos globales: solo pedidos/riders/ingresos de las ciudades de su región."""
+    scope = await get_scope_city_ids(current_user)  # None = Fundador (global)
+    if scope is None:
+        # El Fundador usa su panel global (/admin/kpis); aquí no hay vista regional.
+        return {'is_founder': True, 'region': None}
+
+    region_id = current_user.get('region_id')
+    region = await db.regions.find_one({'id': region_id}, {'_id': 0}) if region_id else None
+    region_name = region.get('name') if region else None
+
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    month_start = today.replace(day=1)
+    window_cutoff = (now - timedelta(days=60)).isoformat()
+    oq = {'city_id': {'$in': scope}}
+
+    orders = await db.orders.find(
+        {**oq, 'created_at': {'$gte': window_cutoff}},
+        {'_id': 0, 'status': 1, 'total_amount': 1, 'currency': 1, 'created_at': 1, 'delivered_at': 1}
+    ).to_list(50000)
+
+    orders_today = 0
+    delivered_today = 0
+    revenue_today_eur = 0.0
+    revenue_month_eur = 0.0
+    for o in orders:
+        created = _parse_iso(o.get('created_at'))
+        if created and created.date() == today:
+            orders_today += 1
+        if o.get('status') == 'delivered':
+            eff = _parse_iso(o.get('delivered_at')) or created
+            if eff and eff.date() == today:
+                delivered_today += 1
+                revenue_today_eur += _to_eur(o.get('total_amount'), o.get('currency'))
+            if eff and eff.date() >= month_start:
+                revenue_month_eur += _to_eur(o.get('total_amount'), o.get('currency'))
+
+    in_transit = await db.orders.count_documents({**oq, 'status': 'in_transit'})
+    total_riders = await db.users.count_documents({'role': 'driver', 'region_id': region_id})
+    active_riders = await db.users.count_documents({'role': 'driver', 'region_id': region_id, 'is_available': True})
+
+    return {
+        'is_founder': False,
+        'region': {'id': region_id, 'name': region_name, 'cities': region.get('city_ids', []) if region else []},
+        'orders_today': orders_today,
+        'delivered_today': delivered_today,
+        'in_transit': in_transit,
+        'active_riders': active_riders,
+        'total_riders': total_riders,
+        'revenue_today_eur': round(revenue_today_eur, 2),
+        'revenue_month_eur': round(revenue_month_eur, 2),
+        'as_of': now.isoformat(),
+    }
+
+
+
 # =========================
 # TELEGRAM ALERTS CONFIG
 # =========================

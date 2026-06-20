@@ -13,6 +13,7 @@ import AccountingManager from '@/components/AccountingManager';
 import KpiDashboard from '@/components/KpiDashboard';
 import ManagerManager from '@/components/ManagerManager';
 import RegionManager from '@/components/RegionManager';
+import RegionDashboard from '@/components/RegionDashboard';
 import { LogOut, Truck, Package, CheckCircle2, Users, Activity, MapPin, RadioTower, Bell, BellOff, AlertTriangle, ShoppingBag, Send, CreditCard, RefreshCw } from 'lucide-react';
 
 const SPAIN_CENTER = { lat: 40.4168, lng: -3.7038 };
@@ -226,6 +227,9 @@ export default function AdminDashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Mini-panel "Mi Delegación" — solo Gestor Regional */}
+        {!isFounder && <RegionDashboard API={API} token={token} />}
+
         {/* Stats */}
         <div data-testid="admin-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard testid="stat-active-orders" icon={Truck} label="En reparto" value={stats?.in_transit ?? '—'} color="bg-orange-500" />
