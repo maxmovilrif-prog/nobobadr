@@ -1,0 +1,38 @@
+{
+  "summary": "Iter 11 — Validated the NEW customer (role=customer) password recovery by email at /auth + new /recuperar page. Backend: 148/148 pytest GREEN (8 NEW tests in test_customer_password_reset.py + obsolete iter10 assertion 'customer should NOT generate token' updated to 'customer SHOULD generate token'). Verified: (a) POST /api/auth/forgot-password with qa_customer@nubo.com returns generic message AND creates exactly 1 doc in db.password_reset_tokens with role='customer'; (b) unknown email returns the SAME generic body and creates 0 tokens (anti-enumeration intact, byte-for-byte identical responses); (c) source-code inspection confirms reset_link routes role-correctly: admin/manager -> '/nubo-control/recuperar?token=' and customer/business -> '/recuperar?token='; (d) full e2e reset for a customer via injected token: success → login with NEW password works → reuse of same token returns 400 (one-shot) → short password (<8) returns 400 → invalid/unknown token returns 400; (e) admin regression: forgot-password for badarbox1756@gmail.com still creates token with role='admin'; (f) customer login regression: qa_customer@nubo.com/Test1234! returns 200 with role=customer. Frontend: 8/8 Playwright steps GREEN — (1) customer-forgot-link visible on /auth login tab; (2) clicking it shows customer-forgot-form with customer-forgot-email + customer-forgot-submit + customer-forgot-back; (3) submitting with the customer email auto-returns to login (form detaches, login-email-input visible again); (4) customer-forgot-back returns to login; (5) /recuperar without ?token shows 'Enlace no válido' on customer-pwreset-page; (6) /recuperar?token=... renders customer-pwreset-form with customer-pwreset-password/customer-pwreset-confirm/customer-pwreset-toggle/customer-pwreset-submit; (7) customer-pwreset-toggle switches input type between password/text; (8) customer login regression qa_customer@nubo.com/Test1234! lands on /dashboard with welcome toast.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Carry-over from iter10", "issues": ["Google Maps InvalidKeyMapError overlay on admin dashboard (placeholder REACT_APP_GOOGLE_MAPS_API_KEY). Preview-only cosmetic.", "Manager dashboard generates 2x 401s in console for /api/admin/kpis & finances — cosmetic, UI hides those sections."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_customer_password_reset.py",
+    "/app/test_reports/pytest/iter11_customer_reset.xml",
+    "/app/test_reports/pytest/iter11_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/auth.py forgot_password role gate is now ('admin','manager','customer','business') — riders correctly EXCLUDED (no password_hash check also defends this). Anti-enumeration preserved: identical generic body for ALL paths (registered/unregistered/excluded-role).",
+    "Role-based reset_link branching is clean: admin/manager → /nubo-control/recuperar (management portal), customer/business → /recuperar (light theme client page). This keeps the two portals visually and functionally isolated, matching the multi-tenant strategy.",
+    "/auth Auth.js uses single forgotMode state with handleForgot — clean implementation. The form is INLINE inside the login tab (no extra route), so no risk of session leak from /nubo-control.",
+    "CustomerPasswordReset.js correctly reads ?token= from URL, shows 'Enlace no válido' when missing, posts to /auth/reset-password with new_password, and routes to /auth on success — full client UX coherent.",
+    "Tokens are sha256-hashed at rest (token_hash, never raw), TTL 1h, one-shot (used flag), timezone-aware expiration check. Backend handles short password (<8) with 400 before touching DB."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_customer_password_reset.py (NEW, 8 tests, 100% green)",
+    "/app/backend/tests/test_regional_multitenant.py (renamed obsolete test test_forgot_password_customer_no_token → test_forgot_password_customer_creates_token to reflect iter11 feature extension)"
+  ],
+  "success_rate": {"backend": "100% (148/148 pytest)", "frontend": "100% (8/8 Playwright UI steps)"},
+  "test_credentials": "Customer: qa_customer@nubo.com / Test1234! (RESTORED to canonical password at end of suite via injected reset token). Admin/Fundador: badarbox1756@gmail.com / Admin1234!. Both confirmed via login after the test run.",
+  "seed_data_creation": "Tests only create transient password_reset_tokens which are deleted by test_zz_cleanup AND by a final post-run script. Verified db.password_reset_tokens.count_documents({})==0 after cleanup. Customer bcrypt hash still starts with $2b$ — password format preserved.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Customer (role=customer) and business (role=business) are now supported by /auth/forgot-password with the reset link pointing to /recuperar (NOT /nubo-control/recuperar). Anti-enumeration is byte-for-byte identical responses across registered/unregistered/excluded-role. Full backend suite: cd /app/backend && export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2) && python3 -m pytest tests/ -q → 148 passed. Customer reset tests live in /app/backend/tests/test_customer_password_reset.py and use direct MongoDB token injection (preview has no RESEND_API_KEY so no real email is sent — but the token IS stored in db.password_reset_tokens with sha256(token_raw)). Frontend testids for the new feature: customer-forgot-link, customer-forgot-form, customer-forgot-email, customer-forgot-submit, customer-forgot-back (on /auth); customer-pwreset-page, customer-pwreset-form, customer-pwreset-password, customer-pwreset-confirm, customer-pwreset-toggle, customer-pwreset-submit, customer-pwreset-success, customer-pwreset-go-login (on /recuperar).",
+  "rca of the issue": "No bugs found in iteration 11. The only adjustment was that an iter10 test asserted obsolete behavior ('customer should NOT generate a token') which was actually the spec at that time — iter11 intentionally extended the feature to customers, so the assertion was updated to match the new (correct) spec. No code changes to production routes were necessary."
+}

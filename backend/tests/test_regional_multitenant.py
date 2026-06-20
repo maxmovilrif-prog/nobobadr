@@ -254,14 +254,15 @@ class TestRidersScoped:
 
 # ---------- Password reset flow ----------
 class TestPasswordReset:
-    def test_forgot_password_customer_no_token(self, s):
-        # Customer email should NOT generate a token (anti-enumeration: generic response anyway)
+    def test_forgot_password_customer_creates_token(self, s):
+        # Iter11: customer role IS now supported (reset link /recuperar, not /nubo-control/recuperar).
+        # Anti-enumeration is still preserved with the same generic message.
         before = _count_tokens_for(CUSTOMER_EMAIL)
         r = s.post(f"{API}/auth/forgot-password", json={"email": CUSTOMER_EMAIL})
         assert r.status_code == 200
         assert "Si el email" in r.json().get("message", "")
         after = _count_tokens_for(CUSTOMER_EMAIL)
-        assert after == before, "Customer should NOT have a reset token generated"
+        assert after == before + 1, f"Customer token should be created (before={before}, after={after})"
 
     def test_forgot_password_admin_creates_token(self, s):
         before = _count_tokens_for(ADMIN_EMAIL)
