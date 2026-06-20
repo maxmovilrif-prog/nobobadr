@@ -110,6 +110,8 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Modelos** (`models.py`): `Ride`, `RideRequest`, `RideEstimateRequest`, `RideAccept`, `RideCancel`, `GeoPoint`.
 - **Endpoints** (`routes/rides.py`): `estimate`, `request`, `accept` (reclamo atómico + aislamiento regional), `active` (por rol), `start`, `complete`, `cancel`.
 - **🚕 Telegram en `request`** (`telegram_alerts.py` → `notify_new_ride` + callbacks `rideview`/`rideassign`/`ridedrv`): el despacho recibe la solicitud y asigna conductor disponible de la región en 1 toque (reclamo atómico, no-op sin token).
+- **FRONTEND (2026-06-20)**: Cliente `pages/NuboRide.js` (ruta `/ride`, solo customer): selección de ciudad origen/destino + GPS, `POST /rides/estimate` (3 tarjetas economy/comfort/xl), `POST /rides/request`, seguimiento en vivo (polling 5s) con barra de progreso (buscando→aceptado→en_curso→completado) y cancelar. Banner "Nubo Ride" en `CustomerDashboard` (`nubo-ride-btn`). Conductor en `rider/RiderApp.js`: sección "Nubo Ride · Viajes" con lista de viajes disponibles (Aceptar), viaje activo con Iniciar/Completar (polling 8s). Aviso de viaje interurbano si distancia > 80 km.
+- ✅ **Verificado iter_12**: Backend 7/7 + Frontend e2e **16/16** (cliente pide → rider acepta/inicia/completa → cancelar → validación viaje único).
 - ✅ **155/155 pytest** (148 previos + 7 en `test_nubo_ride.py`). Sin regresiones.
 - ⏳ Pendiente: Frontend de Nubo Ride (UI cliente + app conductor).
 

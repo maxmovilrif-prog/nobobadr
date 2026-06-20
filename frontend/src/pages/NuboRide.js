@@ -225,6 +225,12 @@ export default function NuboRide() {
             {options && (
               <div className="space-y-3" data-testid="ride-options">
                 <h2 className="text-sm font-semibold text-gray-700 px-1">Elige tu vehículo</h2>
+                {options[0]?.distance_km > 80 && (
+                  <div className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-amber-800" data-testid="ride-intercity-note">
+                    <Navigation className="w-4 h-4 mt-0.5 shrink-0" />
+                    <p className="text-xs">Viaje interurbano de larga distancia ({options[0].distance_km} km). La tarifa refleja el trayecto completo.</p>
+                  </div>
+                )}
                 {options.map((opt) => {
                   const meta = VEHICLES[opt.vehicle_type] || VEHICLES.economy;
                   const Icon = meta.icon;
