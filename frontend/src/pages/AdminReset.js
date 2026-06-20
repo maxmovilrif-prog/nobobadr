@@ -7,13 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { AuthContext } from '@/App';
-import { KeyRound, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
+import { KeyRound, ShieldCheck, CheckCircle2, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export default function AdminReset() {
   const navigate = useNavigate();
   const { API } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(null);
+  const [showPass, setShowPass] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const [data, setData] = useState({ email: 'badarbox1756@gmail.com', new_password: '', confirm: '', secret: '' });
 
   const handleSubmit = async (e) => {
@@ -39,7 +41,8 @@ export default function AdminReset() {
       const code = error.response?.status;
       if (code === 403) toast.error('Secreto inválido (ADMIN_RESET_SECRET no coincide)');
       else if (code === 404) toast.error('Función desactivada: falta ADMIN_RESET_SECRET o redeploy');
-      else toast.error(error.response?.data?.detail || 'No se pudo completar la operación');
+      else if (code) toast.error(`Error ${code}: ${error.response?.data?.detail || 'revisa los datos'}`);
+      else toast.error('No se pudo conectar con el servidor (red/CORS). ¿Terminó el despliegue?');
     } finally {
       setLoading(false);
     }
@@ -105,17 +108,28 @@ export default function AdminReset() {
                 </div>
                 <div>
                   <Label htmlFor="reset-pass" className="text-gray-300">Nueva contraseña</Label>
-                  <Input
-                    id="reset-pass"
-                    data-testid="admin-reset-password"
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Mínimo 8 caracteres"
-                    value={data.new_password}
-                    onChange={(e) => setData({ ...data, new_password: e.target.value })}
-                    className="bg-white/10 border-white/15 text-white placeholder:text-gray-500"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="reset-pass"
+                      data-testid="admin-reset-password"
+                      type={showPass ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      placeholder="Mínimo 8 caracteres"
+                      value={data.new_password}
+                      onChange={(e) => setData({ ...data, new_password: e.target.value })}
+                      className="bg-white/10 border-white/15 text-white placeholder:text-gray-500 pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      data-testid="toggle-password-visibility"
+                      onClick={() => setShowPass(!showPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400"
+                      tabIndex={-1}
+                    >
+                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="reset-confirm" className="text-gray-300">Repite la contraseña</Label>
@@ -133,16 +147,27 @@ export default function AdminReset() {
                 </div>
                 <div>
                   <Label htmlFor="reset-secret" className="text-gray-300">Secreto de seguridad</Label>
-                  <Input
-                    id="reset-secret"
-                    data-testid="admin-reset-secret"
-                    type="password"
-                    placeholder="ADMIN_RESET_SECRET"
-                    value={data.secret}
-                    onChange={(e) => setData({ ...data, secret: e.target.value })}
-                    className="bg-white/10 border-white/15 text-white placeholder:text-gray-500"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="reset-secret"
+                      data-testid="admin-reset-secret"
+                      type={showSecret ? 'text' : 'password'}
+                      placeholder="ADMIN_RESET_SECRET"
+                      value={data.secret}
+                      onChange={(e) => setData({ ...data, secret: e.target.value })}
+                      className="bg-white/10 border-white/15 text-white placeholder:text-gray-500 pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      data-testid="toggle-secret-visibility"
+                      onClick={() => setShowSecret(!showSecret)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400"
+                      tabIndex={-1}
+                    >
+                      {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">El mismo valor que definiste en los Secrets de producción.</p>
                 </div>
                 <Button
