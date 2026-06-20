@@ -170,7 +170,7 @@ function App() {
           <Route path="/terms" element={<Terms />} />
         </Routes>
         <InstallPWA />
-        <WhatsAppButton phoneNumber="+34654242092" />
+        <WhatsAppButton phoneNumber="+34654232573" />
         <Toaster position="top-right" />
       </BrowserRouter>
     </AdminAuthContext.Provider>

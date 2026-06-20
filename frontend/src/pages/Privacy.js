@@ -135,7 +135,7 @@ export default function Privacy() {
               <div className="bg-gray-100 rounded-lg p-4 mt-4">
                 <p className="font-semibold text-gray-900 mb-2">Datos de contacto:</p>
                 <p className="text-sm">📧 Email: <a href="mailto:exprenobo@hotmail.com" className="text-emerald-600 hover:underline">exprenobo@hotmail.com</a></p>
-                <p className="text-sm">📱 Teléfono: +34 654 24 20 92</p>
+                <p className="text-sm">📱 Teléfono: +34 654 23 25 73</p>
                 <p className="text-sm">📍 Servicio: España</p>
               </div>
               <p className="text-sm text-gray-600 mt-4">

@@ -145,7 +145,7 @@ export default function Terms() {
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
                 <p className="text-sm text-yellow-900">
-                  <strong>📞 Soporte:</strong> Si tienes un problema con tu pedido, contáctanos inmediatamente en +34 654 24 20 92 o exprenobo@hotmail.com
+                  <strong>📞 Soporte:</strong> Si tienes un problema con tu pedido, contáctanos inmediatamente en +34 654 23 25 73 o exprenobo@hotmail.com
                 </p>
               </div>
             </CardContent>
