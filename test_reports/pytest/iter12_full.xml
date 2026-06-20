@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="1" tests="155" time="190.232" timestamp="2026-06-20T23:08:14.906609+00:00" hostname="agent-env-d35b2b25-2a44-400f-8d33-d0ce05ac738e"><testcase classname="tests.test_admin_separation_iter9.TestResetPasswordEndpoint" name="test_wrong_secret_403" time="0.174" /><testcase classname="tests.test_admin_separation_iter9.TestResetPasswordEndpoint" name="test_existing_user_success_created_false" time="0.580" /><testcase classname="tests.test_admin_separation_iter9.TestResetPasswordEndpoint" name="test_new_email_creates_admin" time="1.367" /><testcase classname="tests.test_admin_separation_iter9.TestAdminLogin" name="test_admin_login_success" time="0.586" /><testcase classname="tests.test_admin_separation_iter9.TestAdminLogin" name="test_admin_login_wrong_password" time="0.700" /><testcase classname="tests.test_admin_separation_iter9.TestStripeStatus" name="test_payments_status_test_mode" time="0.734" /><testcase classname="tests.test_admin_separation_iter9.TestCustomerRBAC" name="test_customer_login_role" time="1.057" /><testcase classname="tests.test_admin_separation_iter9.TestCustomerRBAC" name="test_customer_blocked_on_kpis" time="1.198" /><testcase classname="tests.test_assignments_bloque_c" name="test_nearest_finds_available_rider" time="2.452" /><testcase classname="tests.test_assignments_bloque_c" name="test_nearest_requires_admin_or_business" time="0.886" /><testcase classname="tests.test_assignments_bloque_c" name="test_assign_nearest_and_history" time="2.866" /><testcase classname="tests.test_assignments_bloque_c" name="test_assign_nearest_forbidden_for_customer" time="0.777" /><testcase classname="tests.test_assignments_bloque_c" name="test_assign_nearest_404_unknown_order" time="0.328" /><testcase classname="tests.test_assignments_bloque_c" name="test_ops_orders_lists_pending" time="0.939" /><testcase classname="tests.test_assignments_bloque_c" name="test_ops_orders_requires_admin" time="0.214" /><testcase classname="tests.test_assignments_bloque_c" name="test_history_export_csv" time="0.306" /><testcase classname="tests.test_auto_assign" name="test_express_order_auto_dispatches_to_nearest" time="4.257" /><testcase classname="tests.test_bloque_a_cities_delivery.TestPublicCities" name="test_public_cities_no_auth" time="0.200" /><testcase classname="tests.test_bloque_a_cities_delivery.TestPublicCities" name="test_cities_requires_auth" time="0.101" /><testcase classname="tests.test_bloque_a_cities_delivery.TestPublicCities" name="test_cities_authenticated" time="0.880" /><testcase classname="tests.test_bloque_a_cities_delivery.TestDeliveryQuote" name="test_motorcycle_eur" time="0.041" /><testcase classname="tests.test_bloque_a_cities_delivery.TestDeliveryQuote" name="test_car_eur" time="0.083" /><testcase classname="tests.test_bloque_a_cities_delivery.TestDeliveryQuote" name="test_bicycle_eur" time="0.041" /><testcase classname="tests.test_bloque_a_cities_delivery.TestDeliveryQuote" name="test_mad_conversion" time="0.083" /><testcase classname="tests.test_bloque_a_cities_delivery.TestExpressOrder" name="test_customer_creates_express" time="0.829" /><testcase classname="tests.test_bloque_a_cities_delivery.TestExpressOrder" name="test_admin_cannot_create_order" time="0.841" /><testcase classname="tests.test_bloque_a_cities_delivery.TestExpressOrder" name="test_unauthenticated_cannot_create" time="0.106" /><testcase classname="tests.test_bloque_a_cities_delivery.TestAdminCityCRUD" name="test_non_admin_cannot_create" time="0.223" /><testcase classname="tests.test_bloque_a_cities_delivery.TestAdminCityCRUD" name="test_admin_create_update_delete_city" time="2.389" /><testcase classname="tests.test_bloque_a_cities_delivery.TestAdminCityCRUD" name="test_non_admin_cannot_delete" time="0.212" /><testcase classname="tests.test_customer_password_reset" name="test_forgot_password_customer_creates_token" time="0.991"><failure message="AssertionError: expected exactly 1 token doc for customer, got 0&#10;assert 0 == 1&#10; +  where 0 = len([])">http = &lt;requests.sessions.Session object at 0xfa38c679f9d0&gt;
+
+    def test_forgot_password_customer_creates_token(http):
+        # Clean any prior token for this email so we can assert this run creates a new one
+        _db.password_reset_tokens.delete_many({"email": CUSTOMER_EMAIL})
+    
+        r = http.post(f"{API}/auth/forgot-password", json={"email": CUSTOMER_EMAIL})
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert "message" in data
+        assert "recibirás un enlace" in data["message"] or "enlace" in data["message"].lower()
+    
+        # Token doc must be created with role='customer'
+        docs = list(_db.password_reset_tokens.find({"email": CUSTOMER_EMAIL}))
+&gt;       assert len(docs) == 1, f"expected exactly 1 token doc for customer, got {len(docs)}"
+E       AssertionError: expected exactly 1 token doc for customer, got 0
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_customer_password_reset.py:101: AssertionError</failure></testcase><testcase classname="tests.test_customer_password_reset" name="test_forgot_password_unknown_email_no_token" time="1.000" /><testcase classname="tests.test_customer_password_reset" name="test_reset_link_routes_by_role_in_source" time="0.000" /><testcase classname="tests.test_customer_password_reset" name="test_reset_password_customer_full_flow" time="0.229"><failure message="AssertionError: {&quot;detail&quot;:&quot;Enlace no válido o ya utilizado&quot;}&#10;assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">http = &lt;requests.sessions.Session object at 0xfa38c679f9d0&gt;
+
+    def test_reset_password_customer_full_flow(http):
+        # Generate a known token, store its hash so we can reset and then re-login
+        raw = secrets.token_urlsafe(32)
+        user = _db.users.find_one({"email": CUSTOMER_EMAIL})
+        assert user, "customer must exist"
+        _db.password_reset_tokens.insert_one({
+            "token_hash": _sha256(raw),
+            "user_id": user["id"],
+            "email": CUSTOMER_EMAIL,
+            "role": "customer",
+            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=30),
+            "used": False,
+            "created_at": datetime.now(timezone.utc),
+        })
+    
+        new_pwd = "NewQAPwd987!"
+    
+        # Short password -&gt; 400
+        r_short = http.post(f"{API}/auth/reset-password", json={"token": raw, "new_password": "abc"})
+        assert r_short.status_code == 400, r_short.text
+    
+        # Success
+        r_ok = http.post(f"{API}/auth/reset-password", json={"token": raw, "new_password": new_pwd})
+&gt;       assert r_ok.status_code == 200, r_ok.text
+E       AssertionError: {"detail":"Enlace no válido o ya utilizado"}
+E       assert 400 == 200
+E        +  where 400 = &lt;Response [400]&gt;.status_code
+
+tests/test_customer_password_reset.py:162: AssertionError</failure></testcase><testcase classname="tests.test_customer_password_reset" name="test_forgot_password_admin_regression" time="1.200"><failure message="assert 0 == 1&#10; +  where 0 = len([])">http = &lt;requests.sessions.Session object at 0xfa38c679f9d0&gt;
+
+    def test_forgot_password_admin_regression(http):
+        _db.password_reset_tokens.delete_many({"email": ADMIN_EMAIL})
+    
+        r = http.post(f"{API}/auth/forgot-password", json={"email": ADMIN_EMAIL})
+        assert r.status_code == 200
+    
+        docs = list(_db.password_reset_tokens.find({"email": ADMIN_EMAIL}))
+&gt;       assert len(docs) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_customer_password_reset.py:203: AssertionError</failure></testcase><testcase classname="tests.test_customer_password_reset" name="test_customer_login_regression" time="0.572" /><testcase classname="tests.test_customer_password_reset" name="test_reset_invalid_token" time="0.146" /><testcase classname="tests.test_customer_password_reset" name="test_zz_cleanup" time="0.001" /><testcase classname="tests.test_email_resend" name="test_email_status_founder" time="0.924" /><testcase classname="tests.test_email_resend" name="test_email_test_requires_config" time="1.704" /><testcase classname="tests.test_email_resend" name="test_email_status_blocked_for_customer" time="1.055" /><testcase classname="tests.test_email_resend" name="test_email_test_validates_recipient" time="0.853" /><testcase classname="tests.test_finances_accounting" name="test_cash_in_out_and_balance" time="2.259" /><testcase classname="tests.test_finances_accounting" name="test_daily_closing" time="0.409" /><testcase classname="tests.test_finances_accounting" name="test_manual_transaction_and_summary" time="1.131" /><testcase classname="tests.test_finances_accounting" name="test_export_transactions_csv" time="0.309" /><testcase classname="tests.test_finances_accounting" name="test_invalid_transaction_type_rejected" time="0.212" /><testcase classname="tests.test_finances_accounting" name="test_delivery_income_payroll_and_payout" time="8.985" /><testcase classname="tests.test_finances_accounting" name="test_accounting_requires_admin[/accounting/transactions]" time="0.203" /><testcase classname="tests.test_finances_accounting" name="test_accounting_requires_admin[/accounting/cash/balance]" time="0.218" /><testcase classname="tests.test_finances_accounting" name="test_accounting_requires_admin[/accounting/payroll]" time="0.220" /><testcase classname="tests.test_finances_accounting" name="test_accounting_requires_admin[/admin/finances/summary]" time="0.210" /><testcase classname="tests.test_kpis" name="test_kpis_contract" time="1.146" /><testcase classname="tests.test_kpis" name="test_kpis_requires_admin" time="0.852" /><testcase classname="tests.test_login_lockout_security" name="test_login_lockout_triggers_through_public_url" time="2.860" /><testcase classname="tests.test_nubo_features.TestSmartSearch" name="test_smart_search_hambre" time="1.679" /><testcase classname="tests.test_nubo_features.TestSmartSearch" name="test_smart_search_empty_query_400" time="0.045" /><testcase classname="tests.test_nubo_features.TestSmartSearch" name="test_smart_search_courier" time="0.989" /><testcase classname="tests.test_nubo_features.TestAdminEndpoints" name="test_admin_stats_with_admin" time="1.342" /><testcase classname="tests.test_nubo_features.TestAdminEndpoints" name="test_admin_active_drivers_with_admin" time="0.355" /><testcase classname="tests.test_nubo_features.TestAdminEndpoints" name="test_admin_stats_no_auth_returns_403" time="0.041" /><testcase classname="tests.test_nubo_features.TestAdminEndpoints" name="test_admin_stats_customer_token_returns_403" time="0.724" /><testcase classname="tests.test_nubo_features.TestAdminEndpoints" name="test_admin_active_drivers_no_auth_returns_403" time="0.044" /><testcase classname="tests.test_nubo_features.TestAdminEndpoints" name="test_admin_active_drivers_customer_token_returns_403" time="0.145" /><testcase classname="tests.test_nubo_features.TestRegisterGuard" name="test_register_admin_role_rejected" time="0.043" /><testcase classname="tests.test_nubo_ride" name="test_estimate_returns_three_tiers" time="0.880" /><testcase classname="tests.test_nubo_ride" name="test_full_ride_lifecycle" time="72.793" /><testcase classname="tests.test_nubo_ride" name="test_request_requires_customer" time="0.242" /><testcase classname="tests.test_nubo_ride" name="test_accept_requires_driver" time="0.207" /><testcase classname="tests.test_nubo_ride" name="test_customer_cancel" time="1.300" /><testcase classname="tests.test_nubo_ride" name="test_no_duplicate_active_ride" time="1.896" /><testcase classname="tests.test_nubo_ride" name="test_admin_sees_active_rides" time="1.920" /><testcase classname="tests.test_public_tracking" name="test_tracking_not_found_returns_404" time="0.202" /><testcase classname="tests.test_public_tracking" name="test_tracking_does_not_require_auth" time="1.359" /><testcase classname="tests.test_public_tracking" name="test_tracking_returns_full_payload" time="0.219" /><testcase classname="tests.test_public_tracking" name="test_tracking_response_excludes_mongo_id" time="0.204" /><testcase classname="tests.test_rbac_roles" name="test_founder_creates_and_lists_manager" time="3.391" /><testcase classname="tests.test_rbac_roles" name="test_duplicate_manager_email_rejected" time="0.310" /><testcase classname="tests.test_rbac_roles" name="test_manager_can_access_operations[/admin/ops/orders]" time="0.523" /><testcase classname="tests.test_rbac_roles" name="test_manager_can_access_operations[/admin/stats]" time="1.018" /><testcase classname="tests.test_rbac_roles" name="test_manager_can_access_operations[/admin/active-drivers]" time="0.532" /><testcase classname="tests.test_rbac_roles" name="test_manager_can_access_operations[/admin/assignment-history]" time="0.419" /><testcase classname="tests.test_rbac_roles" name="test_manager_blocked_from_finance_and_admin[/admin/kpis]" time="0.202" /><testcase classname="tests.test_rbac_roles" name="test_manager_blocked_from_finance_and_admin[/accounting/transactions/summary]" time="0.209" /><testcase classname="tests.test_rbac_roles" name="test_manager_blocked_from_finance_and_admin[/admin/finances/summary]" time="0.211" /><testcase classname="tests.test_rbac_roles" name="test_manager_blocked_from_finance_and_admin[/accounting/cash/balance]" time="0.249" /><testcase classname="tests.test_rbac_roles" name="test_manager_blocked_from_finance_and_admin[/admin/managers]" time="0.215" /><testcase classname="tests.test_rbac_roles" name="test_manager_can_manage_own_riders_but_not_managers" time="0.724" /><testcase classname="tests.test_rbac_roles" name="test_manager_can_dispatch" time="0.306" /><testcase classname="tests.test_rbac_roles" name="test_customer_cannot_create_managers" time="0.837" /><testcase classname="tests.test_rbac_roles" name="test_delete_manager" time="1.375" /><testcase classname="tests.test_regional_multitenant.TestRegionsCRUD" name="test_admin_create_region" time="1.441" /><testcase classname="tests.test_regional_multitenant.TestRegionsCRUD" name="test_admin_create_region_b" time="0.701" /><testcase classname="tests.test_regional_multitenant.TestRegionsCRUD" name="test_admin_list_regions" time="1.174" /><testcase classname="tests.test_regional_multitenant.TestRegionsCRUD" name="test_customer_cannot_list_regions" time="0.862" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_admin_create_manager" time="0.723" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_admin_create_manager_b" time="0.678" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_manager_login" time="0.582" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_manager_login_b" time="0.590" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_manager_403_kpis" time="0.144" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_manager_403_regions_list" time="0.146" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_manager_403_create_manager" time="0.145" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_manager_regions_mine" time="0.597" /><testcase classname="tests.test_regional_multitenant.TestManagerRBAC" name="test_admin_regions_mine" time="0.143" /><testcase classname="tests.test_regional_multitenant.TestRidersScoped" name="test_admin_create_rider_in_region_a" time="0.501" /><testcase classname="tests.test_regional_multitenant.TestRidersScoped" name="test_admin_create_rider_in_region_b" time="0.456" /><testcase classname="tests.test_regional_multitenant.TestRidersScoped" name="test_manager_a_sees_only_region_a_riders" time="0.251" /><testcase classname="tests.test_regional_multitenant.TestRidersScoped" name="test_admin_regenerate_code" time="0.463" /><testcase classname="tests.test_regional_multitenant.TestRidersScoped" name="test_manager_b_cannot_regenerate_other_region_rider" time="0.246" /><testcase classname="tests.test_regional_multitenant.TestRidersScoped" name="test_manager_a_can_regenerate_own_region_rider" time="0.461" /><testcase classname="tests.test_regional_multitenant.TestPasswordReset" name="test_forgot_password_customer_creates_token" time="1.098"><failure message="AssertionError: Customer token should be created (before=0, after=0)&#10;assert 0 == (0 + 1)">self = &lt;test_regional_multitenant.TestPasswordReset object at 0xfa38c81779d0&gt;
+s = &lt;requests.sessions.Session object at 0xfa38c6827950&gt;
+
+    def test_forgot_password_customer_creates_token(self, s):
+        # Iter11: customer role IS now supported (reset link /recuperar, not /nubo-control/recuperar).
+        # Anti-enumeration is still preserved with the same generic message.
+        before = _count_tokens_for(CUSTOMER_EMAIL)
+        r = s.post(f"{API}/auth/forgot-password", json={"email": CUSTOMER_EMAIL})
+        assert r.status_code == 200
+        assert "Si el email" in r.json().get("message", "")
+        after = _count_tokens_for(CUSTOMER_EMAIL)
+&gt;       assert after == before + 1, f"Customer token should be created (before={before}, after={after})"
+E       AssertionError: Customer token should be created (before=0, after=0)
+E       assert 0 == (0 + 1)
+
+tests/test_regional_multitenant.py:265: AssertionError</failure></testcase><testcase classname="tests.test_regional_multitenant.TestPasswordReset" name="test_forgot_password_admin_creates_token" time="1.369"><failure message="AssertionError: Admin token not created (before=0, after=0)&#10;assert 0 == (0 + 1)">self = &lt;test_regional_multitenant.TestPasswordReset object at 0xfa38c8180050&gt;
+s = &lt;requests.sessions.Session object at 0xfa38c6827950&gt;
+
+    def test_forgot_password_admin_creates_token(self, s):
+        before = _count_tokens_for(ADMIN_EMAIL)
+        r = s.post(f"{API}/auth/forgot-password", json={"email": ADMIN_EMAIL})
+        assert r.status_code == 200
+        # generic message expected
+        assert "Si el email" in r.json().get("message", "")
+        after = _count_tokens_for(ADMIN_EMAIL)
+&gt;       assert after == before + 1, f"Admin token not created (before={before}, after={after})"
+E       AssertionError: Admin token not created (before=0, after=0)
+E       assert 0 == (0 + 1)
+
+tests/test_regional_multitenant.py:274: AssertionError</failure></testcase><testcase classname="tests.test_regional_multitenant.TestPasswordReset" name="test_forgot_password_unknown_email_generic" time="0.144" /><testcase classname="tests.test_regional_multitenant.TestPasswordReset" name="test_reset_password_invalid_token" time="0.147" /><testcase classname="tests.test_regional_multitenant.TestPasswordReset" name="test_reset_password_short_password" time="0.049" /><testcase classname="tests.test_regional_multitenant.TestPasswordReset" name="test_reset_password_token_one_shot" time="0.003"><failure message="AssertionError: manager user not in DB&#10;assert None">self = &lt;test_regional_multitenant.TestPasswordReset object at 0xfa38c8181990&gt;
+s = &lt;requests.sessions.Session object at 0xfa38c6827950&gt;
+request = &lt;FixtureRequest for &lt;Function test_reset_password_token_one_shot&gt;&gt;
+
+    def test_reset_password_token_one_shot(self, s, request):
+        """Inject a known token in DB to validate full reset + one-shot semantics
+        without depending on real email delivery (preview has no RESEND_API_KEY)."""
+        import hashlib
+        from pymongo import MongoClient
+        mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+        db_name = os.environ.get('DB_NAME', 'glovo_algeciras')
+        mc = MongoClient(mongo_url)
+        dbm = mc[db_name]
+    
+        # Pick an existing manager (just created in TestManagerRBAC). If unavailable, skip.
+        mgr_email = STATE.get('mgr_a_email')
+        if not mgr_email:
+            pytest.skip("No manager created in this run")
+        user = dbm.users.find_one({'email': mgr_email})
+&gt;       assert user, "manager user not in DB"
+E       AssertionError: manager user not in DB
+E       assert None
+
+tests/test_regional_multitenant.py:304: AssertionError</failure></testcase><testcase classname="tests.test_regional_multitenant" name="test_zz_cleanup" time="0.004" /><testcase classname="tests.test_regression_modularization.TestAuth" name="test_register_customer_ok" time="0.612" /><testcase classname="tests.test_regression_modularization.TestAuth" name="test_register_admin_role_rejected" time="0.051" /><testcase classname="tests.test_regression_modularization.TestAuth" name="test_login_admin_ok" time="0.576" /><testcase classname="tests.test_regression_modularization.TestAuth" name="test_login_customer_ok" time="0.583" /><testcase classname="tests.test_regression_modularization.TestAuth" name="test_login_wrong_password_401" time="0.679" /><testcase classname="tests.test_regression_modularization.TestAuth" name="test_auth_me_with_admin" time="0.720" /><testcase classname="tests.test_regression_modularization.TestAuth" name="test_auth_me_no_token_403" time="0.041" /><testcase classname="tests.test_regression_modularization.TestBusinessesProducts" name="test_get_businesses_public" time="0.146"><failure message="AssertionError: Expected seeded businesses&#10;assert 0 &gt; 0&#10; +  where 0 = len([])">self = &lt;test_regression_modularization.TestBusinessesProducts object at 0xfa38c6766690&gt;
+api = &lt;requests.sessions.Session object at 0xfa38c4e36b10&gt;
+
+    def test_get_businesses_public(self, api):
+        r = api.get(f"{BASE_URL}/api/businesses", timeout=30)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert isinstance(data, list)
+&gt;       assert len(data) &gt; 0, "Expected seeded businesses"
+E       AssertionError: Expected seeded businesses
+E       assert 0 &gt; 0
+E        +  where 0 = len([])
+
+tests/test_regression_modularization.py:116: AssertionError</failure></testcase><testcase classname="tests.test_regression_modularization.TestBusinessesProducts" name="test_get_products_for_business" time="0.000"><skipped type="pytest.skip" message="No business id from previous test">/app/backend/tests/test_regression_modularization.py:126: No business id from previous test</skipped></testcase><testcase classname="tests.test_regression_modularization.TestBusinessesProducts" name="test_create_product_as_customer_forbidden" time="0.724" /><testcase classname="tests.test_regression_modularization.TestOrders" name="test_create_order_as_customer" time="0.156"><failure message="AssertionError: No businesses available&#10;assert []">self = &lt;test_regression_modularization.TestOrders object at 0xfa38c6767ad0&gt;
+api = &lt;requests.sessions.Session object at 0xfa38c4e36b10&gt;
+customer_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNmMxOGY4YzctMWU5Mi00NDY4LWJjNTItYmNlY2IyZjM5YWVhIiwicm9sZSI6ImN1c3RvbWVyIiwiZXhwIjoxNzgyMDgzNDYyfQ.CMW2HBdhU3Bo_hkOvbh1rmPsDoNgsd-vmUpm2aMmwXU'}
+
+    def test_create_order_as_customer(self, api, customer_headers):
+        # get a business
+        bs = api.get(f"{BASE_URL}/api/businesses", timeout=30).json()
+&gt;       assert bs, "No businesses available"
+E       AssertionError: No businesses available
+E       assert []
+
+tests/test_regression_modularization.py:150: AssertionError</failure></testcase><testcase classname="tests.test_regression_modularization.TestOrders" name="test_get_orders_as_customer" time="0.252" /><testcase classname="tests.test_regression_modularization.TestOrders" name="test_get_orders_no_auth_403" time="0.040" /><testcase classname="tests.test_regression_modularization.TestOrders" name="test_create_order_no_auth_403" time="0.043" /><testcase classname="tests.test_regression_modularization.TestSearch" name="test_smart_search_hambre" time="1.005" /><testcase classname="tests.test_regression_modularization.TestDropshipping" name="test_get_dropshipping_products" time="0.148" /><testcase classname="tests.test_regression_modularization.TestAffiliate" name="test_get_affiliate_links" time="0.155" /><testcase classname="tests.test_regression_modularization.TestAdmin" name="test_admin_stats_ok" time="0.766" /><testcase classname="tests.test_regression_modularization.TestAdmin" name="test_admin_active_drivers_with_idle_fields" time="0.354" /><testcase classname="tests.test_regression_modularization.TestAdmin" name="test_admin_stats_customer_token_403" time="0.147" /><testcase classname="tests.test_regression_modularization.TestAdmin" name="test_admin_active_drivers_no_auth_403" time="0.041" /><testcase classname="tests.test_regression_modularization.TestAdmin" name="test_admin_active_drivers_customer_token_403" time="0.147" /><testcase classname="tests.test_riders_and_lockout.TestAdminRiderCRUD" name="test_create_rider_returns_code_and_qr" time="1.083" /><testcase classname="tests.test_riders_and_lockout.TestAdminRiderCRUD" name="test_create_rider_invalid_vehicle_400" time="0.207" /><testcase classname="tests.test_riders_and_lockout.TestAdminRiderCRUD" name="test_create_rider_non_admin_403" time="0.832" /><testcase classname="tests.test_riders_and_lockout.TestAdminRiderCRUD" name="test_list_riders_admin" time="0.310" /><testcase classname="tests.test_riders_and_lockout.TestAdminRiderCRUD" name="test_list_riders_non_admin_403" time="0.216" /><testcase classname="tests.test_riders_and_lockout.TestRiderActivation" name="test_activate_invalid_code_404" time="0.201" /><testcase classname="tests.test_riders_and_lockout.TestRiderActivation" name="test_activate_valid_code_and_use_token" time="1.153" /><testcase classname="tests.test_riders_and_lockout.TestRiderActivation" name="test_rider_me_with_admin_token_403" time="0.201" /><testcase classname="tests.test_riders_and_lockout.TestRiderLifecycle" name="test_suspend_then_activate_blocked" time="1.610" /><testcase classname="tests.test_riders_and_lockout.TestRiderLifecycle" name="test_regenerate_code_invalidates_old" time="1.040" /><testcase classname="tests.test_riders_and_lockout.TestBruteForceLockout" name="test_lockout_logic_via_localhost" time="2.290" /><testcase classname="tests.test_riders_and_lockout.TestBruteForceLockout" name="test_lockout_via_public_url_ingress_aware" time="2.510" /><testcase classname="tests.test_riders_and_lockout.TestBruteForceLockout" name="test_correct_login_before_lockout_clears_attempts" time="5.839" /><testcase classname="tests.test_stripe_mode" name="test_payments_status_founder_only" time="0.840" /><testcase classname="tests.test_stripe_mode" name="test_payments_status_blocked_for_customer" time="0.839" /><testcase classname="tests.test_stripe_mode" name="test_stripe_key_resolution_prefers_live" time="0.002" /></testsuite></testsuites>

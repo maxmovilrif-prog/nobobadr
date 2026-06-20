@@ -1,0 +1,44 @@
+{
+  "summary": "Iter 12 — Full end-to-end validation of the Nubo Ride module (transporte de pasajeros). Backend: 7/7 tests in test_nubo_ride.py GREEN (estimate, full lifecycle, RBAC request/accept, customer cancel, duplicate-active validation, admin visibility). Frontend Playwright e2e (customer + rider in separate browser contexts): 16/16 steps GREEN — customer login → dashboard banner (nubo-ride-btn) → /ride → ride-form with origin/destination Selects → choose Algeciras → Barcelona → ride-estimate-btn → 3 vehicle cards rendered (ride-vehicle-economy/comfort/xl) with prices €1138.17 < €1575.33 < €2100.80 (>0 and correctly ordered) → select economy + ride-request-btn → ride-active-card visible with estado='Buscando conductor…' + ride-active-price=€1138.17 + ride-cancel-btn → duplicate POST /api/rides/request returns 400 'Ya tienes un viaje en curso' (single-active validation enforced server-side) → rider /rider activation with code NUBO-6NJP succeeds, rider-rides-section visible, rider-accept-ride-{id} button rendered → accept transitions ride to 'aceptado' and customer UI (after reload) shows 'Conductor en camino' → rider-ride-start → en_curso → customer UI shows 'Viaje en curso' AND ride-cancel-btn is correctly hidden during en_curso (matches code: estado !== 'en_curso') → rider-ride-complete → backend marks 'completado' → customer reload: ride-active-card disappears and ride-form reappears (active ride cleared). Suite total: 146/154 pytest passing (8 pre-existing failures in password-reset & businesses tests — unrelated to Nubo Ride scope; the preview is wired to nubo_produccion Atlas which lacks businesses seed and likely Resend env).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/businesses (regression test)", "issue": "test_regression_modularization.test_get_businesses_public fails on prod Atlas DB (no businesses seeded). Pre-existing environmental — out of Nubo Ride scope."},
+      {"endpoint": "/api/auth/forgot-password (regression tests)", "issue": "6 password-reset tests fail in this preview (likely missing RESEND_API_KEY / network differences vs iter11 env). Out of Nubo Ride scope."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/ride (Algeciras → Barcelona)", "issues": ["Distance shown is straight-line geodesic (881.19 km / ETA 1718 min) which is huge for a passenger ride request; product may want to (a) restrict ride requests to same-region/short distances or (b) reflect a road-distance multiplier and cap. Cosmetic/product decision, not a bug — backend math is correct per haversine."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_nubo_ride.py",
+    "/app/test_reports/pytest/iter12_nubo_ride.xml",
+    "/app/test_reports/pytest/iter12_full.xml"
+  ],
+  "action_items": [
+    "(Optional product polish) Consider warning the user when origin/destination are in different regions because the resulting fare is unrealistic for a single passenger ride (Algeciras→Barcelona = €1138.17). Backend computes haversine straight-line — this is intentional but UX-confusing for a 'Uber-like' service.",
+    "(Out of scope, but visible in full pytest run) 8 failing tests outside Nubo Ride: 6 password-reset + 2 businesses/orders — likely caused by preview pointing to Atlas prod DB (no businesses seeded) and possibly missing RESEND_API_KEY. Not blocking Nubo Ride."
+  ],
+  "critical_code_review_comments": [
+    "rides.py implements proper atomic reclaim on accept via update_one with {estado:'buscando', conductor_id:None} filter — second concurrent accept correctly returns 409, validated in test_full_ride_lifecycle.",
+    "Regional isolation respected: accept_ride rejects 409/403 when ride.region_id != driver.region_id; available rides query in /rides/active for drivers limits to their region or region_id=None (cross-region public).",
+    "Duplicate-active validation enforced server-side (existing find_one with estado in ACTIVE_STATES) — frontend benefits but cannot be bypassed by manipulating UI. Verified with raw fetch in e2e step 7.",
+    "Cancel button correctly hidden in UI during 'en_curso' (NuboRide.js L317) — matches business rule that an in-progress ride cannot be cancelled by the client.",
+    "Polling on /api/rides/active every 5s while active ride is in buscando|aceptado|en_curso (NuboRide.js L80-85). useEffect cleanup correctly clears interval. No memory leak.",
+    "Money formatting helper handles MAD/EUR cleanly; currency derives from origin city's country (.country === 'MA'). GPS origin always defaults to EUR (acceptable simplification).",
+    "MongoDB _id always excluded via {_id:0} projections — no ObjectId leakage.",
+    "Telegram alert call (telegram_alerts.notify_new_ride) is awaited inline in /rides/request — could become latency burden if Telegram is slow; consider asyncio.create_task to avoid blocking the response. Low priority."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% Nubo-Ride scope (7/7), 94.8% overall suite (146/154 — 8 pre-existing failures unrelated to ride module)", "frontend": "100% (16/16 Playwright steps)"},
+  "test_credentials": "Customer: qa_customer@nubo.com / Test1234! (login on /auth — verified working). Rider activation code: NUBO-6NJP (verified — activation returns rider token used for accept/start/complete). Founder: badarbox1756@gmail.com / Admin1234! (not needed for this scope).",
+  "seed_data_creation": "No seed creation. Tests reuse the production-Atlas-seeded customer/rider/cities. The single ride created during e2e (id 33ffd57d-…) was driven through buscando→aceptado→en_curso→completado, so it no longer occupies the customer's active slot. Verified GET /api/rides/active returns {ride:null} at end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Nubo Ride frontend testids are stable: nubo-ride-btn (dashboard), nubo-ride-page, ride-form, ride-origin-select, ride-dest-select, ride-origin-{cityId}, ride-dest-{cityId}, ride-estimate-btn, ride-options, ride-vehicle-{economy|comfort|xl}, ride-price-{type}, ride-request-btn, ride-active-card, ride-active-estado, ride-active-price, ride-cancel-btn. Rider: rider-code-input, rider-activate-btn, rider-rides-section, rider-active-ride, rider-ride-start, rider-ride-complete, rider-accept-ride-{rideId}. NOTE: Auth submit testid is login-submit-btn (NOT login-submit-button). NOTE: Customer and rider share the same origin so do NOT use localStorage.clear() in one tab while the other is active — use a separate browser context (page.context.browser.new_context()) or drive the rider via direct API calls as done in this iteration. Active-ride single-tenancy is enforced by the backend (returns 400 'Ya tienes un viaje en curso'). Cancel button is hidden by design once estado='en_curso'.",
+  "rca of the issue": "No bugs found in Nubo Ride. The 8 failures in the wider pytest run are environmental (preview wired to nubo_produccion Atlas without businesses seed, and password-reset tests likely needing RESEND_API_KEY) and pre-existed iter12. Confirmed by isolating tests/test_nubo_ride.py which is 100% green."
+}

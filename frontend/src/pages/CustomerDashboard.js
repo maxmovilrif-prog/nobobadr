@@ -351,6 +351,30 @@ export default function CustomerDashboard() {
           </CardContent>
         </Card>
 
+        {/* Nubo Ride Banner */}
+        <Card className="mb-8 bg-gradient-to-r from-slate-900 to-emerald-800 text-white border-0 overflow-hidden relative">
+          <div className="absolute right-0 top-0 w-64 h-64 bg-emerald-400/10 rounded-full -mr-32 -mt-32"></div>
+          <CardContent className="p-6 relative z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-2">🚕 Nubo Ride · Pide tu coche</h3>
+                <p className="text-white/90 mb-4">
+                  Transporte de pasajeros con conductor. Elige Economy, Comfort o XL y conoce el precio antes de pedir.
+                </p>
+                <Button
+                  data-testid="nubo-ride-btn"
+                  onClick={() => navigate('/ride')}
+                  className="bg-emerald-500 text-white hover:bg-emerald-400"
+                >
+                  Pedir un viaje
+                  <Car className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+              <div className="hidden md:block text-6xl opacity-20">🚕</div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Express Delivery Banner */}
         <Card className="mb-8 bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0 overflow-hidden relative">
           <CardContent className="p-6 relative z-10">

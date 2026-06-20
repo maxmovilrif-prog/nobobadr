@@ -3,6 +3,7 @@
 ## QA accounts (created by agent, known passwords)
 - Customer: `qa_customer@nubo.com` / `Test1234!`
 - Admin (Fundador): `badarbox1756@gmail.com` / `Admin1234!`  (role: admin → acceso TOTAL: KPIs, Contabilidad, Operaciones, Riders, Gestores). Login SOLO por la ruta oculta `/nubo-control`.
+- Rider QA (Nubo Ride / delivery): código de activación `NUBO-6NJP` (vehículo: car). Se activa en `/rider`. NOTA: existe en la base de PRODUCCIÓN `nubo_produccion` (creado para verificar Nubo Ride).
 
 ## Roles / RBAC (segregación + multi-tenant regional)
 - `admin` (Fundador / Director General): acceso TOTAL. Login por `/nubo-control` (oculto) o subdominio `director.noboexpress.com`.

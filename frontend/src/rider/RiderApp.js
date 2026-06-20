@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { ScanLine, LogOut, MapPin, Package, Power, Loader2, Bike, Car, Truck, Zap, ShieldAlert, Camera, X, Banknote, Route } from 'lucide-react';
+import { ScanLine, LogOut, MapPin, Package, Power, Loader2, Bike, Car, Truck, Zap, ShieldAlert, Camera, X, Banknote, Route, Navigation, CheckCircle2, Play, Flag } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -22,6 +22,8 @@ export default function RiderApp() {
   const [code, setCode] = useState('');
   const [activating, setActivating] = useState(false);
   const [orders, setOrders] = useState([]);
+  const [rideData, setRideData] = useState({ ride: null, available: [] });
+  const [rideBusy, setRideBusy] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [scanning, setScanning] = useState(false);
   const watchIdRef = useRef(null);
@@ -56,6 +58,43 @@ export default function RiderApp() {
   useEffect(() => {
     if (rider) loadOrders();
   }, [rider, loadOrders]);
+
+  const loadRides = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/rides/active`, authHeaders());
+      setRideData({ ride: res.data?.ride || null, available: res.data?.available || [] });
+    } catch (e) { /* noop */ }
+  }, [authHeaders]);
+
+  useEffect(() => {
+    if (!rider) return;
+    loadRides();
+    const t = setInterval(loadRides, 8000);
+    return () => clearInterval(t);
+  }, [rider, loadRides]);
+
+  const acceptRide = async (rideId) => {
+    setRideBusy(true);
+    try {
+      await axios.post(`${API}/rides/accept`, { ride_id: rideId }, authHeaders());
+      toast.success('¡Viaje aceptado!');
+      await loadRides();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'No se pudo aceptar');
+      await loadRides();
+    } finally { setRideBusy(false); }
+  };
+
+  const rideAction = async (rideId, action, okMsg) => {
+    setRideBusy(true);
+    try {
+      await axios.post(`${API}/rides/${rideId}/${action}`, {}, authHeaders());
+      toast.success(okMsg);
+      await loadRides();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Error');
+    } finally { setRideBusy(false); }
+  };
 
   const activateWithCode = async (rawCode) => {
     const c = (rawCode || '').trim().toUpperCase();
@@ -272,6 +311,73 @@ export default function RiderApp() {
             )}
           </CardContent>
         </Card>
+
+        {/* Nubo Ride — viajes de pasajeros */}
+        <div data-testid="rider-rides-section">
+          <h2 className="text-sm font-semibold text-gray-700 mb-2 px-1 flex items-center gap-1.5">
+            <Car className="w-4 h-4 text-emerald-600" /> Nubo Ride · Viajes
+          </h2>
+
+          {rideData.ride ? (
+            <Card className="border-0 shadow-md ring-1 ring-emerald-200" data-testid="rider-active-ride">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-gray-900">Viaje #{rideData.ride.id.slice(0, 8)}</span>
+                  <Badge className={rideData.ride.estado === 'en_curso' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}>
+                    {rideData.ride.estado === 'en_curso' ? 'En curso' : 'Aceptado'}
+                  </Badge>
+                </div>
+                <p className="text-sm text-gray-700 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-emerald-600" />{rideData.ride.origin?.label || 'Origen'}</p>
+                <p className="text-sm text-gray-700 flex items-center gap-1.5"><Navigation className="w-3.5 h-3.5 text-slate-700" />{rideData.ride.destination?.label || 'Destino'}</p>
+                <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2">
+                  <span className="text-xs text-gray-500">{rideData.ride.vehicle_type} · {rideData.ride.distance_km} km</span>
+                  <span className="text-lg font-bold text-emerald-700" data-testid="rider-ride-price">
+                    {rideData.ride.currency === 'MAD' ? `${(rideData.ride.precio_estimado ?? 0).toFixed(2)} د.م` : `€${(rideData.ride.precio_estimado ?? 0).toFixed(2)}`}
+                  </span>
+                </div>
+                {rideData.ride.estado === 'aceptado' ? (
+                  <Button onClick={() => rideAction(rideData.ride.id, 'start', 'Viaje iniciado')} disabled={rideBusy}
+                    className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 gap-2" data-testid="rider-ride-start">
+                    {rideBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} Iniciar viaje
+                  </Button>
+                ) : (
+                  <Button onClick={() => rideAction(rideData.ride.id, 'complete', 'Viaje completado')} disabled={rideBusy}
+                    className="w-full mt-3 bg-slate-900 hover:bg-slate-800 gap-2" data-testid="rider-ride-complete">
+                    {rideBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flag className="w-4 h-4" />} Completar viaje
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : rideData.available.length === 0 ? (
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-6 text-center text-gray-400">
+                <Car className="w-9 h-9 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">No hay solicitudes de viaje ahora.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {rideData.available.map((r) => (
+                <Card key={r.id} data-testid={`rider-available-ride-${r.id}`} className="border-0 shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-gray-700 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-emerald-600" />{r.origin?.label || 'Origen'}</p>
+                    <p className="text-sm text-gray-700 flex items-center gap-1.5"><Navigation className="w-3.5 h-3.5 text-slate-700" />{r.destination?.label || 'Destino'}</p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-gray-500 flex items-center gap-1"><Route className="w-3 h-3" />{r.vehicle_type} · {r.distance_km} km · ~{r.eta_mins} min</span>
+                      <span className="text-base font-bold text-emerald-700">
+                        {r.currency === 'MAD' ? `${(r.precio_estimado ?? 0).toFixed(2)} د.م` : `€${(r.precio_estimado ?? 0).toFixed(2)}`}
+                      </span>
+                    </div>
+                    <Button onClick={() => acceptRide(r.id)} disabled={rideBusy}
+                      className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 gap-2" data-testid={`rider-accept-ride-${r.id}`}>
+                      {rideBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Aceptar viaje
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Assigned orders */}
         <div>
