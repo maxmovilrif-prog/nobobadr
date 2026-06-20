@@ -105,6 +105,18 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - App usa MongoDB (NO PostgreSQL).
 - Tests: `/app/backend/tests/test_nubo_features.py`. Credenciales: `/app/memory/test_credentials.md`.
 
+## Nubo Ride — Transporte de pasajeros (Backend) (2026-06-20) ✅
+- **Tarifas específicas de pasajeros** (`geo.py` → `RIDE_PRICING` + `calculate_ride_quote`): 3 niveles `economy` / `comfort` / `xl` con tarifa base + €/km + €/min + **tarifa mínima**, ETA con factor de tráfico, moneda EUR/MAD.
+- **Modelos** (`models.py`): `Ride` (client_id, conductor_id, origin/destination `GeoPoint`, vehicle_type, distance_km, eta_mins, precio_estimado, currency, estado `buscando|aceptado|en_curso|completado|cancelado`, region_id, city_id, timestamps), `RideRequest`, `RideEstimateRequest`, `RideAccept`, `RideCancel`.
+- **Endpoints** (`routes/rides.py`, registrado en `server.py`):
+  - `POST /api/rides/estimate` (precio por los 3 vehículos).
+  - `POST /api/rides/request` (cliente; evita viajes activos duplicados; calcula región por city_id).
+  - `POST /api/rides/accept` (conductor; **reclamo atómico** `find_one_and_update`, 409 si ya aceptado; aislamiento regional por `region_id`; bloquea si el conductor ya tiene viaje activo).
+  - `GET /api/rides/active` (cliente→su viaje; conductor→su viaje + disponibles de su región; admin/manager→lista activos scoped por `get_scope_city_ids`).
+  - `POST /api/rides/{id}/start` · `/complete` · `/cancel` (ciclo completo; cancel permitido a cliente dueño/conductor/Fundador/Gestor).
+- ✅ **155/155 pytest** (148 previos + 7 nuevos en `test_nubo_ride.py`: ciclo completo, RBAC, doble-accept 409, sin duplicados, vista admin).
+- ⏳ Pendiente: **Frontend** de Nubo Ride (UI cliente para pedir viaje + app conductor para aceptar/iniciar/completar).
+
 ## Separación total: Web pública vs Panel oculto (2026-06-19) ✅
 - **Web pública** en `/` (`Landing.js`): SIEMPRE informativa, sin login (aunque haya sesión). Navbar con "Seguir pedido" (`/track`) y "Calcular precio" (`/presupuesto`); se quitó el botón de login/registro de clientes. CTAs del hero/footer → `/presupuesto` y `/track`.
 - **Panel de administración oculto** en `/nubo-control` (no enlazado desde la web pública): login dedicado `AdminLogin.js` (marca "Nubo Control · Acceso restringido", tema oscuro glass). Valida rol admin/manager ANTES de iniciar sesión; cliente → "Acceso no autorizado". Tras login → `AdminDashboard`.

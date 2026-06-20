@@ -35,6 +35,37 @@ VEHICLE_PRICING = {
 # Factor de tráfico/ajuste aplicado al ETA teórico
 ETA_TRAFFIC_FACTOR = 1.3
 
+# ===== Nubo Ride (transporte de pasajeros) — tarifas específicas =====
+# Tarifa base + coste por km + coste por minuto + tarifa mínima (todo en EUR).
+RIDE_PRICING = {
+    "economy": {"base": 1.50, "per_km": 0.90, "per_min": 0.20, "min_fare": 4.0, "speed_kmh": 40, "label": "Economy"},
+    "comfort": {"base": 2.50, "per_km": 1.20, "per_min": 0.30, "min_fare": 6.0, "speed_kmh": 40, "label": "Comfort"},
+    "xl":      {"base": 3.50, "per_km": 1.60, "per_min": 0.35, "min_fare": 9.0, "speed_kmh": 35, "label": "XL / Van"},
+}
+
+RIDE_VEHICLE_TYPES = set(RIDE_PRICING.keys())
+
+
+def calculate_ride_quote(origin_lat: float, origin_lng: float,
+                         destination_lat: float, destination_lng: float,
+                         vehicle_type: str = "economy", currency: str = "EUR") -> dict:
+    """Calcula la tarifa de un viaje de pasajeros (Nubo Ride) por distancia + tiempo, con tarifa mínima."""
+    pricing = RIDE_PRICING.get(vehicle_type, RIDE_PRICING["economy"])
+    distance_km = haversine_km(origin_lat, origin_lng, destination_lat, destination_lng)
+    base_eta = (distance_km / pricing["speed_kmh"]) * 60 if pricing["speed_kmh"] else 0
+    adjusted_eta = max(3, round(base_eta * ETA_TRAFFIC_FACTOR))
+    fare_eur = pricing["base"] + pricing["per_km"] * distance_km + pricing["per_min"] * adjusted_eta
+    fare_eur = max(pricing["min_fare"], fare_eur)
+    price = convert_from_eur(fare_eur, currency)
+    return {
+        "distance_km": distance_km,
+        "estimated_price": price,
+        "currency": currency if currency in ("EUR", "MAD") else "EUR",
+        "eta_mins": adjusted_eta,
+        "vehicle_type": vehicle_type if vehicle_type in RIDE_PRICING else "economy",
+        "vehicle_label": pricing["label"],
+    }
+
 
 def currency_for_location(country: Optional[str] = None, city: Optional[str] = None) -> str:
     """Devuelve MAD para Marruecos, EUR para España/UE. Por defecto EUR."""

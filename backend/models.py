@@ -279,6 +279,65 @@ class SmartSearchRequest(BaseModel):
     language: Optional[str] = "es"
 
 
+# ===== Nubo Ride (transporte de pasajeros) =====
+class GeoPoint(BaseModel):
+    lat: float
+    lng: float
+    label: Optional[str] = None
+
+
+class Ride(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_id: str
+    conductor_id: Optional[str] = None
+    origin: GeoPoint
+    destination: GeoPoint
+    vehicle_type: str = "economy"  # economy | comfort | xl
+    distance_km: Optional[float] = None
+    eta_mins: Optional[int] = None
+    precio_estimado: float
+    currency: str = "EUR"
+    estado: str = "buscando"  # buscando | aceptado | en_curso | completado | cancelado
+    region_id: Optional[str] = None
+    city_id: Optional[str] = None
+    cancel_reason: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    accepted_at: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    cancelled_at: Optional[str] = None
+
+
+class RideRequest(BaseModel):
+    origin_lat: float
+    origin_lng: float
+    origin_label: Optional[str] = None
+    destination_lat: float
+    destination_lng: float
+    destination_label: Optional[str] = None
+    vehicle_type: str = "economy"
+    city_id: Optional[str] = None
+    currency: str = "EUR"
+
+
+class RideEstimateRequest(BaseModel):
+    origin_lat: float
+    origin_lng: float
+    destination_lat: float
+    destination_lng: float
+    currency: str = "EUR"
+
+
+class RideAccept(BaseModel):
+    ride_id: str
+
+
+class RideCancel(BaseModel):
+    reason: Optional[str] = None
+
+
 # ===== Dropshipping =====
 class DropshippingProduct(BaseModel):
     model_config = ConfigDict(extra="ignore")
