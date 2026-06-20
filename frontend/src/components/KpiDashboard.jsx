@@ -40,7 +40,7 @@ export const KpiDashboard = ({ API, token }) => {
     try {
       const res = await axios.get(`${API}/admin/kpis`, auth);
       setKpi(res.data);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando KPIs', e); }
     // eslint-disable-next-line
   }, [API, token]);
 

@@ -52,7 +52,7 @@ export default function RiderApp() {
     try {
       const res = await axios.get(`${API}/orders`, authHeaders());
       setOrders(res.data || []);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando pedidos del rider', e); }
   }, [authHeaders]);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function RiderApp() {
     try {
       const res = await axios.get(`${API}/rides/active`, authHeaders());
       setRideData({ ride: res.data?.ride || null, available: res.data?.available || [] });
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando viajes Nubo Ride', e); }
   }, [authHeaders]);
 
   useEffect(() => {
@@ -165,7 +165,7 @@ export default function RiderApp() {
   };
 
   const sendLocation = useCallback((lat, lng) => {
-    axios.post(`${API}/rider/location`, { lat, lng }, authHeaders()).catch(() => {});
+    axios.post(`${API}/rider/location`, { lat, lng }, authHeaders()).catch((e) => console.warn('No se pudo enviar ubicación', e));
   }, [authHeaders]);
 
   const startSharing = () => {

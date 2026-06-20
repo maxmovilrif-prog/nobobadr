@@ -29,7 +29,7 @@ export const RiderManager = ({ API, token }) => {
     try {
       const res = await axios.get(`${API}/admin/riders`, auth);
       setRiders(res.data.riders || []);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando riders', e); }
   };
 
   useEffect(() => { fetchRiders(); /* eslint-disable-next-line */ }, []);
@@ -87,14 +87,19 @@ export const RiderManager = ({ API, token }) => {
 
   const printQr = () => {
     if (!qrModal) return;
-    const vlabel = VLABEL[qrModal.vehicle_type] || qrModal.vehicle_type || '—';
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+    const vlabelRaw = VLABEL[qrModal.vehicle_type] || qrModal.vehicle_type || '—';
+    const vlabel = esc(vlabelRaw);
+    const name = esc(qrModal.name);
+    const code = esc(qrModal.code);
     let downloadQr = '';
-    try { downloadQr = downloadQrRef.current?.toDataURL('image/png') || ''; } catch (e) { /* noop */ }
+    try { downloadQr = downloadQrRef.current?.toDataURL('image/png') || ''; } catch (e) { console.warn('No se pudo generar el QR de descarga', e); }
     const row = (label, value) => value
-      ? `<tr><td style="padding:6px 14px;color:#6b7280;font-size:13px">${label}</td><td style="padding:6px 14px;font-weight:600;color:#111827">${value}</td></tr>`
+      ? `<tr><td style="padding:6px 14px;color:#6b7280;font-size:13px">${label}</td><td style="padding:6px 14px;font-weight:600;color:#111827">${esc(value)}</td></tr>`
       : '';
-    const w = window.open('', '_blank');
-    w.document.write(`<html><head><title>Ficha de activación · ${qrModal.name} · ${qrModal.code}</title>
+    const html = `<html><head><title>Ficha de activación · ${name} · ${code}</title>
       <meta charset="utf-8"/>
       <style>
         @page { margin: 16mm; }
@@ -127,11 +132,11 @@ export const RiderManager = ({ API, token }) => {
           </div>
           <div class="body">
             <div class="info">
-              <p class="name">${qrModal.name}</p>
+              <p class="name">${name}</p>
               <span class="badge">${vlabel}</span>
               <table>
                 ${row('ID único', qrModal.code)}
-                ${row('Vehículo', vlabel)}
+                ${row('Vehículo', vlabelRaw)}
                 ${row('Teléfono', qrModal.phone)}
                 ${row('DNI/ID', qrModal.dni)}
                 ${row('Matrícula', qrModal.license_plate)}
@@ -147,7 +152,7 @@ export const RiderManager = ({ API, token }) => {
             <div class="qrcard">
               <h4>2 · Activa tu cuenta</h4>
               <img src="${qrModal.qr}" alt="Activación"/>
-              <div class="code">${qrModal.code}</div>
+              <div class="code">${code}</div>
             </div>
           </div>
           <div class="steps">
@@ -156,14 +161,17 @@ export const RiderManager = ({ API, token }) => {
               <li>Escanea el <b>QR 1</b> para abrir e instalar la app <b>Nubo Riders</b> en tu móvil.</li>
               <li>Dentro de la app, pulsa <b>"Escanear QR"</b> y apunta al <b>QR 2</b>.</li>
               <li>La app se configurará con tu nombre, perfil y vehículo automáticamente.</li>
-              <li>Si no puedes escanear, escribe el código <b>${qrModal.code}</b> manualmente.</li>
+              <li>Si no puedes escanear, escribe el código <b>${code}</b> manualmente.</li>
             </ol>
           </div>
           <div class="foot">Documento generado por Nubo Express · Conserva esta hoja. El código es personal e intransferible.</div>
         </div>
         <script>window.onload = function(){ window.focus(); window.print(); }</script>
-      </body></html>`);
-    w.document.close();
+      </body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { toast.error('Permite las ventanas emergentes para imprimir la ficha'); return; }
+    const blob = new Blob([html], { type: 'text/html' });
+    w.location.href = URL.createObjectURL(blob);
   };
 
   return (

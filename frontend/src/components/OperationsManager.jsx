@@ -43,7 +43,7 @@ export const OperationsManager = ({ API, token }) => {
     try {
       const res = await axios.get(`${API}/admin/ops/orders`, auth);
       setOps(res.data);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando operaciones', e); }
     // eslint-disable-next-line
   }, [API, token]);
 
@@ -56,7 +56,7 @@ export const OperationsManager = ({ API, token }) => {
       if (dateTo) params.set('date_to', dateTo);
       const res = await axios.get(`${API}/admin/assignment-history?${params.toString()}`, auth);
       setHistory(res.data);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando historial de asignaciones', e); }
     // eslint-disable-next-line
   }, [API, token, filterAction, filterDriver, dateFrom, dateTo]);
 

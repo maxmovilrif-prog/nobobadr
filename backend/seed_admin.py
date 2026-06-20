@@ -8,8 +8,8 @@ import bcrypt
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-ADMIN_EMAIL = "badarbox1756@gmail.com"
-ADMIN_PASSWORD = "Admin1234!"
+ADMIN_EMAIL = os.environ.get("SEED_ADMIN_EMAIL", "badarbox1756@gmail.com").strip().lower()
+ADMIN_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "Admin1234!")
 
 
 async def main():
