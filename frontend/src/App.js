@@ -11,6 +11,7 @@ import AdminDashboard from '@/pages/AdminDashboard';
 import AdminLogin from '@/pages/AdminLogin';
 import AdminReset from '@/pages/AdminReset';
 import AdminPasswordReset from '@/pages/AdminPasswordReset';
+import CustomerPasswordReset from '@/pages/CustomerPasswordReset';
 import { getPortal } from '@/lib/portal';
 import DeliveryQuote from '@/pages/DeliveryQuote';
 import RiderApp from '@/rider/RiderApp';
@@ -139,6 +140,7 @@ function App() {
         <Routes>
           <Route path="/" element={rootElement} />
           <Route path="/auth" element={!user ? <Auth /> : <Navigate to="/dashboard" />} />
+          <Route path="/recuperar" element={<CustomerPasswordReset />} />
           <Route path="/dashboard" element={
             user ? (
               user.role === 'customer' ? <CustomerDashboard /> :

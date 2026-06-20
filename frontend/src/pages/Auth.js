@@ -18,6 +18,23 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   
   const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/auth/forgot-password`, { email: forgotEmail.trim().toLowerCase() });
+      toast.success('Si el email está registrado, recibirás un enlace de recuperación.');
+      setForgotMode(false);
+      setForgotEmail('');
+    } catch (error) {
+      toast.error('No se pudo procesar la solicitud');
+    } finally {
+      setLoading(false);
+    }
+  };
   const [registerData, setRegisterData] = useState({
     email: '',
     password: '',
@@ -95,6 +112,31 @@ export default function Auth() {
               </TabsList>
 
               <TabsContent value="login">
+                {forgotMode ? (
+                  <form data-testid="customer-forgot-form" onSubmit={handleForgot} className="space-y-4">
+                    <p className="text-sm text-gray-600">Introduce tu email registrado y te enviaremos un enlace para restablecer tu contraseña.</p>
+                    <div>
+                      <Label htmlFor="forgot-email">Email</Label>
+                      <Input
+                        id="forgot-email"
+                        data-testid="customer-forgot-email"
+                        type="email"
+                        placeholder="tu@email.com"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button data-testid="customer-forgot-submit" type="submit" disabled={loading}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700">
+                      {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
+                    </Button>
+                    <button type="button" data-testid="customer-forgot-back" onClick={() => setForgotMode(false)}
+                      className="w-full text-center text-sm text-gray-500 hover:text-emerald-700">
+                      ← Volver a iniciar sesión
+                    </button>
+                  </form>
+                ) : (
                 <form data-testid="login-form" onSubmit={handleLogin} className="space-y-4">
                   <div>
                     <Label htmlFor="login-email">Email</Label>
@@ -128,7 +170,12 @@ export default function Auth() {
                   >
                     {loading ? 'Cargando...' : 'Iniciar Sesión'}
                   </Button>
+                  <button type="button" data-testid="customer-forgot-link" onClick={() => setForgotMode(true)}
+                    className="w-full text-center text-sm text-emerald-600 hover:text-emerald-700">
+                    ¿Olvidaste tu contraseña?
+                  </button>
                 </form>
+                )}
               </TabsContent>
 
               <TabsContent value="register">

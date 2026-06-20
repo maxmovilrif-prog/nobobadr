@@ -102,11 +102,11 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 async def forgot_password(payload: ForgotPasswordRequest):
     """Solicita un enlace de recuperación por email. Solo para cuentas de gestión
     (Fundador / Gestores regionales). Anti-enumeración: respuesta genérica siempre."""
-    generic = {"message": "Si el email pertenece a una cuenta de gestión, recibirás un enlace de recuperación."}
+    generic = {"message": "Si el email pertenece a una cuenta registrada, recibirás un enlace de recuperación."}
     email = payload.email.strip().lower()
     user = await db.users.find_one({'email': email}, {'_id': 0})
-    # Solo cuentas con contraseña y de gestión (admin/manager)
-    if not user or user.get('role') not in ('admin', 'manager') or not user.get('password_hash'):
+    # Cuentas con contraseña (los riders entran por QR → excluidos)
+    if not user or user.get('role') not in ('admin', 'manager', 'customer', 'business') or not user.get('password_hash'):
         return generic
 
     raw = secrets.token_urlsafe(32)
@@ -120,7 +120,11 @@ async def forgot_password(payload: ForgotPasswordRequest):
         'used': False,
         'created_at': datetime.now(timezone.utc),
     })
-    reset_link = f"{APP_BASE_URL}/nubo-control/recuperar?token={raw}"
+    # El enlace apunta al panel correcto según el rol
+    if user.get('role') in ('admin', 'manager'):
+        reset_link = f"{APP_BASE_URL}/nubo-control/recuperar?token={raw}"
+    else:
+        reset_link = f"{APP_BASE_URL}/recuperar?token={raw}"
     result = await email_service.send_password_reset_email(email, reset_link, user.get('name', ''))
     if not result.get('sent'):
         logger.warning("forgot-password: email NO enviado a %s (%s)", email, result.get('reason'))
