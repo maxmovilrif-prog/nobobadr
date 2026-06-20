@@ -77,7 +77,9 @@ export default function Footer() {
             <h4 className="font-semibold mb-4 text-emerald-400">{t('footer.links')}</h4>
             <ul className="space-y-2 text-sm text-gray-300">
               <li><a href="/" className="hover:text-emerald-400 transition-colors">{t('footer.home')}</a></li>
-              <li><a href="/auth" className="hover:text-emerald-400 transition-colors">{t('common.login')}</a></li>
+              <li><a href="/presupuesto" className="hover:text-emerald-400 transition-colors">Calcular precio</a></li>
+              <li><a href="/track" className="hover:text-emerald-400 transition-colors">Seguir pedido</a></li>
+              <li><a data-testid="footer-client-login" href="/auth" className="hover:text-emerald-400 transition-colors font-medium text-emerald-300">Área de clientes</a></li>
               <li><a href="/privacy" className="hover:text-emerald-400 transition-colors">Privacidad</a></li>
               <li><a href="/terms" className="hover:text-emerald-400 transition-colors">{t('footer.terms')}</a></li>
             </ul>
