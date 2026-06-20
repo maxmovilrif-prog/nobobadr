@@ -1,8 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header, WebSocket, WebSocketDisconnect, Response
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import ReturnDocument
 import os
 import logging
@@ -11,8 +9,6 @@ from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timezone, timedelta
-import bcrypt
-import jwt
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 import json
@@ -27,10 +23,14 @@ sys.path.append(str(Path(__file__).parent))
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# Conexión a MongoDB y autenticación: viven en db.py / auth.py (ver esos
+# archivos) para que cualquier router de la app -incluido dropshipping_routes.py-
+# pueda importarlos sin crear un import circular con server.py.
+from db import client, db
+from auth import (
+    JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS, security,
+    hash_password, verify_password, create_token, get_current_user,
+)
 
 def db_error(endpoint: str, e: Exception) -> HTTPException:
     """Registra un error de base de datos con detalle (nombre de db, tipo y mensaje)
@@ -45,11 +45,6 @@ def db_error(endpoint: str, e: Exception) -> HTTPException:
         status_code=503,
         detail=f"Error de base de datos en {endpoint} (db='{db_name}'): {type(e).__name__}: {e}"
     )
-
-# JWT Configuration
-JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
-JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_HOURS = 24
 
 # Stripe Configuration
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
@@ -67,7 +62,12 @@ ADMIN_LOCKOUT_MINUTES = 15
 # Create the main app
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
-security = HTTPBearer()
+
+# Router de dropshipping (productos, ciclo de vida de pedidos, comisiones).
+# Ya no hay riesgo de import circular: dropshipping_routes.py importa `db`
+# desde db.py y `get_current_user` desde auth.py, no desde este archivo.
+from dropshipping_routes import router as dropshipping_router, create_dropship_orders_for_order
+
 
 # =========================
 # MODELS
@@ -287,38 +287,8 @@ class PaymentTransaction(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# =========================
-# AUTH HELPERS
-# =========================
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-
-def create_token(user_id: str, role: str) -> str:
-    expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
-    payload = {
-        'user_id': user_id,
-        'role': role,
-        'exp': expiration
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    try:
-        token = credentials.credentials
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id = payload['user_id']
-        user = await db.users.find_one({'id': user_id}, {'_id': 0})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+# Nota: hash_password, verify_password, create_token y get_current_user ya
+# no se definen aquí — se importan de auth.py al principio del archivo.
 
 # =========================
 # AUTH ENDPOINTS
@@ -510,13 +480,43 @@ async def get_products(business_id: str):
 async def create_order(order_data: OrderCreate, current_user: dict = Depends(get_current_user)):
     if current_user['role'] != 'customer':
         raise HTTPException(status_code=403, detail="Only customers can create orders")
-    
-    # Calculate total
-    total = sum(item.price * item.quantity for item in order_data.items)
-    
+
+    if not order_data.items:
+        raise HTTPException(status_code=400, detail="Order must contain at least one item")
+
+    # Seguridad: el precio NUNCA se confía del cliente. order_data.items[i].price
+    # venía directamente del JSON enviado por el navegador, así que cualquiera
+    # podía manipularlo (p.ej. mandar price=0.01) y pagar lo que quisiera vía
+    # Stripe, ya que el total se usaba tal cual en create_checkout_session.
+    # Aquí se recalcula cada precio a partir del producto real en la base de
+    # datos, ignorando por completo lo que mande el cliente.
+    verified_items = []
+    total = 0.0
+    for item in order_data.items:
+        if item.quantity < 1:
+            raise HTTPException(status_code=400, detail="Quantity must be at least 1")
+
+        product = await db.products.find_one(
+            {'id': item.product_id, 'business_id': order_data.business_id}, {'_id': 0}
+        )
+        if not product:
+            raise HTTPException(status_code=400, detail=f"Product {item.product_id} not found for this business")
+        if not product.get('available', True):
+            raise HTTPException(status_code=400, detail=f"Product '{product['name']}' is not available")
+
+        real_price = product['price']
+        verified_items.append(OrderItem(
+            product_id=product['id'],
+            product_name=product['name'],
+            quantity=item.quantity,
+            price=real_price
+        ))
+        total += real_price * item.quantity
+
     order_dict = order_data.model_dump()
+    order_dict['items'] = [vi.model_dump() for vi in verified_items]
     order_dict['customer_id'] = current_user['id']
-    order_dict['total_amount'] = total
+    order_dict['total_amount'] = round(total, 2)
     order_dict['status'] = 'pending'
     try:
         # Resolver nombre de ciudad si se indicó city_id
@@ -1044,6 +1044,8 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
         )
         # Despacho automático: asigna la Abeja más cercana al instante
         await auto_assign_order(transaction['order_id'])
+        # Genera los pedidos de dropshipping (si el pedido contiene productos dropshipping)
+        await _create_dropship_orders_safe(transaction['order_id'])
         od = await db.orders.find_one({'id': transaction['order_id']}, {'_id': 0, 'order_type': 1})
         order_type = (od or {}).get('order_type', 'marketplace')
     
@@ -1084,6 +1086,8 @@ async def stripe_webhook(request: Request):
                 )
                 # Despacho automático: asigna la Abeja más cercana al instante
                 await auto_assign_order(transaction['order_id'])
+                # Genera los pedidos de dropshipping (si el pedido contiene productos dropshipping)
+                await _create_dropship_orders_safe(transaction['order_id'])
         
         return {'status': 'success'}
     except Exception as e:
@@ -1106,6 +1110,8 @@ async def admin_mark_order_paid(order_id: str, current_user: dict = Depends(get_
     )
     # Despacho automático: asigna la Abeja más cercana (origen real en exprés, centro de ciudad en marketplace)
     result = await auto_assign_order(order_id)
+    # Genera los pedidos de dropshipping (si el pedido contiene productos dropshipping)
+    await _create_dropship_orders_safe(order_id)
     assigned = None
     if result:
         chosen = result['driver']
@@ -1115,84 +1121,13 @@ async def admin_mark_order_paid(order_id: str, current_user: dict = Depends(get_
             'payment_status': 'paid', 'auto_assigned': assigned}
 
 # =========================
-# DROPSHIPPING MODELS & ROUTES
+# DROPSHIPPING — productos y workflow de pedidos
 # =========================
-
-class DropshippingProduct(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    business_id: str
-    name: str
-    description: str
-    original_price: float
-    selling_price: float
-    commission_percentage: float
-    platform: str  # alibaba, temu, aliexpress
-    product_url: str
-    image_url: str
-    category: str
-    stock_status: str = "available"
-    shipping_time: str = "15-30 días"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class DropshippingProductCreate(BaseModel):
-    name: str
-    description: str
-    original_price: float
-    commission_percentage: float
-    platform: str
-    product_url: str
-    image_url: str
-    category: str
-    shipping_time: str = "15-30 días"
-
-class DropshippingOrderStatusUpdate(BaseModel):
-    status: str
-    tracking_number: Optional[str] = None
-    notes: Optional[str] = None
-
-@api_router.post("/dropshipping/products", response_model=DropshippingProduct)
-async def create_dropshipping_product(product_data: DropshippingProductCreate, current_user: dict = Depends(get_current_user)):
-    if current_user['role'] != 'business':
-        raise HTTPException(status_code=403, detail="Only business users can create products")
-    
-    selling_price = product_data.original_price * (1 + product_data.commission_percentage / 100)
-    
-    product_dict = product_data.model_dump()
-    product_dict['business_id'] = current_user['id']
-    product_dict['selling_price'] = round(selling_price, 2)
-    
-    product = DropshippingProduct(**product_dict)
-    doc = product.model_dump()
-    doc['created_at'] = doc['created_at'].isoformat()
-    
-    await db.dropshipping_products.insert_one(doc)
-    return product
-
-@api_router.get("/dropshipping/products", response_model=List[DropshippingProduct])
-async def get_dropshipping_products(
-    platform: Optional[str] = None,
-    category: Optional[str] = None,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None
-):
-    query = {}
-    if platform:
-        query['platform'] = platform
-    if category:
-        query['category'] = category
-    if min_price is not None:
-        query['selling_price'] = {'$gte': min_price}
-    if max_price is not None:
-        query.setdefault('selling_price', {})['$lte'] = max_price
-    
-    products = await db.dropshipping_products.find(query, {'_id': 0}).to_list(1000)
-    
-    for product in products:
-        if isinstance(product.get('created_at'), str):
-            product['created_at'] = datetime.fromisoformat(product['created_at'])
-    
-    return products
+# NOTA: la creación/listado de productos y el ciclo de vida completo de los
+# pedidos de dropshipping (purchased/shipped/delivered, tracking, comisiones
+# por plataforma) viven ahora en dropshipping_routes.py, montado más abajo
+# vía `api_router.include_router(dropshipping_router)`. Aquí solo se quedan
+# los endpoints que no duplican esa funcionalidad.
 
 @api_router.get("/dropshipping/orders-to-purchase")
 async def get_orders_to_purchase(current_user: dict = Depends(get_current_user)):
@@ -2742,6 +2677,17 @@ async def get_driver_location(order_id: str):
 # =========================
 # APP CONFIGURATION
 # =========================
+
+async def _create_dropship_orders_safe(order_id: str):
+    """Wrapper de create_dropship_orders_for_order que nunca debe poder romper
+    el flujo de confirmación de pago si algo falla generando los pedidos de
+    dropshipping (p.ej. producto dropshipping borrado, datos inconsistentes)."""
+    try:
+        await create_dropship_orders_for_order(order_id)
+    except Exception as e:
+        logger.error(f"No se pudieron generar los pedidos de dropshipping para order_id={order_id}: {e}")
+
+api_router.include_router(dropshipping_router)
 
 app.include_router(api_router)
 
