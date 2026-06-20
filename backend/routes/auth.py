@@ -2,6 +2,8 @@
 import os
 import hmac
 import uuid
+import logging
+import traceback
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -14,6 +16,7 @@ from core import (
 from models import User, UserCreate, UserLogin, UserResponse
 
 router = APIRouter()
+logger = logging.getLogger("nubo")
 
 
 class PasswordResetRequest(BaseModel):
@@ -87,28 +90,37 @@ async def admin_reset_password(payload: PasswordResetRequest):
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
 
     email = payload.email.strip().lower()
-    user = await db.users.find_one({'email': email}, {'_id': 0})
-    if not user:
-        # Provisiona una cuenta de Fundador si no existe (alta de admin real)
-        doc = {
-            'id': str(uuid.uuid4()),
-            'email': email,
-            'name': 'Administrador Nubo',
-            'phone': '',
-            'role': 'admin',
-            'password_hash': hash_password(payload.new_password),
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'is_available': False,
-            'vehicle_type': None,
-            'current_location': None,
-        }
-        await db.users.insert_one(doc)
-        return {'success': True, 'email': email, 'role': 'admin', 'created': True}
+    try:
+        user = await db.users.find_one({'email': email}, {'_id': 0})
+        if not user:
+            # Provisiona una cuenta de Fundador si no existe (alta de admin real)
+            doc = {
+                'id': str(uuid.uuid4()),
+                'email': email,
+                'name': 'Administrador Nubo',
+                'phone': '',
+                'role': 'admin',
+                'password_hash': hash_password(payload.new_password),
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'is_available': False,
+                'vehicle_type': None,
+                'current_location': None,
+            }
+            await db.users.insert_one(doc)
+            return {'success': True, 'email': email, 'role': 'admin', 'created': True}
 
-    await db.users.update_one(
-        {'email': email},
-        {'$set': {'password_hash': hash_password(payload.new_password)}}
-    )
-    # Limpia bloqueos de fuerza bruta para esa cuenta
-    await db.login_attempts.delete_many({'identifier': {'$regex': f':{email}$'}})
-    return {'success': True, 'email': email, 'role': user.get('role'), 'created': False}
+        await db.users.update_one(
+            {'email': email},
+            {'$set': {'password_hash': hash_password(payload.new_password)}}
+        )
+        # Limpia bloqueos de fuerza bruta para esa cuenta (best-effort)
+        try:
+            await db.login_attempts.delete_many({'identifier': {'$regex': f':{email}$'}})
+        except Exception:
+            pass
+        return {'success': True, 'email': email, 'role': user.get('role'), 'created': False}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("reset-password failed for %s: %s\n%s", email, exc, traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Fallo interno: {type(exc).__name__}: {exc}")
