@@ -8,6 +8,8 @@ bloquear el event loop de FastAPI.
 import os
 import asyncio
 import logging
+import smtplib
+from email.message import EmailMessage
 
 import resend
 
@@ -18,16 +20,41 @@ SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
 SENDER_NAME = os.environ.get("SENDER_NAME", "Nubo Express")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://noboexpress.com").rstrip("/")
 
+# Gmail SMTP (alternativa a Resend): requiere App Password de Gmail
+MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
+MAIL_PASSWORD = (os.environ.get("MAIL_PASSWORD") or "").replace(" ", "")
+MAIL_FROM = os.environ.get("MAIL_FROM", MAIL_USERNAME or SENDER_EMAIL)
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 
+def _gmail_configured() -> bool:
+    return bool(MAIL_USERNAME and MAIL_PASSWORD)
+
+
 def is_configured() -> bool:
-    return bool(RESEND_API_KEY)
+    return _gmail_configured() or bool(RESEND_API_KEY)
 
 
 def _from() -> str:
     return f"{SENDER_NAME} <{SENDER_EMAIL}>"
+
+
+def _send_gmail_sync(to: str, subject: str, html_full: str) -> None:
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = f"{SENDER_NAME} <{MAIL_FROM}>"
+    msg["To"] = to
+    msg.set_content("Tu cliente de correo no soporta HTML. Abre este mensaje en un cliente compatible.")
+    msg.add_alternative(html_full, subtype="html")
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(MAIL_USERNAME, MAIL_PASSWORD)
+        server.send_message(msg)
 
 
 def _wrap(title: str, body_html: str) -> str:
@@ -55,17 +82,28 @@ async def send_email(to: str, subject: str, html: str, wrap: bool = True, attach
     `attachments`: lista opcional de adjuntos Resend (soporta inline vía content_id)."""
     if not is_configured():
         return {"sent": False, "reason": "not_configured"}
+    html_full = _wrap(subject, html) if wrap else html
+    # Preferir Gmail SMTP si está configurado (atachments inline no soportados por esta vía)
+    if _gmail_configured():
+        try:
+            await asyncio.to_thread(_send_gmail_sync, to, subject, html_full)
+            return {"sent": True, "via": "gmail"}
+        except Exception as e:
+            logger.error(f"Gmail SMTP send failed: {e}")
+            if not RESEND_API_KEY:
+                return {"sent": False, "reason": str(e)}
+            # si hay Resend, continúa como fallback
     params = {
         "from": _from(),
         "to": [to],
         "subject": subject,
-        "html": _wrap(subject, html) if wrap else html,
+        "html": html_full,
     }
     if attachments:
         params["attachments"] = attachments
     try:
         result = await asyncio.to_thread(resend.Emails.send, params)
-        return {"sent": True, "id": result.get("id") if isinstance(result, dict) else getattr(result, "id", None)}
+        return {"sent": True, "via": "resend", "id": result.get("id") if isinstance(result, dict) else getattr(result, "id", None)}
     except Exception as e:
         logger.error(f"Resend send failed: {e}")
         return {"sent": False, "reason": str(e)}
