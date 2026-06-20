@@ -9,6 +9,7 @@ import DriverDashboard from '@/pages/DriverDashboard';
 import BusinessDashboard from '@/pages/BusinessDashboard';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminLogin from '@/pages/AdminLogin';
+import AdminReset from '@/pages/AdminReset';
 import DeliveryQuote from '@/pages/DeliveryQuote';
 import RiderApp from '@/rider/RiderApp';
 import PublicTracking from '@/pages/PublicTracking';
@@ -93,6 +94,7 @@ function App() {
           <Route path="/nubo-control" element={
             user && (user.role === 'admin' || user.role === 'manager') ? <AdminDashboard /> : <AdminLogin />
           } />
+          <Route path="/nubo-control/reset" element={<AdminReset />} />
           <Route path="/admin" element={<Navigate to="/nubo-control" replace />} />
           <Route path="/presupuesto" element={<DeliveryQuote />} />
           <Route path="/rider" element={<RiderApp />} />
