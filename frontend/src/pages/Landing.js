@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Package, Truck, Store, Clock, Shield, MapPin } from 'lucide-react';
+import { Package, Truck, Store, Clock, Shield, MapPin, User } from 'lucide-react';
 import Footer from '@/components/Footer';
 import LanguageSelector from '@/components/LanguageSelector';
 
@@ -71,6 +71,15 @@ export default function Landing() {
             </div>
             <div className="flex items-center gap-3">
               <LanguageSelector variant="outline" />
+              <Button
+                data-testid="nav-client-login-btn"
+                variant="ghost"
+                onClick={() => navigate('/auth')}
+                className="text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 px-3"
+              >
+                <User className="w-4 h-4 mr-1.5" />
+                Área de clientes
+              </Button>
               <Button
                 data-testid="nav-track-btn"
                 variant="outline"
