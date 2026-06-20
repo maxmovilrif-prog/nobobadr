@@ -2,9 +2,11 @@
 import os
 import hmac
 import uuid
+import hashlib
+import secrets
 import logging
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
@@ -14,9 +16,32 @@ from core import (
     check_login_lockout, register_failed_login, clear_login_attempts,
 )
 from models import User, UserCreate, UserLogin, UserResponse
+import email_service
 
 router = APIRouter()
 logger = logging.getLogger("nubo")
+
+RESET_TOKEN_TTL_MINUTES = 60
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://noboexpress.com").rstrip("/")
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+    new_password: str
+    secret: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class TokenResetRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+def _hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 class PasswordResetRequest(BaseModel):
@@ -71,6 +96,65 @@ async def login(credentials: UserLogin, request: Request):
 @router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**current_user)
+
+
+@router.post("/auth/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest):
+    """Solicita un enlace de recuperación por email. Solo para cuentas de gestión
+    (Fundador / Gestores regionales). Anti-enumeración: respuesta genérica siempre."""
+    generic = {"message": "Si el email pertenece a una cuenta de gestión, recibirás un enlace de recuperación."}
+    email = payload.email.strip().lower()
+    user = await db.users.find_one({'email': email}, {'_id': 0})
+    # Solo cuentas con contraseña y de gestión (admin/manager)
+    if not user or user.get('role') not in ('admin', 'manager') or not user.get('password_hash'):
+        return generic
+
+    raw = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+    await db.password_reset_tokens.insert_one({
+        'token_hash': _hash_token(raw),
+        'user_id': user['id'],
+        'email': email,
+        'role': user.get('role'),
+        'expires_at': expires_at,
+        'used': False,
+        'created_at': datetime.now(timezone.utc),
+    })
+    reset_link = f"{APP_BASE_URL}/nubo-control/recuperar?token={raw}"
+    result = await email_service.send_password_reset_email(email, reset_link, user.get('name', ''))
+    if not result.get('sent'):
+        logger.warning("forgot-password: email NO enviado a %s (%s)", email, result.get('reason'))
+    return generic
+
+
+@router.post("/auth/reset-password")
+async def reset_password_with_token(payload: TokenResetRequest):
+    """Restablece la contraseña usando el token recibido por email (un solo uso)."""
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+    token_hash = _hash_token(payload.token.strip())
+    now = datetime.now(timezone.utc)
+    doc = await db.password_reset_tokens.find_one({'token_hash': token_hash})
+    if not doc or doc.get('used'):
+        raise HTTPException(status_code=400, detail="Enlace no válido o ya utilizado")
+    exp = doc.get('expires_at')
+    if exp and exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if not exp or exp < now:
+        raise HTTPException(status_code=400, detail="El enlace ha caducado. Solicita uno nuevo.")
+
+    await db.users.update_one(
+        {'id': doc['user_id']},
+        {'$set': {'password_hash': hash_password(payload.new_password)}}
+    )
+    await db.password_reset_tokens.update_one({'_id': doc['_id']}, {'$set': {'used': True}})
+    # Limpia bloqueos de fuerza bruta de esa cuenta (best-effort)
+    try:
+        await db.login_attempts.delete_many({'identifier': {'$regex': f":{doc['email']}$"}})
+    except Exception:
+        pass
+    return {'success': True, 'email': doc['email']}
+
 
 
 @router.post("/admin/reset-password")

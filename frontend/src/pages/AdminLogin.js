@@ -13,7 +13,23 @@ export default function AdminLogin() {
   const navigate = useNavigate();
   const { adminLogin, API } = useContext(AdminAuthContext);
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
   const [data, setData] = useState({ email: '', password: '' });
+
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/auth/forgot-password`, { email: forgotEmail.trim().toLowerCase() });
+      toast.success('Si el email pertenece a una cuenta de gestión, recibirás un enlace de recuperación.');
+      setForgotMode(false);
+    } catch (error) {
+      toast.error('No se pudo procesar la solicitud');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,54 +68,98 @@ export default function AdminLogin() {
         </div>
 
         <Card className="border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2 text-lg">
-              <Lock className="w-4 h-4 text-emerald-400" /> Iniciar sesión
-            </CardTitle>
-            <CardDescription className="text-gray-400">
-              Introduce tus credenciales de administración.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form data-testid="admin-login-form" onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="admin-email" className="text-gray-300">Email</Label>
-                <Input
-                  id="admin-email"
-                  data-testid="admin-login-email"
-                  type="email"
-                  autoComplete="username"
-                  placeholder="tu@email.com"
-                  value={data.email}
-                  onChange={(e) => setData({ ...data, email: e.target.value })}
-                  className="bg-white/10 border-white/15 text-white placeholder:text-gray-500"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="admin-password" className="text-gray-300">Contraseña</Label>
-                <Input
-                  id="admin-password"
-                  data-testid="admin-login-password"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  value={data.password}
-                  onChange={(e) => setData({ ...data, password: e.target.value })}
-                  className="bg-white/10 border-white/15 text-white placeholder:text-gray-500"
-                  required
-                />
-              </div>
-              <Button
-                data-testid="admin-login-submit"
-                type="submit"
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
-                disabled={loading}
-              >
-                {loading ? 'Verificando...' : 'Acceder'}
-              </Button>
-            </form>
-          </CardContent>
+          {forgotMode ? (
+            <>
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2 text-lg">
+                  <Lock className="w-4 h-4 text-emerald-400" /> Recuperar contraseña
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Te enviaremos un enlace de recuperación a tu email de gestión.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form data-testid="admin-forgot-form" onSubmit={handleForgot} className="space-y-4">
+                  <div>
+                    <Label htmlFor="forgot-email" className="text-gray-300">Email registrado</Label>
+                    <Input
+                      id="forgot-email"
+                      data-testid="admin-forgot-email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      className="bg-white/10 border-white/15 text-white placeholder:text-gray-500"
+                      required
+                    />
+                  </div>
+                  <Button data-testid="admin-forgot-submit" type="submit" disabled={loading}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
+                    {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
+                  </Button>
+                  <button type="button" data-testid="admin-forgot-back" onClick={() => setForgotMode(false)}
+                    className="w-full text-center text-sm text-gray-400 hover:text-emerald-400">
+                    ← Volver a iniciar sesión
+                  </button>
+                </form>
+              </CardContent>
+            </>
+          ) : (
+            <>
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2 text-lg">
+                  <Lock className="w-4 h-4 text-emerald-400" /> Iniciar sesión
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Introduce tus credenciales de administración.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form data-testid="admin-login-form" onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="admin-email" className="text-gray-300">Email</Label>
+                    <Input
+                      id="admin-email"
+                      data-testid="admin-login-email"
+                      type="email"
+                      autoComplete="username"
+                      placeholder="tu@email.com"
+                      value={data.email}
+                      onChange={(e) => setData({ ...data, email: e.target.value })}
+                      className="bg-white/10 border-white/15 text-white placeholder:text-gray-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="admin-password" className="text-gray-300">Contraseña</Label>
+                    <Input
+                      id="admin-password"
+                      data-testid="admin-login-password"
+                      type="password"
+                      autoComplete="current-password"
+                      placeholder="••••••••"
+                      value={data.password}
+                      onChange={(e) => setData({ ...data, password: e.target.value })}
+                      className="bg-white/10 border-white/15 text-white placeholder:text-gray-500"
+                      required
+                    />
+                  </div>
+                  <Button
+                    data-testid="admin-login-submit"
+                    type="submit"
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+                    disabled={loading}
+                  >
+                    {loading ? 'Verificando...' : 'Acceder'}
+                  </Button>
+                  <button type="button" data-testid="admin-forgot-link" onClick={() => setForgotMode(true)}
+                    className="w-full text-center text-sm text-emerald-300/70 hover:text-emerald-400">
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </form>
+              </CardContent>
+            </>
+          )}
         </Card>
 
         <p className="text-center text-xs text-gray-600 mt-6">

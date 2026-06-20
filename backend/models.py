@@ -200,6 +200,7 @@ class RiderCreate(BaseModel):
     dni: Optional[str] = None
     license_plate: Optional[str] = None
     city_id: Optional[str] = None
+    region_id: Optional[str] = None
 
 
 class RiderUpdate(BaseModel):
@@ -209,7 +210,27 @@ class RiderUpdate(BaseModel):
     dni: Optional[str] = None
     license_plate: Optional[str] = None
     city_id: Optional[str] = None
+    region_id: Optional[str] = None
     contract_status: Optional[str] = None  # active | suspended
+
+
+# ===== Regiones (Administraciones regionales) =====
+class Region(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    city_ids: list = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RegionCreate(BaseModel):
+    name: str = Field(min_length=2)
+    city_ids: list = Field(default_factory=list)
+
+
+class RegionUpdate(BaseModel):
+    name: Optional[str] = None
+    city_ids: Optional[list] = None
 
 
 class RiderActivate(BaseModel):

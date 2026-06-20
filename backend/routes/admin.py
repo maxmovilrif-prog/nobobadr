@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
-from core import db, manager, get_current_admin, get_current_manager_or_admin, hash_password
+from core import db, manager, get_current_admin, get_current_manager_or_admin, hash_password, get_scope_city_ids
 from accounting import ACCT_MAD_TO_EUR
 import telegram_alerts
 
@@ -20,23 +20,28 @@ class ManagerCreate(BaseModel):
     name: str = Field(min_length=2)
     email: EmailStr
     password: str = Field(min_length=6)
+    region_id: str = Field(min_length=1)
 
 
 def _public_manager(u: dict) -> dict:
     return {
         'id': u['id'], 'name': u.get('name'), 'email': u.get('email'),
         'role': u.get('role'), 'is_active': u.get('is_active', True),
+        'region_id': u.get('region_id'), 'region_name': u.get('region_name'),
         'created_at': u.get('created_at'),
     }
 
 
 @router.post("/admin/managers")
 async def create_manager(payload: ManagerCreate, current_user: dict = Depends(get_current_admin)):
-    """El Fundador crea una cuenta de Gestor (acceso solo a Operaciones)."""
+    """El Fundador crea un Gestor Regional, vinculado a UNA región (aislamiento total)."""
     email = payload.email.strip().lower()
     existing = await db.users.find_one({'email': email}, {'_id': 0, 'id': 1})
     if existing:
         raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
+    region = await db.regions.find_one({'id': payload.region_id}, {'_id': 0, 'id': 1, 'name': 1})
+    if not region:
+        raise HTTPException(status_code=400, detail="Región no válida")
     doc = {
         'id': str(uuid.uuid4()),
         'name': payload.name.strip(),
@@ -44,6 +49,8 @@ async def create_manager(payload: ManagerCreate, current_user: dict = Depends(ge
         'role': 'manager',
         'password_hash': hash_password(payload.password),
         'is_active': True,
+        'region_id': region['id'],
+        'region_name': region['name'],
         'created_by': current_user.get('id'),
         'created_at': datetime.now(timezone.utc).isoformat(),
         'is_available': False,
@@ -92,17 +99,23 @@ def _parse_iso(v):
 @router.get("/admin/active-drivers")
 async def admin_active_drivers(current_user: dict = Depends(get_current_manager_or_admin)):
     """
-    Devuelve todas las 'Abejas' (conductores) activas en tiempo real.
-    Combina las ubicaciones en vivo (WebSocket) con los conductores disponibles.
+    Devuelve las 'Abejas' (conductores) activas en tiempo real.
+    Aislamiento regional: un Gestor solo ve la flota y pedidos de SU región;
+    el Fundador ve todo.
     """
+    scope = await get_scope_city_ids(current_user)  # None = global (Fundador)
+    region_id = current_user.get('region_id') if scope is not None else None
     fleet = []
     seen_order_ids = set()
     now = datetime.now(timezone.utc)
 
     # 1. Conductores en vivo (con pedido activo, ubicación por WebSocket)
     for order_id, loc in manager.driver_locations.items():
-        seen_order_ids.add(order_id)
         order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+        # Aislamiento regional: omitir pedidos fuera de la región del Gestor
+        if scope is not None and (not order or order.get('city_id') not in scope):
+            continue
+        seen_order_ids.add(order_id)
         idle_seconds = None
         idle = False
         ts = loc.get("timestamp")
@@ -128,9 +141,12 @@ async def admin_active_drivers(current_user: dict = Depends(get_current_manager_
             "live": True,
         })
 
-    # 2. Conductores disponibles registrados (pueden no tener pedido activo)
+    # 2. Conductores disponibles registrados (filtrados por región si es Gestor)
+    drv_query = {'role': 'driver', 'is_available': True}
+    if region_id is not None:
+        drv_query['region_id'] = region_id
     drivers = await db.users.find(
-        {'role': 'driver', 'is_available': True},
+        drv_query,
         {'_id': 0, 'password_hash': 0}
     ).to_list(500)
     for d in drivers:
@@ -145,7 +161,10 @@ async def admin_active_drivers(current_user: dict = Depends(get_current_manager_
             "live": False,
         })
 
-    active_orders = await db.orders.count_documents({'status': 'in_transit'})
+    active_orders_q = {'status': 'in_transit'}
+    if scope is not None:
+        active_orders_q['city_id'] = {'$in': scope}
+    active_orders = await db.orders.count_documents(active_orders_q)
     idle_count = sum(1 for d in fleet if d.get("idle"))
 
     return {
@@ -160,11 +179,15 @@ async def admin_active_drivers(current_user: dict = Depends(get_current_manager_
 
 @router.get("/admin/stats")
 async def admin_stats(current_user: dict = Depends(get_current_manager_or_admin)):
-    total_orders = await db.orders.count_documents({})
-    in_transit = await db.orders.count_documents({'status': 'in_transit'})
-    delivered = await db.orders.count_documents({'status': 'delivered'})
-    total_drivers = await db.users.count_documents({'role': 'driver'})
-    available_drivers = await db.users.count_documents({'role': 'driver', 'is_available': True})
+    scope = await get_scope_city_ids(current_user)  # None = global
+    region_id = current_user.get('region_id') if scope is not None else None
+    oq = {} if scope is None else {'city_id': {'$in': scope}}
+    dq = {'role': 'driver'} if region_id is None else {'role': 'driver', 'region_id': region_id}
+    total_orders = await db.orders.count_documents(oq)
+    in_transit = await db.orders.count_documents({**oq, 'status': 'in_transit'})
+    delivered = await db.orders.count_documents({**oq, 'status': 'delivered'})
+    total_drivers = await db.users.count_documents(dq)
+    available_drivers = await db.users.count_documents({**dq, 'is_available': True})
     total_businesses = await db.businesses.count_documents({})
     return {
         "total_orders": total_orders,

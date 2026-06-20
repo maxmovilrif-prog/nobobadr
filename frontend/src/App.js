@@ -10,6 +10,7 @@ import BusinessDashboard from '@/pages/BusinessDashboard';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminLogin from '@/pages/AdminLogin';
 import AdminReset from '@/pages/AdminReset';
+import AdminPasswordReset from '@/pages/AdminPasswordReset';
 import DeliveryQuote from '@/pages/DeliveryQuote';
 import RiderApp from '@/rider/RiderApp';
 import PublicTracking from '@/pages/PublicTracking';
@@ -142,6 +143,7 @@ function App() {
             adminUser && (adminUser.role === 'admin' || adminUser.role === 'manager') ? <AdminDashboard /> : <AdminLogin />
           } />
           <Route path="/nubo-control/reset" element={<AdminReset />} />
+          <Route path="/nubo-control/recuperar" element={<AdminPasswordReset />} />
           <Route path="/admin" element={<Navigate to="/nubo-control" replace />} />
           <Route path="/presupuesto" element={<DeliveryQuote />} />
           <Route path="/rider" element={<RiderApp />} />

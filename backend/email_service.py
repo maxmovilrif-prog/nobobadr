@@ -123,3 +123,19 @@ async def send_order_delivered(to: str, order: dict) -> dict:
       <p style="margin-top:16px;">¡Gracias por confiar en Nubo Express! 🐝</p>
     """
     return await send_email(to, f"Pedido #{oid} entregado · Nubo Express", body)
+
+
+async def send_password_reset_email(to: str, reset_link: str, name: str = "") -> dict:
+    """Recuperación de contraseña: enlace seguro de un solo uso (válido 1 hora)."""
+    saludo = f"Hola {name}," if name else "Hola,"
+    body = f"""
+      <p>{saludo}</p>
+      <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta de gestión en Nubo Express.</p>
+      <div style="margin:24px 0;text-align:center;">
+        <a href="{reset_link}" style="display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:bold;font-size:15px;">Restablecer contraseña</a>
+      </div>
+      <p style="font-size:13px;color:#6b7280;">Este enlace caduca en <b>1 hora</b> y solo puede usarse una vez. Si no solicitaste este cambio, ignora este correo; tu contraseña seguirá siendo la misma.</p>
+      <p style="font-size:12px;color:#9ca3af;margin-top:18px;word-break:break-all;">Si el botón no funciona, copia este enlace:<br>{reset_link}</p>
+    """
+    return await send_email(to, "Recuperación de contraseña · Nubo Express", body)
+

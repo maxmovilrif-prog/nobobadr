@@ -134,6 +134,21 @@ async def get_current_manager_or_admin(current_user: dict = Depends(get_current_
     return current_user
 
 
+async def get_scope_city_ids(current_user: dict):
+    """Aislamiento regional multi-tenant.
+    - Fundador (admin) → None  → acceso GLOBAL (todas las ciudades/regiones).
+    - Gestor regional (manager) → lista de city_ids de SU región (aislamiento total).
+      Un gestor sin región asignada no ve nada ([]).
+    """
+    if current_user.get('role') == 'admin':
+        return None
+    region_id = current_user.get('region_id')
+    if not region_id:
+        return []
+    region = await db.regions.find_one({'id': region_id}, {'_id': 0, 'city_ids': 1})
+    return list(region.get('city_ids', [])) if region else []
+
+
 async def get_current_business(current_user: dict = Depends(get_current_user)):
     if current_user.get('role') != 'business':
         raise HTTPException(status_code=403, detail="Only business users can perform this action")

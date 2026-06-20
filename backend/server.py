@@ -10,7 +10,7 @@ import telegram_alerts
 from routes import (
     auth, businesses, search, orders, drivers,
     messages, payments, dropshipping, affiliate, tracking, admin, cities, riders, assignments,
-    finances, accounting, email,
+    finances, accounting, email, regions,
 )
 
 app = FastAPI(title="Nubo API")
@@ -19,7 +19,7 @@ api_router = APIRouter(prefix="/api")
 # Montar todos los routers bajo /api
 for module in (auth, businesses, search, orders, drivers, messages,
                payments, dropshipping, affiliate, tracking, admin, cities, riders, assignments,
-               finances, accounting, email):
+               finances, accounting, email, regions):
     api_router.include_router(module.router)
 
 
@@ -84,6 +84,11 @@ async def start_background_tasks():
         logger.info("2dsphere index ensured on users.geo_location")
     except Exception as e:
         logger.error(f"Could not create 2dsphere index: {e}")
+    # Índice TTL: los tokens de recuperación caducan automáticamente
+    try:
+        await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+    except Exception as e:
+        logger.error(f"Could not create TTL index on password_reset_tokens: {e}")
     app.state.idle_monitor_task = asyncio.create_task(telegram_alerts.idle_monitor_loop())
     app.state.telegram_listener_task = asyncio.create_task(telegram_alerts.command_listener_loop())
     logger.info("Background tasks started (idle monitor + telegram listener)")
