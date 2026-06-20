@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, get_scope_city_ids
 from models import Ride, RideRequest, RideEstimateRequest, RideAccept, RideCancel, GeoPoint
 from geo import calculate_ride_quote, currency_for_location, RIDE_VEHICLE_TYPES, RIDE_PRICING
+import telegram_alerts
 
 router = APIRouter()
 
@@ -85,6 +86,10 @@ async def request_ride(data: RideRequest, current_user: dict = Depends(get_curre
     doc["created_at"] = doc["created_at"].isoformat()
     doc["updated_at"] = doc["updated_at"].isoformat()
     await db.rides.insert_one(doc)
+
+    # Alerta al despacho por Telegram (no bloquea la respuesta): botón para asignar conductor
+    await telegram_alerts.notify_new_ride(doc)
+
     return ride
 
 

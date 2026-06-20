@@ -91,6 +91,38 @@ async def notify_new_order(order: dict) -> None:
         logger.error(f"notify_new_order error: {e}")
 
 
+async def notify_new_ride(ride: dict) -> None:
+    """Notifica al despacho cuando un cliente solicita un viaje (Nubo Ride), con botones de acción."""
+    try:
+        full_id = str(ride.get("id", ""))
+        rid = full_id[:8]
+        origin = (ride.get("origin") or {}).get("label") or "Origen"
+        dest = (ride.get("destination") or {}).get("label") or "Destino"
+        price = ride.get("precio_estimado", 0)
+        currency = ride.get("currency", "EUR")
+        sym = "€" if currency == "EUR" else "MAD "
+        vt = ride.get("vehicle_type", "economy")
+        dist = ride.get("distance_km")
+        text = (
+            "🚕 <b>Nueva solicitud de viaje (Nubo Ride)</b>\n"
+            f"🧾 Viaje #{rid}\n"
+            f"📍 Origen: {origin}\n"
+            f"🏁 Destino: {dest}\n"
+            f"🚗 Vehículo: {vt}\n"
+            f"📏 Distancia: {dist} km\n"
+            f"💶 Precio estimado: {sym}{price:.2f}"
+        )
+        reply_markup = {
+            "inline_keyboard": [[
+                {"text": "✅ Asignar conductor", "callback_data": f"rideassign:{full_id}"},
+                {"text": "👁 Ver viaje", "callback_data": f"rideview:{full_id}"},
+            ]]
+        }
+        await send_telegram_message(text, reply_markup=reply_markup)
+    except Exception as e:
+        logger.error(f"notify_new_ride error: {e}")
+
+
 async def notify_idle_driver(driver_name: str, idle_seconds: int, order_id=None) -> None:
     """Notifica al admin cuando una Abeja lleva demasiado tiempo parada, con botón de reasignación."""
     minutes = max(1, idle_seconds // 60)
@@ -185,6 +217,7 @@ async def build_fleet_summary() -> str:
 
 _command_offset = 0
 _pending_assign: dict = {}  # short_code -> {order_id, driver_id, driver_name}
+_pending_ride_assign: dict = {}  # short_code -> {ride_id, driver_id, driver_name}
 
 
 async def _handle_callback(cq: dict) -> None:
@@ -319,6 +352,112 @@ async def _handle_callback(cq: dict) -> None:
     await _answer_callback(cq_id)
 
 
+async def _handle_ride_callback(cq: dict) -> bool:
+    """Procesa los botones inline de Nubo Ride. Devuelve True si el callback era de un viaje."""
+    import uuid as _uuid
+    cq_id = cq.get("id")
+    data = cq.get("data") or ""
+    message = cq.get("message") or {}
+    chat = message.get("chat") or {}
+    chat_id = chat.get("id")
+    message_id = message.get("message_id")
+
+    def _fmt(ride):
+        cur = ride.get("currency", "EUR")
+        sym = "€" if cur == "EUR" else "MAD "
+        return sym, ride
+
+    # Ver detalle del viaje
+    if data.startswith("rideview:"):
+        rid = data.split(":", 1)[1]
+        ride = await core.db.rides.find_one({"id": rid}, {"_id": 0})
+        await _answer_callback(cq_id)
+        if not ride:
+            await send_telegram_message("❌ Viaje no encontrado.", chat_id=chat_id)
+            return True
+        sym, _ = _fmt(ride)
+        conductor = "Sin asignar"
+        if ride.get("conductor_id"):
+            d = await core.db.users.find_one({"id": ride["conductor_id"]}, {"_id": 0})
+            conductor = d.get("name", "Conductor") if d else "Conductor"
+        o = (ride.get("origin") or {}).get("label") or "—"
+        de = (ride.get("destination") or {}).get("label") or "—"
+        await send_telegram_message(
+            f"🚕 <b>Viaje #{rid[:8]}</b>\n"
+            f"Estado: {ride.get('estado')}\n"
+            f"📍 {o} → 🏁 {de}\n"
+            f"🚗 {ride.get('vehicle_type')} · {ride.get('distance_km')} km\n"
+            f"💶 {sym}{ride.get('precio_estimado', 0):.2f}\n"
+            f"👤 Conductor: {conductor}",
+            chat_id=chat_id,
+        )
+        return True
+
+    # Mostrar conductores disponibles para asignar el viaje
+    if data.startswith("rideassign:"):
+        rid = data.split(":", 1)[1]
+        ride = await core.db.rides.find_one({"id": rid}, {"_id": 0})
+        if not ride:
+            await _answer_callback(cq_id, "Viaje no encontrado", show_alert=True)
+            return True
+        if ride.get("conductor_id"):
+            await _answer_callback(cq_id, "Este viaje ya tiene conductor", show_alert=True)
+            return True
+        if ride.get("estado") != "buscando":
+            await _answer_callback(cq_id, f"El viaje está en estado '{ride.get('estado')}'", show_alert=True)
+            return True
+        driver_query = {"role": "driver", "is_available": True}
+        if ride.get("region_id"):
+            driver_query["region_id"] = ride["region_id"]
+        drivers = await core.db.users.find(driver_query, {"_id": 0, "password_hash": 0}).to_list(20)
+        if not drivers:
+            await _answer_callback(cq_id, "No hay conductores disponibles ahora", show_alert=True)
+            return True
+        await _answer_callback(cq_id)
+        rows = []
+        for d in drivers:
+            code = _uuid.uuid4().hex[:8]
+            _pending_ride_assign[code] = {"ride_id": rid, "driver_id": d["id"], "driver_name": d.get("name", "Conductor")}
+            label = f"👤 {d.get('name', 'Conductor')}"
+            if d.get("vehicle_type"):
+                label += f" ({d['vehicle_type']})"
+            rows.append([{"text": label, "callback_data": f"ridedrv:{code}"}])
+        await _edit_message_text(
+            chat_id, message_id,
+            f"👤 Elige el conductor para el viaje #{rid[:8]}:",
+            reply_markup={"inline_keyboard": rows},
+        )
+        return True
+
+    # Confirmar asignación de conductor al viaje (reclamo atómico)
+    if data.startswith("ridedrv:"):
+        code = data.split(":", 1)[1]
+        info = _pending_ride_assign.get(code)
+        if not info:
+            await _answer_callback(cq_id, "Opción expirada, vuelve a intentarlo", show_alert=True)
+            return True
+        now = datetime.now(timezone.utc).isoformat()
+        result = await core.db.rides.update_one(
+            {"id": info["ride_id"], "estado": "buscando", "conductor_id": None},
+            {"$set": {"conductor_id": info["driver_id"], "estado": "aceptado",
+                      "accepted_at": now, "updated_at": now}},
+        )
+        if result.modified_count == 0:
+            await _answer_callback(cq_id, "El viaje ya fue aceptado o cancelado", show_alert=True)
+            await _edit_message_text(chat_id, message_id, f"⚠️ El viaje #{info['ride_id'][:8]} ya no estaba disponible.")
+            return True
+        await _answer_callback(cq_id, "✅ Conductor asignado")
+        await _edit_message_text(
+            chat_id, message_id,
+            f"✅ Viaje #{info['ride_id'][:8]} asignado a 👤 <b>{info['driver_name']}</b>.",
+        )
+        for k in [k for k, v in _pending_ride_assign.items() if v["ride_id"] == info["ride_id"]]:
+            _pending_ride_assign.pop(k, None)
+        return True
+
+    return False
+
+
 async def command_listener_loop() -> None:
     """Escucha comandos (/flota, /start, /help) y callbacks de botones vía long polling."""
     global _command_offset
@@ -340,7 +479,9 @@ async def command_listener_loop() -> None:
 
                 # Callbacks de botones inline
                 if upd.get("callback_query"):
-                    await _handle_callback(upd["callback_query"])
+                    cq = upd["callback_query"]
+                    if not await _handle_ride_callback(cq):
+                        await _handle_callback(cq)
                     continue
 
                 msg = upd.get("message") or upd.get("edited_message") or {}
