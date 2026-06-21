@@ -168,6 +168,9 @@ function App() {
           <Route path="/affiliate-settings" element={user && user.role === 'business' ? <AffiliateSettings /> : <Navigate to="/auth" />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/manager" element={<Navigate to="/nubo-control" replace />} />
+          <Route path="/admin-panel" element={<Navigate to="/nubo-control" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <InstallPWA />
         <WhatsAppButton phoneNumber="+34654232573" />
