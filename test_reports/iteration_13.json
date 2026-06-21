@@ -1,0 +1,24 @@
+{
+  "summary": "Nubo Express pre-launch integral audit (frontend only) - all 7 critical flows PASS: (1) admin login at /nubo-control loads dashboard with all sections (KPIs, Operaciones, Conductores, Regiones/Gestores, Contabilidad/Finanzas) no blank screens, no JS errors. (2) Route aliases /manager and /admin redirect to /nubo-control, /xyz123 catch-all redirects to /. (3) Customer login + 4 service tiles work: restaurant/supermarket/courier filter without logging out, ride tile navigates to /ride. (4) Nubo Ride client flow end-to-end: origin Algeciras -> dest Alhucemas -> Ver precios -> 3 vehicle cards with prices (Economy €219.67, Comfort €304.40, XL €405.98) -> select economy -> Pedir viaje -> ride-active-card shown with estado 'Buscando conductor…'. (5) Rider activation with NUBO-6NJP works, ride bead44d4 visible in rider-rides-section, Aceptar -> rider-active-ride shown, Iniciar -> Completar -> ride finished (active=0, toast 'Viaje completado'). (6) /track with ORD-4821 shows clean fallback 'Mapa en vivo próximamente' (NO Google InvalidKey error) and order data is displayed. (7) Session isolation verified: customer cookies do NOT grant access to /nubo-control (admin login shown).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Nubo Control - Mapa de Flota", "issues": ["Google Maps InvalidKey console warning appears on admin dashboard map widget (expected per task note - placeholder API key); however the public /track page correctly shows a clean fallback. Consider also wrapping the admin 'Mapa de Flota en Tiempo Real' under MAPS_ENABLED to suppress the Google warning until the real key is configured."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Admin dashboard 'Mapa de Flota' still attempts to load Google Maps with placeholder key producing console warning 'InvalidKey'. The public /track already uses MAPS_ENABLED gate correctly - consider applying the same gate to the admin fleet map for consistency."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100% (7/7 flows green)"},
+  "test_credentials": "Admin: badarbox1756@gmail.com / Admin1234! | Customer: qa_customer@nubo.com / Test1234! | Rider activation code: NUBO-6NJP",
+  "seed_data_creation": "None - used existing production seed (16 cities, qa_customer, NUBO-6NJP rider). Test created one ride (bead44d4) which was completed end-to-end during the test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All flows passing on iteration 13. Customer dashboard service tiles use data-testid='service-tile-{restaurant|supermarket|courier|ride}'. Nubo Ride origin/dest are shadcn Select buttons - need .click() then [role=\"option\"]. Rider testids: rider-code-input, rider-activate-btn, rider-rides-section, rider-accept-ride-{id}, rider-active-ride, rider-ride-start, rider-ride-complete. Tracking uses data-testid='tracking-search-input' and 'tracking-search-btn', map fallback element is 'tracking-map'. Ride flow correctly clears active card after completion. Note: every new test run creates a real ride in nubo_produccion atlas DB - clean up if regression suite is run frequently.",
+  "rca of the issue": "No issues found. Pre-launch audit GREEN."
+}
