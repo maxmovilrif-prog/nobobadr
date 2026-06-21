@@ -162,3 +162,48 @@ En el VPS **sí ves los logs reales**. Con `docker compose logs backend` sabrás
 ### ¿Y MongoDB?
 Se queda en **Atlas** tal cual. Solo asegúrate de que en **Atlas → Network Access** esté permitida
 la IP del Droplet (o `0.0.0.0/0`). No se instala Mongo en el VPS.
+
+---
+
+## 11. 🔄 CI/CD automático con GitHub Actions
+Cada `git push` a `main` redespliega el VPS solo. El workflow está en `.github/workflows/deploy.yml`.
+
+**Configura estos *Secrets* en GitHub** (repo → Settings → Secrets and variables → Actions):
+
+| Secret | Valor |
+|---|---|
+| `DO_HOST` | IP pública del Droplet |
+| `DO_USER` | `root` (o tu usuario) |
+| `DO_SSH_KEY` | **clave privada SSH** completa (la que corresponde a la pública del Droplet) |
+| `DO_SSH_PORT` | `22` (opcional) |
+
+Flujo: push → GitHub se conecta por SSH → `git pull` → `docker compose up -d --build` → health check de `/api/public/cities`. Si el backend falla, el job muestra los logs y marca el deploy en rojo. También puedes lanzarlo a mano desde la pestaña **Actions → Run workflow**.
+
+> Requisito: el repo ya clonado en `/opt/nubo` y `deploy/backend.env` + `deploy/.env` ya creados en el VPS (los secrets de runtime viven en el servidor, no en GitHub).
+
+---
+
+## 12. 💾 Backup automático de MongoDB Atlas
+Script: `deploy/backup_mongo.sh` → hace `mongodump` comprimido, rota copias de +14 días y (opcional) sube a DO Spaces.
+
+**Instalar herramientas en el VPS (una vez):**
+```bash
+curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb.gpg --dearmor
+echo "deb [signed-by=/usr/share/keyrings/mongodb.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb.list
+apt-get update && apt-get install -y mongodb-database-tools
+```
+
+**Programar backup diario (03:30):**
+```bash
+chmod +x /opt/nubo/deploy/backup_mongo.sh
+crontab -e
+# añade:
+30 3 * * * /opt/nubo/deploy/backup_mongo.sh >> /var/log/nubo-backup.log 2>&1
+```
+
+**Restaurar una copia:**
+```bash
+mongorestore --uri="<MONGO_URI>" --gzip \
+  --archive=/opt/nubo-backups/ARCHIVO.archive.gz \
+  --nsInclude="nubo_produccion.*"
+```
