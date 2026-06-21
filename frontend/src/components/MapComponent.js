@@ -13,7 +13,22 @@ const defaultCenter = {
   lng: -5.4534
 };
 
-export default function MapComponent({ 
+const Fallback = () => (
+  <div className="w-full h-[400px] bg-gradient-to-br from-slate-50 to-emerald-50 rounded-xl flex items-center justify-center">
+    <div className="text-center p-6">
+      <p className="text-gray-700 font-semibold mb-1">Mapa en vivo próximamente</p>
+      <p className="text-sm text-gray-500">El mapa estará disponible al activar la clave de Google Maps. Los datos sí se muestran.</p>
+    </div>
+  </div>
+);
+
+export default function MapComponent(props) {
+  // Si no hay clave válida, ni siquiera montamos el loader de Google (evita el warning InvalidKey)
+  if (!MAPS_ENABLED) return <Fallback />;
+  return <MapInner {...props} />;
+}
+
+function MapInner({ 
   markers = [], 
   showDirections = false, 
   origin = null, 
@@ -23,7 +38,7 @@ export default function MapComponent({
 }) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: MAPS_ENABLED ? MAPS_API_KEY : 'YOUR_API_KEY_HERE'
+    googleMapsApiKey: MAPS_API_KEY
   });
 
   const [map, setMap] = React.useState(null);
@@ -59,15 +74,8 @@ export default function MapComponent({
     }
   }, [showDirections, origin, destination, isLoaded]);
 
-  if (!MAPS_ENABLED || loadError) {
-    return (
-      <div className="w-full h-[400px] bg-gradient-to-br from-slate-50 to-emerald-50 rounded-xl flex items-center justify-center">
-        <div className="text-center p-6">
-          <p className="text-gray-700 font-semibold mb-1">Mapa en vivo próximamente</p>
-          <p className="text-sm text-gray-500">El mapa estará disponible al activar la clave de Google Maps. Los datos sí se muestran.</p>
-        </div>
-      </div>
-    );
+  if (loadError) {
+    return <Fallback />;
   }
 
   if (!isLoaded) {
