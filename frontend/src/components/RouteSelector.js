@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleMap, DirectionsRenderer, Marker, useJsApiLoader } from '@react-google-maps/api';
+import { MAPS_ENABLED, MAPS_API_KEY } from '@/lib/maps';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,7 +26,7 @@ export default function RouteSelector({
 }) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY_HERE',
+    googleMapsApiKey: MAPS_ENABLED ? MAPS_API_KEY : 'YOUR_API_KEY_HERE',
     libraries: ['places']
   });
 
@@ -89,6 +90,17 @@ export default function RouteSelector({
   const onLoad = React.useCallback(function callback(map) {
     setMap(map);
   }, []);
+
+  if (!MAPS_ENABLED) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center bg-gradient-to-br from-slate-50 to-emerald-50 rounded-xl">
+          <p className="text-gray-700 font-semibold mb-1">Mapa en vivo próximamente</p>
+          <p className="text-sm text-gray-500">El cálculo de precio funciona; el mapa se activará con la clave de Google Maps.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!isLoaded) {
     return (

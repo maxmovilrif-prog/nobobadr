@@ -1,5 +1,6 @@
 import React from 'react';
 import { GoogleMap, Marker, useJsApiLoader, DirectionsRenderer } from '@react-google-maps/api';
+import { MAPS_ENABLED, MAPS_API_KEY } from '@/lib/maps';
 
 const containerStyle = {
   width: '100%',
@@ -22,7 +23,7 @@ export default function MapComponent({
 }) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY_HERE'
+    googleMapsApiKey: MAPS_ENABLED ? MAPS_API_KEY : 'YOUR_API_KEY_HERE'
   });
 
   const [map, setMap] = React.useState(null);
@@ -58,12 +59,12 @@ export default function MapComponent({
     }
   }, [showDirections, origin, destination, isLoaded]);
 
-  if (loadError) {
+  if (!MAPS_ENABLED || loadError) {
     return (
-      <div className="w-full h-[400px] bg-gray-100 rounded-xl flex items-center justify-center">
+      <div className="w-full h-[400px] bg-gradient-to-br from-slate-50 to-emerald-50 rounded-xl flex items-center justify-center">
         <div className="text-center p-6">
-          <p className="text-red-600 font-semibold mb-2">Error al cargar el mapa</p>
-          <p className="text-sm text-gray-600">Por favor, verifica tu conexión a internet</p>
+          <p className="text-gray-700 font-semibold mb-1">Mapa en vivo próximamente</p>
+          <p className="text-sm text-gray-500">El mapa estará disponible al activar la clave de Google Maps. Los datos sí se muestran.</p>
         </div>
       </div>
     );

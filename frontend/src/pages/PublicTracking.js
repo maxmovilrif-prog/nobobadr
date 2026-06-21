@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from '@react-google-maps/api';
+import { MAPS_ENABLED, MAPS_API_KEY } from '@/lib/maps';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -77,7 +78,7 @@ export default function PublicTracking() {
   const navigate = useNavigate();
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY_HERE',
+    googleMapsApiKey: MAPS_ENABLED ? MAPS_API_KEY : 'YOUR_API_KEY_HERE',
   });
 
   const { i18n } = useTranslation();
@@ -234,11 +235,12 @@ export default function PublicTracking() {
           <div className="lg:col-span-2">
             <Card className="border-0 shadow-lg overflow-hidden">
               <CardContent className="p-0 relative" style={{ minHeight: 480 }} data-testid="tracking-map">
-                {loadError ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 text-center">
+                {(!MAPS_ENABLED || loadError) ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50 p-6 text-center">
                     <div>
-                      <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">{S.mapUnavailable}</p>
+                      <MapPin className="w-9 h-9 text-emerald-500 mx-auto mb-2" />
+                      <p className="text-sm font-medium text-gray-700 mb-1">Mapa en vivo próximamente</p>
+                      <p className="text-xs text-gray-500 max-w-xs mx-auto">{S.mapUnavailable}</p>
                     </div>
                   </div>
                 ) : !isLoaded ? (
