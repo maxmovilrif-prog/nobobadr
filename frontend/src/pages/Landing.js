@@ -45,9 +45,10 @@ export default function Landing() {
   ];
 
   const categories = [
-    { name: t('landing.services.restaurants'), emoji: '🍔', color: 'from-orange-400 to-red-500' },
-    { name: t('landing.services.supermarkets'), emoji: '🛒', color: 'from-blue-400 to-cyan-500' },
-    { name: t('landing.services.courier'), emoji: '📦', color: 'from-purple-400 to-pink-500' }
+    { name: t('landing.services.restaurants'), emoji: '🍔', color: 'from-orange-400 to-red-500', path: '/auth' },
+    { name: t('landing.services.supermarkets'), emoji: '🛒', color: 'from-blue-400 to-cyan-500', path: '/auth' },
+    { name: t('landing.services.courier'), emoji: '📦', color: 'from-purple-400 to-pink-500', path: '/presupuesto' },
+    { name: 'Nubo Ride', emoji: '🚕', color: 'from-slate-700 to-emerald-600', path: '/ride' }
   ];
 
   return (
@@ -134,9 +135,14 @@ export default function Landing() {
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl blur-2xl opacity-20"></div>
                 <div className="relative bg-white rounded-3xl p-8 shadow-2xl">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     {categories.map((cat, idx) => (
-                      <div key={idx} className="text-center hover-lift cursor-pointer">
+                      <div
+                        key={idx}
+                        data-testid={`landing-service-${idx}`}
+                        onClick={() => navigate(cat.path)}
+                        className="text-center hover-lift cursor-pointer"
+                      >
                         <div className={`w-20 h-20 mx-auto mb-3 bg-gradient-to-br ${cat.color} rounded-2xl flex items-center justify-center text-3xl shadow-lg`}>
                           {cat.emoji}
                         </div>

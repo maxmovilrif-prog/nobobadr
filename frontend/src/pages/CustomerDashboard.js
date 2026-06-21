@@ -351,30 +351,6 @@ export default function CustomerDashboard() {
           </CardContent>
         </Card>
 
-        {/* Nubo Ride Banner */}
-        <Card className="mb-8 bg-gradient-to-r from-slate-900 to-emerald-800 text-white border-0 overflow-hidden relative">
-          <div className="absolute right-0 top-0 w-64 h-64 bg-emerald-400/10 rounded-full -mr-32 -mt-32"></div>
-          <CardContent className="p-6 relative z-10">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold mb-2">🚕 Nubo Ride · Pide tu coche</h3>
-                <p className="text-white/90 mb-4">
-                  Transporte de pasajeros con conductor. Elige Economy, Comfort o XL y conoce el precio antes de pedir.
-                </p>
-                <Button
-                  data-testid="nubo-ride-btn"
-                  onClick={() => navigate('/ride')}
-                  className="bg-emerald-500 text-white hover:bg-emerald-400"
-                >
-                  Pedir un viaje
-                  <Car className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-              <div className="hidden md:block text-6xl opacity-20">🚕</div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Express Delivery Banner */}
         <Card className="mb-8 bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0 overflow-hidden relative">
           <CardContent className="p-6 relative z-10">
@@ -414,6 +390,28 @@ export default function CustomerDashboard() {
           </TabsList>
 
           <TabsContent value="businesses">
+            {/* Selector de servicios (4 opciones) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6" data-testid="service-selector">
+              {[
+                { key: 'restaurant', label: 'Restaurantes', icon: ShoppingBag, grad: 'from-orange-400 to-red-500', action: () => setFilter('restaurant') },
+                { key: 'supermarket', label: 'Supermercados', icon: ShoppingCart, grad: 'from-blue-400 to-cyan-500', action: () => setFilter('supermarket') },
+                { key: 'courier', label: 'Paquetería', icon: Package, grad: 'from-purple-400 to-pink-500', action: () => setFilter('courier') },
+                { key: 'ride', label: 'Nubo Ride', icon: Car, grad: 'from-slate-800 to-emerald-600', action: () => navigate('/ride') },
+              ].map(s => (
+                <button
+                  key={s.key}
+                  data-testid={`service-tile-${s.key}`}
+                  onClick={s.action}
+                  className="group flex flex-col items-center justify-center gap-2 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all py-5 px-3"
+                >
+                  <span className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${s.grad} flex items-center justify-center text-white shadow`}>
+                    <s.icon className="w-6 h-6" />
+                  </span>
+                  <span className="text-sm font-semibold text-gray-800">{s.label}</span>
+                </button>
+              ))}
+            </div>
+
             {/* AI Smart Search */}
             <Card className="mb-6 border-0 shadow-lg bg-white">
               <CardContent className="p-5">
