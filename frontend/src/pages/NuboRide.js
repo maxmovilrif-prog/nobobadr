@@ -158,7 +158,7 @@ export default function NuboRide() {
           </Button>
           <div>
             <p className="text-xs text-emerald-300/80 font-medium tracking-wide">NUBO EXPRESS</p>
-            <h1 className="text-2xl font-bold leading-tight">Nubo Ride 🚕</h1>
+            <h1 className="text-2xl font-bold leading-tight">Nubo Car 🚗</h1>
           </div>
         </div>
       </header>

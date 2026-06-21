@@ -48,7 +48,7 @@ export default function Landing() {
     { name: t('landing.services.restaurants'), emoji: '🍔', color: 'from-orange-400 to-red-500', path: '/auth' },
     { name: t('landing.services.supermarkets'), emoji: '🛒', color: 'from-blue-400 to-cyan-500', path: '/auth' },
     { name: t('landing.services.courier'), emoji: '📦', color: 'from-purple-400 to-pink-500', path: '/presupuesto' },
-    { name: 'Nubo Ride', emoji: '🚕', color: 'from-slate-700 to-emerald-600', path: '/ride', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/d552cfa87c3a8496c18d6e69f19ff9b0a9b683909f92722679f2076c4b4635ad.png' }
+    { name: 'Nubo Car', emoji: '🚗', color: 'from-slate-800 to-slate-900', path: '/ride', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/6171a4cb06401b700892f39b880ec54b1e5d9ec3ebbe57e460b62c7400cad0c4.png' }
   ];
 
   return (
@@ -144,7 +144,9 @@ export default function Landing() {
                         className="text-center hover-lift cursor-pointer"
                       >
                         {cat.img ? (
-                          <img src={cat.img} alt={cat.name} className="w-20 h-20 mx-auto mb-3 rounded-2xl object-cover shadow-lg ring-1 ring-black/5" />
+                          <div className="w-20 h-20 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center overflow-hidden shadow-lg ring-1 ring-black/5">
+                            <img src={cat.img} alt={cat.name} className="w-full h-full object-contain p-1.5" />
+                          </div>
                         ) : (
                           <div className={`w-20 h-20 mx-auto mb-3 bg-gradient-to-br ${cat.color} rounded-2xl flex items-center justify-center text-3xl shadow-lg`}>
                             {cat.emoji}

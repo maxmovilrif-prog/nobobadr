@@ -315,7 +315,7 @@ export default function RiderApp() {
         {/* Nubo Ride — viajes de pasajeros */}
         <div data-testid="rider-rides-section">
           <h2 className="text-sm font-semibold text-gray-700 mb-2 px-1 flex items-center gap-1.5">
-            <Car className="w-4 h-4 text-emerald-600" /> Nubo Ride · Viajes
+            <Car className="w-4 h-4 text-emerald-600" /> Nubo Car · Viajes
           </h2>
 
           {rideData.ride ? (

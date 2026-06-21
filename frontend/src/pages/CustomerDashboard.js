@@ -396,7 +396,7 @@ export default function CustomerDashboard() {
                 { key: 'restaurant', label: 'Restaurantes', icon: ShoppingBag, grad: 'from-orange-400 to-red-500', action: () => setFilter('restaurant') },
                 { key: 'supermarket', label: 'Supermercados', icon: ShoppingCart, grad: 'from-blue-400 to-cyan-500', action: () => setFilter('supermarket') },
                 { key: 'courier', label: 'Paquetería', icon: Package, grad: 'from-purple-400 to-pink-500', action: () => setFilter('courier') },
-                { key: 'ride', label: 'Nubo Ride', icon: Car, grad: 'from-slate-800 to-emerald-600', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/d552cfa87c3a8496c18d6e69f19ff9b0a9b683909f92722679f2076c4b4635ad.png', action: () => navigate('/ride') },
+                { key: 'ride', label: 'Nubo Car', icon: Car, grad: 'from-slate-800 to-slate-900', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/6171a4cb06401b700892f39b880ec54b1e5d9ec3ebbe57e460b62c7400cad0c4.png', action: () => navigate('/ride') },
               ].map(s => (
                 <button
                   key={s.key}
@@ -405,8 +405,8 @@ export default function CustomerDashboard() {
                   className="group flex flex-col items-center justify-center gap-2 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all py-5 px-3"
                 >
                   {s.img ? (
-                    <span className="w-12 h-12 rounded-2xl overflow-hidden shadow ring-1 ring-black/5">
-                      <img src={s.img} alt={s.label} className="w-full h-full object-cover" />
+                    <span className="w-12 h-12 rounded-2xl overflow-hidden shadow ring-1 ring-black/5 bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+                      <img src={s.img} alt={s.label} className="w-full h-full object-contain p-1" />
                     </span>
                   ) : (
                     <span className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${s.grad} flex items-center justify-center text-white shadow`}>
