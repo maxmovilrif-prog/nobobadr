@@ -48,7 +48,7 @@ export default function Landing() {
     { name: t('landing.services.restaurants'), emoji: '🍔', color: 'from-orange-400 to-red-500', path: '/auth' },
     { name: t('landing.services.supermarkets'), emoji: '🛒', color: 'from-blue-400 to-cyan-500', path: '/auth' },
     { name: t('landing.services.courier'), emoji: '📦', color: 'from-purple-400 to-pink-500', path: '/presupuesto' },
-    { name: 'Nubo Ride', emoji: '🚕', color: 'from-slate-700 to-emerald-600', path: '/ride' }
+    { name: 'Nubo Ride', emoji: '🚕', color: 'from-slate-700 to-emerald-600', path: '/ride', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/d552cfa87c3a8496c18d6e69f19ff9b0a9b683909f92722679f2076c4b4635ad.png' }
   ];
 
   return (
@@ -143,9 +143,13 @@ export default function Landing() {
                         onClick={() => navigate(cat.path)}
                         className="text-center hover-lift cursor-pointer"
                       >
-                        <div className={`w-20 h-20 mx-auto mb-3 bg-gradient-to-br ${cat.color} rounded-2xl flex items-center justify-center text-3xl shadow-lg`}>
-                          {cat.emoji}
-                        </div>
+                        {cat.img ? (
+                          <img src={cat.img} alt={cat.name} className="w-20 h-20 mx-auto mb-3 rounded-2xl object-cover shadow-lg ring-1 ring-black/5" />
+                        ) : (
+                          <div className={`w-20 h-20 mx-auto mb-3 bg-gradient-to-br ${cat.color} rounded-2xl flex items-center justify-center text-3xl shadow-lg`}>
+                            {cat.emoji}
+                          </div>
+                        )}
                         <p className="text-sm font-medium text-gray-700">{cat.name}</p>
                       </div>
                     ))}
