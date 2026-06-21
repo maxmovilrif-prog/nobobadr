@@ -1,0 +1,4 @@
+deploy/backend.env
+deploy/.env
+certbot/
+*.pem

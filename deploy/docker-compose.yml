@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    container_name: nubo-backend
+    restart: unless-stopped
+    env_file:
+      - ./deploy/backend.env
+    expose:
+      - "8001"
+    networks:
+      - nubo-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+      args:
+        # CRA bakes these at build time (must match production domain)
+        REACT_APP_BACKEND_URL: "https://noboexpress.com"
+        REACT_APP_GOOGLE_MAPS_API_KEY: "${REACT_APP_GOOGLE_MAPS_API_KEY}"
+    container_name: nubo-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    networks:
+      - nubo-net
+
+  certbot:
+    image: certbot/certbot
+    container_name: nubo-certbot
+    restart: unless-stopped
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    # Renueva certificados cada 12h
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done'"
+
+networks:
+  nubo-net:
+    driver: bridge
