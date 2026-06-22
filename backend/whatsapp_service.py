@@ -67,3 +67,24 @@ async def notify_logistics_quote_priced(phone: str, order: dict) -> dict:
         f"Gracias por confiar en Nubo Express. 🐝"
     )
     return await send_whatsapp(phone, body)
+
+
+async def notify_admin_logistics_priced(admin_phone: str, order: dict, customer: dict | None = None) -> dict:
+    """Alerta/copia al WhatsApp del admin cada vez que se fija una tarifa de logística."""
+    oid = str(order.get("id", ""))
+    price = order.get("total_amount") or 0
+    currency = order.get("currency") or "EUR"
+    cust_line = ""
+    if customer:
+        cname = customer.get("name") or "—"
+        cphone = customer.get("phone") or "—"
+        cust_line = f"👤 Cliente: {cname} ({cphone})\n"
+    body = (
+        f"🔔 *Nubo Express · Alerta de gestión*\n"
+        f"Tarifa logística fijada — pedido #{oid[:8]}\n\n"
+        f"{cust_line}"
+        f"📍 {order.get('origin_name') or '—'} → {order.get('destination_name') or '—'}\n"
+        f"💶 Precio enviado: *{price} {currency}*\n\n"
+        f"El cliente ya ha sido notificado. 🐝"
+    )
+    return await send_whatsapp(admin_phone, body)
