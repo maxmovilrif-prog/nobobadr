@@ -20,7 +20,7 @@ async def main():
     if existing:
         await db.users.update_one(
             {'email': ADMIN_EMAIL},
-            {'$set': {'role': 'admin', 'password_hash': pw_hash, 'name': 'Administrador Nubo'}}
+            {'$set': {'role': 'admin', 'password_hash': pw_hash, 'name': 'Administrador Nubo', 'phone': '+34612284215'}}
         )
         print(f"Admin actualizado: {ADMIN_EMAIL}")
     else:
@@ -28,7 +28,7 @@ async def main():
             'id': str(uuid.uuid4()),
             'email': ADMIN_EMAIL,
             'name': 'Administrador Nubo',
-            'phone': '+34654242092',
+            'phone': '+34612284215',
             'role': 'admin',
             'password_hash': pw_hash,
             'created_at': datetime.now(timezone.utc).isoformat(),
