@@ -360,14 +360,16 @@ async def my_region_kpis(current_user: dict = Depends(get_current_manager_or_adm
 
 
 @router.get("/admin/logistics-quotes")
-async def admin_logistics_quotes(current_user: dict = Depends(get_current_manager_or_admin)):
-    """Lista las solicitudes de cotización de Camión/Logística (status pending_quote),
-    con aislamiento regional para Gestores. El Fundador ve todas."""
+async def admin_logistics_quotes(status: str = 'pending_quote', current_user: dict = Depends(get_current_manager_or_admin)):
+    """Lista solicitudes de Camión/Logística por estado, con aislamiento regional para Gestores.
+    status='pending_quote' (sin precio) o 'quoted' (enviadas, pendientes de confirmar)."""
+    if status not in ('pending_quote', 'quoted'):
+        status = 'pending_quote'
     scope = await get_scope_city_ids(current_user)  # None = global
-    query = {'order_type': 'logistics', 'status': 'pending_quote'}
+    query = {'order_type': 'logistics', 'status': status}
     if scope is not None:
         query['city_id'] = {'$in': scope}
-    rows = await db.orders.find(query, {'_id': 0}).sort('created_at', -1).to_list(200)
+    rows = await db.orders.find(query, {'_id': 0}).sort('updated_at', -1).to_list(200)
     # Enriquecer con datos del cliente
     for r in rows:
         cust = await db.users.find_one({'id': r.get('customer_id')}, {'_id': 0, 'name': 1, 'email': 1, 'phone': 1})

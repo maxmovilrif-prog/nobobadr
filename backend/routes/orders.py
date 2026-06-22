@@ -9,6 +9,7 @@ from core import db, get_current_user, manager
 from models import Order, OrderCreate, OrderStatusUpdate, ExpressOrderCreate
 import telegram_alerts
 import email_service
+import whatsapp_service
 from assignments import auto_assign_order, release_driver
 from accounting import record_order_income
 
@@ -205,11 +206,13 @@ async def set_logistics_quote_price(order_id: str, payload: dict, current_user: 
         {'$set': {'total_amount': price, 'status': 'quoted', 'updated_at': now}},
     )
     # Email automático al cliente con la tarifa final + enlace para confirmar (best-effort)
-    customer = await db.users.find_one({'id': order.get('customer_id')}, {'_id': 0, 'email': 1})
+    customer = await db.users.find_one({'id': order.get('customer_id')}, {'_id': 0, 'email': 1, 'phone': 1})
+    priced_order = {**order, 'total_amount': price, 'status': 'quoted'}
     if customer and customer.get('email'):
-        asyncio.create_task(email_service.send_logistics_quote_priced(
-            customer['email'], {**order, 'total_amount': price, 'status': 'quoted'}
-        ))
+        asyncio.create_task(email_service.send_logistics_quote_priced(customer['email'], priced_order))
+    # WhatsApp automático (best-effort, no rompe si Twilio no está configurado)
+    if customer and customer.get('phone'):
+        asyncio.create_task(whatsapp_service.notify_logistics_quote_priced(customer['phone'], priced_order))
     return {'message': 'Precio fijado · cliente notificado', 'id': order_id, 'total_amount': price, 'status': 'quoted'}
 
 
