@@ -96,38 +96,26 @@ def _parse_iso(v):
         return None
 
 
-@router.get("/admin/active-drivers")
-async def admin_active_drivers(current_user: dict = Depends(get_current_manager_or_admin)):
-    """
-    Devuelve las 'Abejas' (conductores) activas en tiempo real.
-    Aislamiento regional: un Gestor solo ve la flota y pedidos de SU región;
-    el Fundador ve todo.
-    """
-    scope = await get_scope_city_ids(current_user)  # None = global (Fundador)
-    region_id = current_user.get('region_id') if scope is not None else None
+def _idle_from_timestamp(ts, now):
+    """Calcula segundos inactivo e indicador idle a partir de un timestamp ISO."""
+    last_seen = _parse_iso(ts)
+    if not last_seen:
+        return None, False
+    idle_seconds = int((now - last_seen).total_seconds())
+    return idle_seconds, idle_seconds > IDLE_THRESHOLD_SECONDS
+
+
+async def _build_live_fleet(scope, now):
+    """Conductores en vivo (con pedido activo y ubicación por WebSocket)."""
     fleet = []
     seen_order_ids = set()
-    now = datetime.now(timezone.utc)
-
-    # 1. Conductores en vivo (con pedido activo, ubicación por WebSocket)
     for order_id, loc in manager.driver_locations.items():
         order = await db.orders.find_one({'id': order_id}, {'_id': 0})
         # Aislamiento regional: omitir pedidos fuera de la región del Gestor
         if scope is not None and (not order or order.get('city_id') not in scope):
             continue
         seen_order_ids.add(order_id)
-        idle_seconds = None
-        idle = False
-        ts = loc.get("timestamp")
-        if ts:
-            try:
-                last_seen = datetime.fromisoformat(ts)
-                if last_seen.tzinfo is None:
-                    last_seen = last_seen.replace(tzinfo=timezone.utc)
-                idle_seconds = int((now - last_seen).total_seconds())
-                idle = idle_seconds > IDLE_THRESHOLD_SECONDS
-            except (ValueError, TypeError):
-                pass
+        idle_seconds, idle = _idle_from_timestamp(loc.get("timestamp"), now)
         fleet.append({
             "order_id": order_id,
             "driver_name": loc.get("driver_name", "Abeja"),
@@ -140,15 +128,16 @@ async def admin_active_drivers(current_user: dict = Depends(get_current_manager_
             "delivery_address": order.get("delivery_address") if order else None,
             "live": True,
         })
+    return fleet, seen_order_ids
 
-    # 2. Conductores disponibles registrados (filtrados por región si es Gestor)
+
+async def _build_available_fleet(region_id):
+    """Conductores disponibles registrados (filtrados por región si es Gestor)."""
     drv_query = {'role': 'driver', 'is_available': True}
     if region_id is not None:
         drv_query['region_id'] = region_id
-    drivers = await db.users.find(
-        drv_query,
-        {'_id': 0, 'password_hash': 0}
-    ).to_list(500)
+    drivers = await db.users.find(drv_query, {'_id': 0, 'password_hash': 0}).to_list(500)
+    fleet = []
     for d in drivers:
         loc = d.get('current_location')
         fleet.append({
@@ -160,18 +149,105 @@ async def admin_active_drivers(current_user: dict = Depends(get_current_manager_
             "status": "disponible",
             "live": False,
         })
+    return fleet, len(drivers)
+
+
+def _accumulate_delivered_kpi(o, created, today, month_start, last_30, series, metrics):
+    """Suma métricas de un pedido entregado a los acumuladores del cuadro de mandos."""
+    delivered = _parse_iso(o.get('delivered_at'))
+    eff = delivered or created
+    if eff and eff.date() >= month_start:
+        metrics['revenue_month_eur'] += _to_eur(o.get('total_amount'), o.get('currency'))
+    if delivered and delivered.date().isoformat() in series:
+        series[delivered.date().isoformat()]['delivered'] += 1
+    if created and delivered and delivered > created:
+        mins = (delivered - created).total_seconds() / 60.0
+        if 0 < mins < 60 * 24 * 7:  # descarta valores absurdos
+            metrics['delivery_durations'].append(mins)
+    did = o.get('driver_id')
+    if did and eff and eff >= last_30:
+        b = metrics['bees'].setdefault(did, {'driver_id': did, 'deliveries': 0, 'revenue_eur': 0.0})
+        b['deliveries'] += 1
+        b['revenue_eur'] = round(b['revenue_eur'] + _to_eur(o.get('total_amount'), o.get('currency')), 2)
+
+
+def _accumulate_kpis(orders, today, month_start, last_30, series):
+    """Recorre los pedidos y construye los acumuladores del cuadro de mandos del Fundador."""
+    metrics = {'orders_today': 0, 'revenue_month_eur': 0.0, 'delivery_durations': [], 'bees': {}}
+    for o in orders:
+        created = _parse_iso(o.get('created_at'))
+        if created:
+            ckey = created.date().isoformat()
+            if ckey in series:
+                series[ckey]['orders'] += 1
+            if created.date() == today:
+                metrics['orders_today'] += 1
+        if o.get('status') == 'delivered':
+            _accumulate_delivered_kpi(o, created, today, month_start, last_30, series, metrics)
+    return metrics
+
+
+async def _resolve_top_bees(bees):
+    """Ordena el ranking de Abejas y resuelve sus nombres/vehículo."""
+    top = sorted(bees.values(), key=lambda x: -x['deliveries'])[:5]
+    if top:
+        names = {}
+        async for u in db.users.find(
+            {'id': {'$in': [b['driver_id'] for b in top]}},
+            {'_id': 0, 'id': 1, 'name': 1, 'vehicle_type': 1},
+        ):
+            names[u['id']] = u
+        for b in top:
+            u = names.get(b['driver_id'], {})
+            b['driver_name'] = u.get('name', 'Abeja')
+            b['vehicle_type'] = u.get('vehicle_type')
+    return top
+
+
+def _accumulate_region_kpis(orders, today, month_start):
+    """Acumula métricas locales (hoy + mes) de la delegación del Gestor."""
+    m = {'orders_today': 0, 'delivered_today': 0, 'revenue_today_eur': 0.0, 'revenue_month_eur': 0.0}
+    for o in orders:
+        created = _parse_iso(o.get('created_at'))
+        if created and created.date() == today:
+            m['orders_today'] += 1
+        if o.get('status') == 'delivered':
+            eff = _parse_iso(o.get('delivered_at')) or created
+            amount_eur = _to_eur(o.get('total_amount'), o.get('currency'))
+            if eff and eff.date() == today:
+                m['delivered_today'] += 1
+                m['revenue_today_eur'] += amount_eur
+            if eff and eff.date() >= month_start:
+                m['revenue_month_eur'] += amount_eur
+    return m
+
+
+
+@router.get("/admin/active-drivers")
+async def admin_active_drivers(current_user: dict = Depends(get_current_manager_or_admin)):
+    """
+    Devuelve las 'Abejas' (conductores) activas en tiempo real.
+    Aislamiento regional: un Gestor solo ve la flota y pedidos de SU región;
+    el Fundador ve todo.
+    """
+    scope = await get_scope_city_ids(current_user)  # None = global (Fundador)
+    region_id = current_user.get('region_id') if scope is not None else None
+    now = datetime.now(timezone.utc)
+
+    live_fleet, seen_order_ids = await _build_live_fleet(scope, now)
+    available_fleet, available_count = await _build_available_fleet(region_id)
+    fleet = live_fleet + available_fleet
 
     active_orders_q = {'status': 'in_transit'}
     if scope is not None:
         active_orders_q['city_id'] = {'$in': scope}
     active_orders = await db.orders.count_documents(active_orders_q)
-    idle_count = sum(1 for d in fleet if d.get("idle"))
 
     return {
         "count": len(fleet),
         "live_count": len(seen_order_ids),
-        "available_count": len(drivers),
-        "idle_count": idle_count,
+        "available_count": available_count,
+        "idle_count": sum(1 for d in fleet if d.get("idle")),
         "active_orders": active_orders,
         "drivers": fleet,
     }
@@ -219,60 +295,18 @@ async def admin_kpis(current_user: dict = Depends(get_current_admin)):
     ).to_list(50000)
     delivered_total = await db.orders.count_documents({'status': 'delivered'})
 
-    # Serie de pedidos por día (últimos 7 días)
     days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
     series = {d.isoformat(): {'date': d.isoformat(), 'orders': 0, 'delivered': 0} for d in days}
-    orders_today = 0
-    revenue_month_eur = 0.0
-    delivery_durations = []
-    bees = {}
 
-    for o in orders:
-        created = _parse_iso(o.get('created_at'))
-        status = o.get('status')
-        if created:
-            ckey = created.date().isoformat()
-            if ckey in series:
-                series[ckey]['orders'] += 1
-            if created.date() == today:
-                orders_today += 1
-        if status == 'delivered':
-            delivered = _parse_iso(o.get('delivered_at'))
-            # Ingresos del mes (pedidos entregados este mes)
-            eff = delivered or created
-            if eff and eff.date() >= month_start:
-                revenue_month_eur += _to_eur(o.get('total_amount'), o.get('currency'))
-            if delivered and delivered.date().isoformat() in series:
-                series[delivered.date().isoformat()]['delivered'] += 1
-            # Tiempo de entrega
-            if created and delivered and delivered > created:
-                mins = (delivered - created).total_seconds() / 60.0
-                if 0 < mins < 60 * 24 * 7:  # descarta valores absurdos
-                    delivery_durations.append(mins)
-            # Ranking de Abejas (últimos 30 días)
-            did = o.get('driver_id')
-            if did and (delivered or created) and (delivered or created) >= last_30:
-                b = bees.setdefault(did, {'driver_id': did, 'deliveries': 0, 'revenue_eur': 0.0})
-                b['deliveries'] += 1
-                b['revenue_eur'] = round(b['revenue_eur'] + _to_eur(o.get('total_amount'), o.get('currency')), 2)
-
-    # Nombres de las Abejas del ranking
-    top = sorted(bees.values(), key=lambda x: -x['deliveries'])[:5]
-    if top:
-        names = {}
-        async for u in db.users.find({'id': {'$in': [b['driver_id'] for b in top]}}, {'_id': 0, 'id': 1, 'name': 1, 'vehicle_type': 1}):
-            names[u['id']] = u
-        for b in top:
-            u = names.get(b['driver_id'], {})
-            b['driver_name'] = u.get('name', 'Abeja')
-            b['vehicle_type'] = u.get('vehicle_type')
-
-    avg_delivery = round(sum(delivery_durations) / len(delivery_durations), 1) if delivery_durations else None
+    metrics = _accumulate_kpis(orders, today, month_start, last_30, series)
+    top = await _resolve_top_bees(metrics['bees'])
+    durations = metrics['delivery_durations']
+    avg_delivery = round(sum(durations) / len(durations), 1) if durations else None
 
     return {
-        'orders_today': orders_today,
+        'orders_today': metrics['orders_today'],
         'orders_per_day': list(series.values()),
-        'revenue_month_eur': round(revenue_month_eur, 2),
+        'revenue_month_eur': round(metrics['revenue_month_eur'], 2),
         'delivered_total': delivered_total,
         'avg_delivery_mins': avg_delivery,
         'top_bees': top,
@@ -304,21 +338,7 @@ async def my_region_kpis(current_user: dict = Depends(get_current_manager_or_adm
         {'_id': 0, 'status': 1, 'total_amount': 1, 'currency': 1, 'created_at': 1, 'delivered_at': 1}
     ).to_list(50000)
 
-    orders_today = 0
-    delivered_today = 0
-    revenue_today_eur = 0.0
-    revenue_month_eur = 0.0
-    for o in orders:
-        created = _parse_iso(o.get('created_at'))
-        if created and created.date() == today:
-            orders_today += 1
-        if o.get('status') == 'delivered':
-            eff = _parse_iso(o.get('delivered_at')) or created
-            if eff and eff.date() == today:
-                delivered_today += 1
-                revenue_today_eur += _to_eur(o.get('total_amount'), o.get('currency'))
-            if eff and eff.date() >= month_start:
-                revenue_month_eur += _to_eur(o.get('total_amount'), o.get('currency'))
+    m = _accumulate_region_kpis(orders, today, month_start)
 
     in_transit = await db.orders.count_documents({**oq, 'status': 'in_transit'})
     total_riders = await db.users.count_documents({'role': 'driver', 'region_id': region_id})
@@ -327,13 +347,13 @@ async def my_region_kpis(current_user: dict = Depends(get_current_manager_or_adm
     return {
         'is_founder': False,
         'region': {'id': region_id, 'name': region_name, 'cities': region.get('city_ids', []) if region else []},
-        'orders_today': orders_today,
-        'delivered_today': delivered_today,
+        'orders_today': m['orders_today'],
+        'delivered_today': m['delivered_today'],
         'in_transit': in_transit,
         'active_riders': active_riders,
         'total_riders': total_riders,
-        'revenue_today_eur': round(revenue_today_eur, 2),
-        'revenue_month_eur': round(revenue_month_eur, 2),
+        'revenue_today_eur': round(m['revenue_today_eur'], 2),
+        'revenue_month_eur': round(m['revenue_month_eur'], 2),
         'as_of': now.isoformat(),
     }
 

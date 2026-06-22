@@ -71,7 +71,7 @@ export const AccountingManager = ({ API, token }) => {
         axios.get(`${API}/accounting/transactions?per_page=12&${pqs}`, auth),
       ]);
       setSummary(s.data); setCash(c.data); setPayroll(p.data); setTxns(t.data);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando datos de contabilidad', e); }
     // eslint-disable-next-line
   }, [API, token, period]);
 

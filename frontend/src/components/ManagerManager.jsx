@@ -23,7 +23,7 @@ export const ManagerManager = ({ API, token }) => {
       ]);
       setManagers(mRes.data.managers || []);
       setRegions(rRes.data.regions || []);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando gestores/regiones', e); }
     // eslint-disable-next-line
   }, [API, token]);
 

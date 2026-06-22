@@ -1,8 +1,8 @@
 """Seed one-off para el clúster Atlas de producción de Nubo.
 
-Uso:
+Uso (las credenciales se leen SOLO de variables de entorno, nunca del código):
     ATLAS_URL="mongodb+srv://..." ATLAS_DB="nubo_produccion" \
-    ADMIN_EMAIL="badarbox1756@gmail.com" ADMIN_PASSWORD="Admin1234!" \
+    ADMIN_EMAIL="tu-admin@dominio.com" ADMIN_PASSWORD="********" \
     python3 seed_atlas.py
 """
 import asyncio
@@ -36,8 +36,10 @@ CITIES = [
 async def main():
     url = os.environ["ATLAS_URL"]
     db_name = os.environ.get("ATLAS_DB", "nubo_produccion")
-    admin_email = os.environ.get("ADMIN_EMAIL", "badarbox1756@gmail.com").strip().lower()
-    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin1234!")
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if not admin_email or not admin_password:
+        raise SystemExit("Faltan ADMIN_EMAIL y/o ADMIN_PASSWORD en las variables de entorno.")
 
     client = AsyncIOMotorClient(url, serverSelectionTimeoutMS=20000)
     db = client[db_name]
@@ -80,7 +82,7 @@ async def main():
             "vehicle_type": None,
             "current_location": None,
         })
-        print(f"Fundador creado: {admin_email} / {admin_password}")
+        print(f"Fundador creado: {admin_email}")
 
 
 if __name__ == "__main__":

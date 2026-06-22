@@ -152,7 +152,7 @@ export default function PublicTracking() {
         vehicle_type: d.driver_vehicle_type || prev.vehicle_type,
         current: d.driver_location || prev.current, updated_at: d.updated_at || prev.updated_at,
       } : prev);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error actualizando seguimiento en vivo', e); }
   }, []);
 
   useEffect(() => {

@@ -62,14 +62,14 @@ export default function NuboRide() {
   useEffect(() => {
     axios.get(`${API}/public/cities`).then((res) => {
       setCities(res.data?.cities || res.data || []);
-    }).catch(() => {});
+    }).catch((e) => console.error('Error cargando ciudades', e));
   }, []);
 
   const loadActive = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/rides/active`, authHeaders());
       setActiveRide(res.data?.ride || null);
-    } catch (e) { /* noop */ } finally {
+    } catch (e) { console.error('Error cargando viaje activo', e); } finally {
       setLoadingActive(false);
     }
   }, [authHeaders]);

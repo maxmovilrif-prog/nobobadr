@@ -25,7 +25,7 @@ export const RegionManager = ({ API, token }) => {
       setRegions(rRes.data.regions || []);
       const c = cRes.data;
       setCities(Array.isArray(c) ? c : (c.cities || []));
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando regiones/ciudades', e); }
     // eslint-disable-next-line
   }, [API, token]);
 

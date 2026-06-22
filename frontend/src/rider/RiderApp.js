@@ -120,7 +120,7 @@ export default function RiderApp() {
 
   const stopScan = useCallback(async () => {
     if (scannerRef.current) {
-      try { await scannerRef.current.stop(); await scannerRef.current.clear(); } catch (e) { /* noop */ }
+      try { await scannerRef.current.stop(); await scannerRef.current.clear(); } catch (e) { console.debug('Scanner ya detenido', e); }
       scannerRef.current = null;
     }
     setScanning(false);

@@ -31,7 +31,7 @@ export const CityManager = ({ API, token, onChanged }) => {
     try {
       const res = await axios.get(`${API}/cities`, auth);
       setCities(res.data.cities || []);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.error('Error cargando ciudades', e); }
   };
 
   useEffect(() => { fetchCities(); /* eslint-disable-next-line */ }, []);
