@@ -202,9 +202,39 @@ async def set_logistics_quote_price(order_id: str, payload: dict, current_user: 
     now = datetime.now(timezone.utc).isoformat()
     await db.orders.update_one(
         {'id': order_id},
-        {'$set': {'total_amount': price, 'status': 'pending', 'updated_at': now}},
+        {'$set': {'total_amount': price, 'status': 'quoted', 'updated_at': now}},
     )
-    return {'message': 'Precio fijado', 'id': order_id, 'total_amount': price, 'status': 'pending'}
+    # Email automático al cliente con la tarifa final + enlace para confirmar (best-effort)
+    customer = await db.users.find_one({'id': order.get('customer_id')}, {'_id': 0, 'email': 1})
+    if customer and customer.get('email'):
+        asyncio.create_task(email_service.send_logistics_quote_priced(
+            customer['email'], {**order, 'total_amount': price, 'status': 'quoted'}
+        ))
+    return {'message': 'Precio fijado · cliente notificado', 'id': order_id, 'total_amount': price, 'status': 'quoted'}
+
+
+@router.post("/orders/{order_id}/confirm-quote", response_model=Order)
+async def confirm_logistics_quote(order_id: str, current_user: dict = Depends(get_current_user)):
+    """El cliente confirma la cotización de logística ya cotizada → entra al flujo normal de despacho."""
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    if order.get('customer_id') != current_user['id']:
+        raise HTTPException(status_code=403, detail="No puedes confirmar este pedido")
+    if order.get('status') != 'quoted':
+        raise HTTPException(status_code=400, detail="Esta cotización no está lista para confirmar")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$set': {'status': 'pending', 'confirmed_at': now, 'updated_at': now}},
+    )
+    updated = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    await telegram_alerts.notify_new_order(updated)
+    if isinstance(updated.get('created_at'), str):
+        updated['created_at'] = datetime.fromisoformat(updated['created_at'])
+    if isinstance(updated.get('updated_at'), str):
+        updated['updated_at'] = datetime.fromisoformat(updated['updated_at'])
+    return updated
 
 
 

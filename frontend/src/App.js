@@ -15,6 +15,7 @@ import CustomerPasswordReset from '@/pages/CustomerPasswordReset';
 import { getPortal } from '@/lib/portal';
 import DeliveryQuote from '@/pages/DeliveryQuote';
 import NuboRide from '@/pages/NuboRide';
+import QuoteConfirm from '@/pages/QuoteConfirm';
 import RiderApp from '@/rider/RiderApp';
 import PublicTracking from '@/pages/PublicTracking';
 import OrderTracking from '@/pages/OrderTracking';
@@ -157,6 +158,7 @@ function App() {
           <Route path="/nubo-control/recuperar" element={<AdminPasswordReset />} />
           <Route path="/admin" element={<Navigate to="/nubo-control" replace />} />
           <Route path="/presupuesto" element={<DeliveryQuote />} />
+          <Route path="/confirmar-cotizacion/:orderId" element={<QuoteConfirm />} />
           <Route path="/ride" element={user && user.role === 'customer' ? <NuboRide /> : <Navigate to="/auth" />} />
           <Route path="/rider" element={<RiderApp />} />
           <Route path="/track" element={<PublicTracking />} />

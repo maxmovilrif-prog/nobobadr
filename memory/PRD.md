@@ -25,6 +25,13 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Stripe**: override `STRIPE_LIVE_KEY` + badge LIVE/TEST en panel. **MongoDB Atlas** producción: override `MONGO_URL_OVERRIDE`/`DB_NAME_OVERRIDE` (core.py), seed `seed_atlas.py` (16 ciudades + Fundador).
 - ✅ Testeado: **140/140 pytest** + frontend e2e (iteration_10.json). Email Login normaliza a minúsculas.
 
+## Ciclo Cotización→Venta de Logística (2026-06-22)
+- **Flujo de estados**: pending_quote → (admin fija precio) → **quoted** (+email al cliente con tarifa y botón Confirmar) → (cliente confirma) → **pending** (entra a despacho + alerta Telegram).
+- Backend: `PATCH /api/orders/{id}/set-quote-price` ahora pone status='quoted' y envía `email_service.send_logistics_quote_priced` (precio + enlace `${APP_BASE_URL}/confirmar-cotizacion/{id}`). Nuevo `POST /api/orders/{id}/confirm-quote` (cliente dueño, idempotente: 400 si ya no está 'quoted').
+- Frontend: nueva página `QuoteConfirm.js` en ruta `/confirmar-cotizacion/:orderId` (muestra ruta + precio + botón Confirmar; si no hay sesión → login). Verificado E2E (curl + screenshot).
+- NOTA: WhatsApp automático al cliente NO implementado (requiere integración WhatsApp Business API / Twilio, no configurada). Solo email automático por ahora.
+
+
 ## Email logística + UI admin cotizaciones + Desacople DB (2026-06-22)
 - **Email automático** al crear cotización de Camión: `email_service.send_logistics_quote_received()` ("Hemos recibido tu solicitud..."), llamado best-effort en `create_logistics_quote`. Usa Resend si RESEND_API_KEY está, si no Gmail SMTP (configurado en preview). Para Resend en producción: añadir RESEND_API_KEY en Deploy Secrets.
 - **UI admin** `LogisticsQuotesManager.jsx` (integrado en AdminDashboard, visible Fundador + Gestor): lista cotizaciones `pending_quote` con datos del cliente y permite fijar precio. Backend: `GET /api/admin/logistics-quotes` (scope regional) + `PATCH /api/orders/{id}/set-quote-price`. Verificado E2E (curl + screenshot).

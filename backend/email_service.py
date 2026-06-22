@@ -163,6 +163,33 @@ async def send_order_delivered(to: str, order: dict) -> dict:
     return await send_email(to, f"Pedido #{oid} entregado · Nubo Express", body)
 
 
+async def send_logistics_quote_priced(to: str, order: dict) -> dict:
+    """Notificación con la tarifa final + botón para confirmar el pedido de logística."""
+    oid = str(order.get("id", ""))
+    short = oid[:8]
+    confirm_url = f"{APP_BASE_URL}/confirmar-cotizacion/{oid}"
+    currency = order.get("currency") or "EUR"
+    price = order.get("total_amount") or 0
+    body = f"""
+      <p>¡Buenas noticias! Tu cotización de Camión / Logística Pesada ya tiene precio. 🚛</p>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+        <tr><td style="padding:6px 0;color:#6b7280;">Referencia</td><td style="padding:6px 0;text-align:right;font-weight:bold;">#{short}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Recogida</td><td style="padding:6px 0;text-align:right;">{order.get('origin_name') or '—'}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Entrega</td><td style="padding:6px 0;text-align:right;">{order.get('destination_name') or '—'}</td></tr>
+      </table>
+      <div style="margin:18px 0;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:18px;text-align:center;">
+        <p style="margin:0;color:#6b7280;font-size:13px;">Precio final</p>
+        <p style="margin:4px 0 0;font-size:28px;font-weight:800;color:#059669;">{price} {currency}</p>
+      </div>
+      <div style="text-align:center;margin-top:22px;">
+        <a href="{confirm_url}" style="display:inline-block;background:#059669;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:9999px;font-weight:700;">Confirmar Pedido</a>
+      </div>
+      <p style="margin-top:18px;font-size:12px;color:#9ca3af;text-align:center;">O copia este enlace: {confirm_url}</p>
+      <p style="margin-top:16px;">Gracias por confiar en Nubo Express. 🐝</p>
+    """
+    return await send_email(to, f"Tu cotización #{short} ya tiene precio · Nubo Express", body)
+
+
 async def send_logistics_quote_received(to: str, order: dict) -> dict:
     """Notificación automática: solicitud de cotización de Camión/Logística recibida."""
     oid = str(order.get("id", ""))[:8]

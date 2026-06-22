@@ -34,7 +34,7 @@ export const LogisticsQuotesManager = ({ API, token }) => {
     setSavingId(id);
     try {
       await axios.patch(`${API}/orders/${id}/set-quote-price`, { total_amount: value }, auth);
-      toast.success('Precio fijado · cotización aprobada');
+      toast.success('Precio fijado · cliente notificado por email');
       setPrices((p) => ({ ...p, [id]: '' }));
       fetchQuotes();
     } catch (err) {
