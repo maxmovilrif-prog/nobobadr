@@ -5,14 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import LanguageSelector from '@/components/LanguageSelector';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ArrowLeft, MapPin, Flag, Clock, Route as RouteIcon, Calculator, Loader2, PackageCheck, Car, Truck, FileText } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const MOTO_ICON = 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/518e6cfc5330edab611d6be169eeaa2438011509f7f328eefee2547f2ce35ac8.png';
-
-const TRUCK_QUOTE_MSG = 'El precio final será determinado por la administración basado en el tipo de carga (carga completa o paquetes pequeños por kilo) y la ubicación logística.';
 
 const VEHICLES = [
   { type: 'motorcycle', img: MOTO_ICON, label: 'Moto' },
@@ -22,6 +21,7 @@ const VEHICLES = [
 
 export default function DeliveryQuote() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [cities, setCities] = useState([]);
   const [originId, setOriginId] = useState('');
   const [destId, setDestId] = useState('');
@@ -48,8 +48,8 @@ export default function DeliveryQuote() {
   const handleCalculate = async () => {
     setError('');
     setResult(null);
-    if (!originId || !destId) { setError('Selecciona origen y destino'); return; }
-    if (originId === destId) { setError('El origen y el destino no pueden ser iguales'); return; }
+    if (!originId || !destId) { setError(t('logistics.select_origin_dest')); return; }
+    if (originId === destId) { setError(t('logistics.same_city')); return; }
     const origin = cities.find((c) => c.id === originId);
     const dest = cities.find((c) => c.id === destId);
     setLoading(true);
@@ -61,7 +61,7 @@ export default function DeliveryQuote() {
       });
       setResult(res.data);
     } catch (e) {
-      setError(e?.response?.data?.detail || 'No se pudo calcular la tarifa');
+      setError(e?.response?.data?.detail || t('logistics.load_error'));
     } finally {
       setLoading(false);
     }
@@ -69,11 +69,11 @@ export default function DeliveryQuote() {
 
   const requestQuote = async () => {
     setError('');
-    if (!originId || !destId) { setError('Selecciona origen y destino'); return; }
-    if (originId === destId) { setError('El origen y el destino no pueden ser iguales'); return; }
+    if (!originId || !destId) { setError(t('logistics.select_origin_dest')); return; }
+    if (originId === destId) { setError(t('logistics.same_city')); return; }
     const token = localStorage.getItem('token');
     if (!token) {
-      toast.info('Inicia sesión para solicitar tu cotización de Camión / Logística');
+      toast.info(t('logistics.login_to_quote'));
       navigate('/auth');
       return;
     }
@@ -87,9 +87,9 @@ export default function DeliveryQuote() {
         destination_name: dest.name, destination_lat: dest.lat, destination_lng: dest.lng,
         vehicle_type: 'truck', fee: 0, currency,
       }, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success('¡Solicitud de cotización enviada! La administración revisará tu carga y te contactará con el precio.');
+      toast.success(t('logistics.quote_received'));
     } catch (e) {
-      setError(e?.response?.data?.detail || 'No se pudo enviar la solicitud');
+      setError(e?.response?.data?.detail || t('logistics.load_error'));
     } finally {
       setSubmittingQuote(false);
     }
@@ -123,13 +123,13 @@ export default function DeliveryQuote() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button data-testid="quote-back-btn" onClick={() => navigate('/')} variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-1" /> Volver
+              <ArrowLeft className="w-4 h-4 mr-1" /> {t('logistics.back')}
             </Button>
             <div>
               <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-emerald-600" /> Calcula tu envío
+                <Calculator className="w-5 h-5 text-emerald-600" /> {t('logistics.page_title')}
               </h1>
-              <p className="text-xs text-gray-500">Tarifa de mensajería entre España 🇪🇸 y Marruecos 🇲🇦</p>
+              <p className="text-xs text-gray-500">{t('logistics.subtitle')}</p>
             </div>
           </div>
           <LanguageSelector variant="outline" />
@@ -142,11 +142,11 @@ export default function DeliveryQuote() {
           <CardContent className="p-6 space-y-5">
             <div>
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-1">
-                <MapPin className="w-4 h-4 text-emerald-600" /> Origen
+                <MapPin className="w-4 h-4 text-emerald-600" /> {t('logistics.origin')}
               </label>
               <select data-testid="quote-origin-select" value={originId} onChange={(e) => setOriginId(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                <option value="">Selecciona origen</option>
+                <option value="">{t('logistics.select_origin')}</option>
                 <optgroup label="🇲🇦 Marruecos">
                   {grouped.MA.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </optgroup>
@@ -158,11 +158,11 @@ export default function DeliveryQuote() {
 
             <div>
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-1">
-                <Flag className="w-4 h-4 text-emerald-600" /> Destino
+                <Flag className="w-4 h-4 text-emerald-600" /> {t('logistics.destination')}
               </label>
               <select data-testid="quote-destination-select" value={destId} onChange={(e) => setDestId(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                <option value="">Selecciona destino</option>
+                <option value="">{t('logistics.select_dest')}</option>
                 <optgroup label="🇲🇦 Marruecos">
                   {grouped.MA.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </optgroup>
@@ -173,7 +173,7 @@ export default function DeliveryQuote() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">Vehículo</label>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">{t('logistics.vehicle_label')}</label>
               <div className="grid grid-cols-3 gap-3">
                 {VEHICLES.map((v) => {
                   const Icon = v.icon;
@@ -184,9 +184,9 @@ export default function DeliveryQuote() {
                         vehicle === v.type ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-gray-200 hover:border-emerald-300'
                       }`}>
                       {v.img
-                        ? <img src={v.img} alt={v.label} className="w-7 h-7 object-contain" />
+                        ? <img src={v.img} alt={t(`logistics.vehicle.${v.type}`)} className="w-7 h-7 object-contain" />
                         : <Icon className="w-7 h-7 text-emerald-600" />}
-                      <span className="text-xs font-medium text-gray-700">{v.label}</span>
+                      <span className="text-xs font-medium text-gray-700">{t(`logistics.vehicle.${v.type}`)}</span>
                     </button>
                   );
                 })}
@@ -194,7 +194,7 @@ export default function DeliveryQuote() {
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-700">Moneda</span>
+              <span className="text-sm font-medium text-gray-700">{t('logistics.currency_label')}</span>
               <div className="flex items-center rounded-full bg-gray-100 p-1" data-testid="quote-currency-switch">
                 {['EUR', 'MAD'].map((c) => (
                   <button key={c} type="button" onClick={() => setCurrency(c)} data-testid={`quote-currency-${c}`}
@@ -209,13 +209,13 @@ export default function DeliveryQuote() {
               <Button data-testid="quote-request-quote-btn" onClick={requestQuote} disabled={submittingQuote}
                 className="w-full bg-slate-900 hover:bg-slate-800 gap-2">
                 {submittingQuote ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                {submittingQuote ? 'Enviando...' : 'Solicitar Cotización'}
+                {submittingQuote ? t('logistics.sending') : t('logistics.request_quote')}
               </Button>
             ) : (
               <Button data-testid="quote-calculate-btn" onClick={handleCalculate} disabled={loading}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
-                {loading ? 'Calculando...' : 'Calcular'}
+                {loading ? t('logistics.calculating') : t('logistics.calculate')}
               </Button>
             )}
             {error && <p data-testid="quote-error" className="text-sm text-red-600">{error}</p>}
@@ -230,14 +230,14 @@ export default function DeliveryQuote() {
                 <div className="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center">
                   <Truck className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-base font-semibold text-gray-900">Camión / Logística Pesada</h2>
-                <p className="text-sm text-gray-600 leading-relaxed max-w-sm">{TRUCK_QUOTE_MSG}</p>
-                <Badge className="bg-amber-100 text-amber-700">Precio personalizado por administración</Badge>
+                <h2 className="text-base font-semibold text-gray-900">{t('logistics.truck_title')}</h2>
+                <p className="text-sm text-gray-600 leading-relaxed max-w-sm">{t('logistics.truck_message')}</p>
+                <Badge className="bg-amber-100 text-amber-700">{t('logistics.custom_price_badge')}</Badge>
               </div>
             ) : !result ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[260px] text-center gap-3">
                 <Calculator className="w-10 h-10 text-emerald-300" />
-                <p className="text-sm text-gray-500">Calcula el precio de tu envío al instante</p>
+                <p className="text-sm text-gray-500">{t('logistics.empty_state')}</p>
               </div>
             ) : (
               <div data-testid="quote-result" className="space-y-5">
@@ -246,7 +246,7 @@ export default function DeliveryQuote() {
                   <Badge className="bg-emerald-100 text-emerald-700">{vehLabel(result.vehicle_used)}</Badge>
                 </div>
                 <div className="text-center py-4">
-                  <p className="text-xs text-gray-400">Tarifa estimada</p>
+                  <p className="text-xs text-gray-400">{t('logistics.estimated_fare')}</p>
                   <p className="text-4xl font-bold text-emerald-700" data-testid="quote-fee">{feeText}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -261,7 +261,7 @@ export default function DeliveryQuote() {
                 </div>
                 <Button data-testid="quote-order-btn" onClick={handleOrderThis}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2">
-                  <PackageCheck className="w-4 h-4" /> Pedir este envío
+                  <PackageCheck className="w-4 h-4" /> {t('logistics.order_this')}
                 </Button>
               </div>
             )}

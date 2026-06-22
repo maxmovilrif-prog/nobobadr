@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Truck, MapPin, Flag, Loader2, CheckCircle2, LogIn, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function QuoteConfirm() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const token = localStorage.getItem('token');
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,7 @@ export default function QuoteConfirm() {
       }
     } catch (e) {
       console.error('Error cargando cotización', e);
-      setError('No se pudo cargar la cotización. Verifica que el enlace es correcto.');
+      setError(t('logistics.load_error'));
     } finally {
       setLoading(false);
     }
@@ -44,7 +46,7 @@ export default function QuoteConfirm() {
       await axios.post(`${API}/orders/${orderId}/confirm-quote`, {}, { headers: { Authorization: `Bearer ${token}` } });
       setConfirmed(true);
     } catch (e) {
-      setError(e?.response?.data?.detail || 'No se pudo confirmar el pedido');
+      setError(e?.response?.data?.detail || t('logistics.load_error'));
     } finally {
       setConfirming(false);
     }
@@ -58,24 +60,24 @@ export default function QuoteConfirm() {
             <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center">
               <Truck className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-lg font-bold text-gray-900">Confirmar Pedido de Logística</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t('logistics.confirm_title')}</h1>
           </div>
 
           {loading ? (
             <div className="py-10 text-center"><Loader2 className="w-7 h-7 mx-auto animate-spin text-emerald-500" /></div>
           ) : !token ? (
             <div className="text-center space-y-4" data-testid="quote-confirm-login">
-              <p className="text-sm text-gray-600">Inicia sesión con tu cuenta para confirmar tu pedido.</p>
+              <p className="text-sm text-gray-600">{t('logistics.confirm_login')}</p>
               <Button onClick={() => navigate('/auth')} className="bg-emerald-600 hover:bg-emerald-700 gap-2" data-testid="quote-confirm-login-btn">
-                <LogIn className="w-4 h-4" /> Iniciar sesión
+                <LogIn className="w-4 h-4" /> {t('logistics.login')}
               </Button>
             </div>
           ) : confirmed ? (
             <div className="text-center space-y-3" data-testid="quote-confirm-success">
               <CheckCircle2 className="w-14 h-14 mx-auto text-emerald-500" />
-              <h2 className="font-semibold text-gray-900">¡Pedido confirmado! 🎉</h2>
-              <p className="text-sm text-gray-600">Tu pedido de logística está en marcha. Te asignaremos un transportista en breve.</p>
-              <Button onClick={() => navigate('/orders')} variant="outline" className="mt-2" data-testid="quote-confirm-go-orders">Ver mis pedidos</Button>
+              <h2 className="font-semibold text-gray-900">{t('logistics.confirmed_title')} 🎉</h2>
+              <p className="text-sm text-gray-600">{t('logistics.confirmed_msg')}</p>
+              <Button onClick={() => navigate('/orders')} variant="outline" className="mt-2" data-testid="quote-confirm-go-orders">{t('logistics.view_orders')}</Button>
             </div>
           ) : order ? (
             <div className="space-y-4" data-testid="quote-confirm-detail">
@@ -84,20 +86,20 @@ export default function QuoteConfirm() {
                 <p className="flex items-center gap-2 text-gray-700"><Flag className="w-4 h-4 text-slate-700 shrink-0" /> {order.destination_name || '—'}</p>
               </div>
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center">
-                <p className="text-xs text-gray-500">Precio final</p>
+                <p className="text-xs text-gray-500">{t('logistics.final_price')}</p>
                 <p className="text-3xl font-extrabold text-emerald-600" data-testid="quote-confirm-price">{order.total_amount} {order.currency || 'EUR'}</p>
-                <Badge className="mt-2 bg-amber-100 text-amber-700">Tarifa fijada por administración</Badge>
+                <Badge className="mt-2 bg-amber-100 text-amber-700">{t('logistics.price_set_admin')}</Badge>
               </div>
               {error && <p className="text-sm text-red-600 flex items-center gap-1" data-testid="quote-confirm-error"><AlertCircle className="w-4 h-4" />{error}</p>}
               <Button onClick={confirm} disabled={confirming} className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2" data-testid="quote-confirm-btn">
                 {confirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                {confirming ? 'Confirmando...' : 'Confirmar Pedido'}
+                {confirming ? t('logistics.confirming') : t('logistics.confirm_order')}
               </Button>
             </div>
           ) : (
             <div className="text-center space-y-3" data-testid="quote-confirm-notfound">
               <AlertCircle className="w-10 h-10 mx-auto text-amber-500" />
-              <p className="text-sm text-gray-600">{error || 'Cotización no encontrada.'}</p>
+              <p className="text-sm text-gray-600">{error || t('logistics.not_found')}</p>
             </div>
           )}
         </CardContent>

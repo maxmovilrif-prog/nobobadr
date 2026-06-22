@@ -35,9 +35,47 @@
     "services": {
       "restaurants": "Restaurantes",
       "supermarkets": "Supermercados",
-      "courier": "Paquetería"
+      "courier": "Paquetería",
+      "nubo_car": "Nubo Car"
     },
-    "coverage": "España"
+    "coverage": "España",
+    "nav": {
+      "customer_area": "Área de clientes",
+      "track_order": "Seguir pedido",
+      "calculate_price": "Calcular precio"
+    },
+    "hero_cta_quote": "Calcular presupuesto",
+    "hero_cta_track": "Seguir mi pedido",
+    "why_title": "¿Por qué elegirnos?",
+    "why_subtitle": "Servicio rápido, seguro y fiable en España, Europa y Marruecos",
+    "features": {
+      "restaurants": {
+        "title": "Restaurantes y Comercios",
+        "description": "Pide de tus negocios favoritos en España, Europa y Marruecos"
+      },
+      "express": {
+        "title": "Entregas Exprés",
+        "description": "Envía paquetes y documentos de forma rápida y segura"
+      },
+      "tracking": {
+        "title": "Seguimiento en Tiempo Real",
+        "description": "Sigue tu pedido desde la recogida hasta la entrega"
+      },
+      "payments": {
+        "title": "Pagos Seguros",
+        "description": "Paga con total seguridad mediante tarjeta o en efectivo"
+      },
+      "verified": {
+        "title": "Repartidores Verificados",
+        "description": "Toda nuestra flota está verificada y certificada"
+      },
+      "coverage": {
+        "title": "Cobertura Total",
+        "description": "Operamos en España, Europa y Marruecos"
+      }
+    },
+    "cta_ready_title": "¿Listo para enviar?",
+    "cta_ready_subtitle": "Calcula tu envío al instante en España, Europa y Marruecos"
   },
   "auth": {
     "welcome": "Bienvenido a",
@@ -153,7 +191,8 @@
     "chat": "Chatea con nosotros",
     "rights": "Todos los derechos reservados",
     "whatsapp": "WhatsApp",
-    "payment_methods": "Métodos de pago aceptados"
+    "payment_methods": "Métodos de pago aceptados",
+    "privacy": "Privacidad"
   },
   "order": {
     "status": {
@@ -168,5 +207,47 @@
     "order_details": "Detalles del Pedido",
     "delivery_address": "Dirección de Entrega",
     "contact_driver": "Contactar Conductor"
+  },
+  "logistics": {
+    "page_title": "Calcula tu envío",
+    "vehicle": {
+      "motorcycle": "Moto",
+      "car": "Coche",
+      "truck": "Camión"
+    },
+    "origin": "Origen",
+    "destination": "Destino",
+    "calculate": "Calcular",
+    "calculating": "Calculando...",
+    "order_this": "Pedir este envío",
+    "estimated_fare": "Tarifa estimada",
+    "truck_title": "Camión / Logística Pesada",
+    "truck_message": "El precio final será determinado por la administración en función del tipo de carga (carga completa o paquetería fraccionada por kilo) y de la ubicación logística.",
+    "custom_price_badge": "Tarifa personalizada por la administración",
+    "request_quote": "Solicitar Cotización",
+    "sending": "Enviando...",
+    "quote_received": "¡Solicitud de cotización recibida! Nuestro equipo de logística revisará tu carga y te enviaremos la tarifa a la mayor brevedad.",
+    "login_to_quote": "Inicia sesión para solicitar tu cotización de Camión / Logística",
+    "select_origin_dest": "Selecciona origen y destino",
+    "same_city": "El origen y el destino no pueden coincidir",
+    "confirm_title": "Confirmar Pedido de Logística",
+    "final_price": "Precio final",
+    "price_set_admin": "Tarifa aprobada por la administración",
+    "confirm_order": "Confirmar Pedido",
+    "confirming": "Confirmando...",
+    "confirm_login": "Inicia sesión con tu cuenta para confirmar tu pedido.",
+    "login": "Iniciar sesión",
+    "confirmed_title": "¡Pedido confirmado!",
+    "confirmed_msg": "Tu servicio de logística está en marcha. Asignaremos un transportista en breve.",
+    "view_orders": "Ver mis pedidos",
+    "load_error": "No se pudo cargar la cotización. Verifica que el enlace sea correcto.",
+    "not_found": "Cotización no encontrada.",
+    "back": "Volver",
+    "subtitle": "Tarifa de mensajería entre España 🇪🇸 y Marruecos 🇲🇦",
+    "select_origin": "Selecciona origen",
+    "select_dest": "Selecciona destino",
+    "vehicle_label": "Vehículo",
+    "currency_label": "Moneda",
+    "empty_state": "Calcula el precio de tu envío al instante"
   }
 }

@@ -36,4 +36,14 @@ i18n
     }
   });
 
+// Aplica dirección RTL/LTR según el idioma (al cargar y al cambiar)
+const RTL_LANGS = ['ar'];
+const applyDir = (lng) => {
+  const code = (lng || 'es').split('-')[0];
+  document.documentElement.dir = RTL_LANGS.includes(code) ? 'rtl' : 'ltr';
+  document.documentElement.lang = code;
+};
+applyDir(i18n.language);
+i18n.on('languageChanged', applyDir);
+
 export default i18n;

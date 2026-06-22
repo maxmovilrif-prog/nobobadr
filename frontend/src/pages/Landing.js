@@ -14,33 +14,33 @@ export default function Landing() {
   const features = [
     {
       icon: <Store className="w-8 h-8 text-emerald-600" />,
-      title: 'Restaurantes y Tiendas',
-      description: 'Pide de tus negocios favoritos en España, Europa y Marruecos'
+      title: t('landing.features.restaurants.title'),
+      description: t('landing.features.restaurants.description')
     },
     {
       icon: <Package className="w-8 h-8 text-emerald-600" />,
-      title: 'Entregas Express',
-      description: 'Envía paquetes y documentos de forma rápida y segura'
+      title: t('landing.features.express.title'),
+      description: t('landing.features.express.description')
     },
     {
       icon: <Clock className="w-8 h-8 text-emerald-600" />,
-      title: 'Seguimiento en Tiempo Real',
-      description: 'Sigue tu pedido desde que sale hasta que llega'
+      title: t('landing.features.tracking.title'),
+      description: t('landing.features.tracking.description')
     },
     {
       icon: <Shield className="w-8 h-8 text-emerald-600" />,
-      title: 'Pagos Seguros',
-      description: 'Paga de forma segura con tarjeta o efectivo'
+      title: t('landing.features.payments.title'),
+      description: t('landing.features.payments.description')
     },
     {
       icon: <Truck className="w-8 h-8 text-emerald-600" />,
-      title: 'Repartidores Verificados',
-      description: 'Todos nuestros repartidores están verificados'
+      title: t('landing.features.verified.title'),
+      description: t('landing.features.verified.description')
     },
     {
       icon: <MapPin className="w-8 h-8 text-emerald-600" />,
-      title: 'Cobertura Total',
-      description: 'Servicio en España, Europa y Marruecos'
+      title: t('landing.features.coverage.title'),
+      description: t('landing.features.coverage.description')
     }
   ];
 
@@ -48,8 +48,7 @@ export default function Landing() {
     { name: t('landing.services.restaurants'), emoji: '🍔', color: 'from-orange-400 to-red-500', path: '/auth' },
     { name: t('landing.services.supermarkets'), emoji: '🛒', color: 'from-blue-400 to-cyan-500', path: '/auth' },
     { name: t('landing.services.courier'), emoji: '📦', color: 'from-purple-400 to-pink-500', path: '/presupuesto' },
-    { name: 'Nubo Car', emoji: '🚗', color: 'from-slate-800 to-slate-900', path: '/ride', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/6171a4cb06401b700892f39b880ec54b1e5d9ec3ebbe57e460b62c7400cad0c4.png' }
-  ];
+    { name: 'Nubo Car', emoji: '🚗', color: 'from-slate-800 to-slate-900', path: '/ride', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/6171a4cb06401b700892f39b880ec54b1e5d9ec3ebbe57e460b62c7400cad0c4.png' }  ];
 
   return (
     <div className="min-h-screen">
@@ -79,7 +78,7 @@ export default function Landing() {
                 className="text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 px-3"
               >
                 <User className="w-4 h-4 mr-1.5" />
-                Área de clientes
+                {t('landing.nav.customer_area')}
               </Button>
               <Button
                 data-testid="nav-track-btn"
@@ -87,14 +86,14 @@ export default function Landing() {
                 onClick={() => navigate('/track')}
                 className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-5"
               >
-                Seguir pedido
+                {t('landing.nav.track_order')}
               </Button>
               <Button
                 data-testid="nav-quote-btn"
                 onClick={() => navigate('/presupuesto')}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-6"
               >
-                Calcular precio
+                {t('landing.nav.calculate_price')}
               </Button>
             </div>
           </div>
@@ -118,7 +117,7 @@ export default function Landing() {
                   onClick={() => navigate('/presupuesto')}
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-8 py-6 text-lg rounded-2xl shadow-lg hover:shadow-xl"
                 >
-                  Calcular presupuesto
+                  {t('landing.hero_cta_quote')}
                 </Button>
                 <Button 
                   data-testid="hero-track-btn"
@@ -127,7 +126,7 @@ export default function Landing() {
                   onClick={() => navigate('/track')}
                   className="border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-8 py-6 text-lg rounded-2xl"
                 >
-                  Seguir mi pedido
+                  {t('landing.hero_cta_track')}
                 </Button>
               </div>
             </div>
@@ -167,8 +166,8 @@ export default function Landing() {
       <div className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">¿Por qué elegirnos?</h2>
-            <p className="text-lg text-gray-600">Servicio rápido, seguro y confiable en España, Europa y Marruecos</p>
+            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">{t('landing.why_title')}</h2>
+            <p className="text-lg text-gray-600">{t('landing.why_subtitle')}</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, idx) => (
@@ -189,15 +188,15 @@ export default function Landing() {
       {/* CTA Section */}
       <div className="py-20 px-6 bg-gradient-to-br from-emerald-600 to-teal-700">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">¿Listo para enviar?</h2>
-          <p className="text-xl text-emerald-50 mb-8">Calcula tu envío al instante en España, Europa y Marruecos</p>
+          <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">{t('landing.cta_ready_title')}</h2>
+          <p className="text-xl text-emerald-50 mb-8">{t('landing.cta_ready_subtitle')}</p>
           <Button 
             data-testid="footer-cta-btn"
             size="lg" 
             onClick={() => navigate('/presupuesto')}
             className="bg-white text-emerald-700 hover:bg-gray-100 px-8 py-6 text-lg rounded-2xl shadow-xl"
           >
-            Calcular presupuesto
+            {t('landing.hero_cta_quote')}
           </Button>
         </div>
       </div>

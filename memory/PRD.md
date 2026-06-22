@@ -25,6 +25,15 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Stripe**: override `STRIPE_LIVE_KEY` + badge LIVE/TEST en panel. **MongoDB Atlas** producción: override `MONGO_URL_OVERRIDE`/`DB_NAME_OVERRIDE` (core.py), seed `seed_atlas.py` (16 ciudades + Fundador).
 - ✅ Testeado: **140/140 pytest** + frontend e2e (iteration_10.json). Email Login normaliza a minúsculas.
 
+## i18n profesional ES/AR + RTL + WhatsApp Twilio (2026-06-22)
+- **Switcher de idioma 100% funcional**: ES y AR con PARIDAD COMPLETA (195 claves, AR 100% traducido, terminología logística profesional/corporativa). Internacionalizados: Landing (header, hero CTAs, why-us, features, CTA final), Footer, DeliveryQuote (flujo Camión), QuoteConfirm.
+- **RTL automático en carga**: `i18n.js` ahora aplica `document.dir=rtl/ltr` y `lang` al iniciar y en `languageChanged` (antes solo se aplicaba al pulsar el switcher → bug corregido).
+- **Terminología logística** (namespace `logistics`): "Camión / Logística Pesada"=شاحنة / الخدمات اللوجستية الثقيلة, "Solicitar Cotización"=طلب عرض أسعار, "Tarifa personalizada por la administración"=تعرفة مخصّصة تحدّدها الإدارة, etc.
+- **WhatsApp Twilio** (`whatsapp_service.py`): lee TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM SOLO de os.environ (sin defaults), degrada elegantemente si falta config. Cableado al fijar precio (junto al email). Secrets configurados por el usuario en producción → enviará al desplegar. `twilio==9.10.9` en requirements.txt.
+- **White screen Camión**: NO reproducible en preview (código actual correcto); era el deploy obsoleto en producción. Se resuelve al desplegar el código actual.
+- Panel admin logística: 2 secciones (pending_quote "sin precio" + quoted "por confirmar"), endpoint `GET /admin/logistics-quotes?status=`.
+
+
 ## Ciclo Cotización→Venta de Logística (2026-06-22)
 - **Flujo de estados**: pending_quote → (admin fija precio) → **quoted** (+email al cliente con tarifa y botón Confirmar) → (cliente confirma) → **pending** (entra a despacho + alerta Telegram).
 - Backend: `PATCH /api/orders/{id}/set-quote-price` ahora pone status='quoted' y envía `email_service.send_logistics_quote_priced` (precio + enlace `${APP_BASE_URL}/confirmar-cotizacion/{id}`). Nuevo `POST /api/orders/{id}/confirm-quote` (cliente dueño, idempotente: 400 si ya no está 'quoted').
