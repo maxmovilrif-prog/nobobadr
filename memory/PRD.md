@@ -25,6 +25,14 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Stripe**: override `STRIPE_LIVE_KEY` + badge LIVE/TEST en panel. **MongoDB Atlas** producción: override `MONGO_URL_OVERRIDE`/`DB_NAME_OVERRIDE` (core.py), seed `seed_atlas.py` (16 ciudades + Fundador).
 - ✅ Testeado: **140/140 pytest** + frontend e2e (iteration_10.json). Email Login normaliza a minúsculas.
 
+## Vehículos & Logística en Delivery (2026-06-22)
+- **Flujo "Calcula tu envío" (`/presupuesto`, DeliveryQuote.js)**: opciones de vehículo ahora son **Moto / Coche / Camión** (eliminada "Bici"). Icono de Moto = imagen de motocicleta generada (URL en MOTO_ICON).
+- **Camión / Logística Pesada**: NO calcula precio automático. Muestra mensaje "El precio final será determinado por la administración basado en el tipo de carga..." + badge, y botón **"Solicitar Cotización"** → `POST /api/orders/logistics-quote` (crea order order_type='logistics', status='pending_quote', total_amount=0, vehicle_type='truck' + alerta Telegram). Si no hay sesión → redirige a /auth.
+- **Admin fija precio**: `PATCH /api/orders/{id}/set-quote-price` (admin/manager) → total_amount + status='pending'. Verificado por curl. PENDIENTE: UI admin para fijar el precio de cotizaciones de logística (actualmente solo vía API).
+- Nubo Car (`/ride`) sigue SOLO pasajeros (economy/comfort/xl), sin camión.
+- White screen Casablanca→Meknés: era caché de producción (código antiguo); no requirió cambios de código (preview calcula bien).
+
+
 ## Despliegue a PRODUCCIÓN — RESUELTO y EN VIVO (2026-06-22)
 - 🟢 **https://noboexpress.com LIVE y certificado.** Frontend 200 + API 200.
 - **Bloqueo resuelto**: el deploy fallaba siempre con `external MongoDB connection test failed: bad auth SCRAM-SHA-1`. Causa raíz: el panel de Secrets de Emergent doble-codificaba el `@` de la contraseña (`Ninite@2030` → `%40` → `%2540`) y además un campo Mongo URL bloqueado/cacheado en la pestaña Database. Soporte (support@emergent.sh) desbloqueó el campo cacheado.

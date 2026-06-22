@@ -137,6 +137,74 @@ async def create_express_order(order_data: ExpressOrderCreate, current_user: dic
     return order
 
 
+@router.post("/orders/logistics-quote", response_model=Order)
+async def create_logistics_quote(order_data: ExpressOrderCreate, current_user: dict = Depends(get_current_user)):
+    """Solicitud de cotización para Camión / Logística Pesada.
+    NO calcula precio automático: crea el pedido en estado 'pending_quote' (total 0)
+    para que la administración fije la tarifa manualmente según el tipo de carga."""
+    if current_user['role'] != 'customer':
+        raise HTTPException(status_code=403, detail="Only customers can request quotes")
+
+    city_name = None
+    city_id = order_data.origin_city_id
+    if city_id:
+        city = await db.cities.find_one({'id': city_id}, {'_id': 0, 'name': 1})
+        city_name = city['name'] if city else None
+
+    order = Order(
+        customer_id=current_user['id'],
+        business_id=None,
+        items=[],
+        total_amount=0,
+        delivery_address=order_data.destination_name,
+        city_id=city_id,
+        city_name=city_name,
+        status='pending_quote',
+        order_type='logistics',
+        vehicle_type='truck',
+        origin_name=order_data.origin_name,
+        origin_lat=order_data.origin_lat,
+        origin_lng=order_data.origin_lng,
+        destination_name=order_data.destination_name,
+        destination_lat=order_data.destination_lat,
+        destination_lng=order_data.destination_lng,
+        distance_km=order_data.distance_km,
+        eta_mins=order_data.eta_mins,
+        currency=order_data.currency,
+    )
+    doc = order.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    await db.orders.insert_one(doc)
+    await telegram_alerts.notify_new_order(doc)
+    return order
+
+
+@router.patch("/orders/{order_id}/set-quote-price")
+async def set_logistics_quote_price(order_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
+    """La administración (Fundador/Gestor) fija manualmente el precio de una cotización de logística."""
+    if current_user.get('role') not in ('admin', 'manager'):
+        raise HTTPException(status_code=403, detail="Solo la administración puede fijar el precio")
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    if order.get('order_type') != 'logistics':
+        raise HTTPException(status_code=400, detail="Este pedido no es una cotización de logística")
+    try:
+        price = float(payload.get('total_amount'))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="total_amount inválido")
+    if price <= 0:
+        raise HTTPException(status_code=400, detail="El precio debe ser mayor que 0")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$set': {'total_amount': price, 'status': 'pending', 'updated_at': now}},
+    )
+    return {'message': 'Precio fijado', 'id': order_id, 'total_amount': price, 'status': 'pending'}
+
+
+
 @router.get("/orders", response_model=List[Order])
 async def get_orders(current_user: dict = Depends(get_current_user)):
     query = {}

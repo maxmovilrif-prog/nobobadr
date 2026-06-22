@@ -5,14 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import LanguageSelector from '@/components/LanguageSelector';
-import { ArrowLeft, MapPin, Flag, Clock, Route as RouteIcon, Calculator, Loader2, PackageCheck, Bike, Car, Zap } from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowLeft, MapPin, Flag, Clock, Route as RouteIcon, Calculator, Loader2, PackageCheck, Car, Truck, FileText } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+const MOTO_ICON = 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/518e6cfc5330edab611d6be169eeaa2438011509f7f328eefee2547f2ce35ac8.png';
+
+const TRUCK_QUOTE_MSG = 'El precio final será determinado por la administración basado en el tipo de carga (carga completa o paquetes pequeños por kilo) y la ubicación logística.';
+
 const VEHICLES = [
-  { type: 'motorcycle', icon: Zap, label: 'Moto' },
+  { type: 'motorcycle', img: MOTO_ICON, label: 'Moto' },
   { type: 'car', icon: Car, label: 'Coche' },
-  { type: 'bicycle', icon: Bike, label: 'Bici' },
+  { type: 'truck', icon: Truck, label: 'Camión' },
 ];
 
 export default function DeliveryQuote() {
@@ -23,8 +28,11 @@ export default function DeliveryQuote() {
   const [vehicle, setVehicle] = useState('motorcycle');
   const [currency, setCurrency] = useState('EUR');
   const [loading, setLoading] = useState(false);
+  const [submittingQuote, setSubmittingQuote] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+
+  const isTruck = vehicle === 'truck';
 
   useEffect(() => {
     axios.get(`${API}/public/cities`)
@@ -56,6 +64,34 @@ export default function DeliveryQuote() {
       setError(e?.response?.data?.detail || 'No se pudo calcular la tarifa');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const requestQuote = async () => {
+    setError('');
+    if (!originId || !destId) { setError('Selecciona origen y destino'); return; }
+    if (originId === destId) { setError('El origen y el destino no pueden ser iguales'); return; }
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.info('Inicia sesión para solicitar tu cotización de Camión / Logística');
+      navigate('/auth');
+      return;
+    }
+    const origin = cities.find((c) => c.id === originId);
+    const dest = cities.find((c) => c.id === destId);
+    setSubmittingQuote(true);
+    try {
+      await axios.post(`${API}/orders/logistics-quote`, {
+        origin_name: origin.name, origin_lat: origin.lat, origin_lng: origin.lng,
+        origin_city_id: origin.id,
+        destination_name: dest.name, destination_lat: dest.lat, destination_lng: dest.lng,
+        vehicle_type: 'truck', fee: 0, currency,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('¡Solicitud de cotización enviada! La administración revisará tu carga y te contactará con el precio.');
+    } catch (e) {
+      setError(e?.response?.data?.detail || 'No se pudo enviar la solicitud');
+    } finally {
+      setSubmittingQuote(false);
     }
   };
 
@@ -143,11 +179,13 @@ export default function DeliveryQuote() {
                   const Icon = v.icon;
                   return (
                     <button key={v.type} type="button" data-testid={`quote-vehicle-${v.type}`}
-                      onClick={() => setVehicle(v.type)}
+                      onClick={() => { setVehicle(v.type); setResult(null); setError(''); }}
                       className={`flex flex-col items-center gap-2 rounded-xl border p-3 transition-all ${
                         vehicle === v.type ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-gray-200 hover:border-emerald-300'
                       }`}>
-                      <Icon className="w-7 h-7 text-emerald-600" />
+                      {v.img
+                        ? <img src={v.img} alt={v.label} className="w-7 h-7 object-contain" />
+                        : <Icon className="w-7 h-7 text-emerald-600" />}
                       <span className="text-xs font-medium text-gray-700">{v.label}</span>
                     </button>
                   );
@@ -167,11 +205,19 @@ export default function DeliveryQuote() {
               </div>
             </div>
 
-            <Button data-testid="quote-calculate-btn" onClick={handleCalculate} disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
-              {loading ? 'Calculando...' : 'Calcular'}
-            </Button>
+            {isTruck ? (
+              <Button data-testid="quote-request-quote-btn" onClick={requestQuote} disabled={submittingQuote}
+                className="w-full bg-slate-900 hover:bg-slate-800 gap-2">
+                {submittingQuote ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                {submittingQuote ? 'Enviando...' : 'Solicitar Cotización'}
+              </Button>
+            ) : (
+              <Button data-testid="quote-calculate-btn" onClick={handleCalculate} disabled={loading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
+                {loading ? 'Calculando...' : 'Calcular'}
+              </Button>
+            )}
             {error && <p data-testid="quote-error" className="text-sm text-red-600">{error}</p>}
           </CardContent>
         </Card>
@@ -179,7 +225,16 @@ export default function DeliveryQuote() {
         {/* Result */}
         <Card className="border-0 shadow-lg">
           <CardContent className="p-6">
-            {!result ? (
+            {isTruck ? (
+              <div data-testid="quote-truck-custom" className="flex flex-col items-center justify-center h-full min-h-[260px] text-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center">
+                  <Truck className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-base font-semibold text-gray-900">Camión / Logística Pesada</h2>
+                <p className="text-sm text-gray-600 leading-relaxed max-w-sm">{TRUCK_QUOTE_MSG}</p>
+                <Badge className="bg-amber-100 text-amber-700">Precio personalizado por administración</Badge>
+              </div>
+            ) : !result ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[260px] text-center gap-3">
                 <Calculator className="w-10 h-10 text-emerald-300" />
                 <p className="text-sm text-gray-500">Calcula el precio de tu envío al instante</p>
