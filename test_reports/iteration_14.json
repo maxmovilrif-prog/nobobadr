@@ -1,0 +1,33 @@
+{
+  "summary": "Iter 14 regression after (1) admin.py KPI refactor extracting helpers (_build_live_fleet/_build_available_fleet/_accumulate_kpis/_accumulate_delivered_kpi/_resolve_top_bees/_accumulate_region_kpis/_idle_from_timestamp), (2) console.error logging in empty frontend catches, (3) Google Maps centralized config region='MA' language='es' in lib/maps.js. Backend: 12/12 NEW regression tests GREEN + 9/9 pre-existing KPI & Nubo Ride tests re-run GREEN (21/21 total). Frontend Playwright e2e of the 4 critical surfaces all PASS: landing shows 4 service tiles incl. Nubo Car (car image), /track?order=ORD-4821 renders real Google Map with region MA + Spanish labels (markers A/B, route polyline, cost 78,20 € / 850 د.م MAD equivalent, QR, WhatsApp share button) with ZERO Google Maps console errors, /ride correctly redirects to /auth when unauthenticated, /nubo-control admin login + dashboard fully render (KPI cards, Cuadro de mandos with Ingresos 108,50 €, Pedidos por día 7d chart, Abejas más activas ranking, Mapa de Flota with Spain/Andorra view, Stripe test panel). Zero console errors across all pages. KPI refactor preserves behaviour 1:1; Google Maps now loads cleanly on /track (regression vs iter13 where /track previously showed InvalidKey).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_regression.py",
+    "/app/test_reports/pytest/iter14_regression.xml",
+    "/app/test_reports/pytest/iter14_kpis_nuboride.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin.py KPI refactor is clean: helpers have clear single responsibility and identical behaviour. _accumulate_kpis correctly delegates delivered branch to _accumulate_delivered_kpi; _resolve_top_bees keeps the user lookup async and limited to top 5; _idle_from_timestamp DRYs idle calc.",
+    "admin.py line 79 (IDLE_THRESHOLD_SECONDS=90) sits oddly AFTER the manager CRUD block; consider moving to top with the imports for readability (no functional impact).",
+    "rides.py /rides/request awaits telegram_alerts.notify_new_ride inline (L91). If Telegram is slow this adds latency to the client response. Suggest asyncio.create_task to fire-and-forget (already noted iter12, still applies).",
+    "rides.py duplicate-active check (L58-62) does an extra find_one before validation; could be combined with vehicle_type check but acceptable.",
+    "Google Maps centralized config in lib/maps.js (region:'MA', language:'es') verified live on /track — real Spain/Morocco map renders correctly with Spanish labels. No InvalidKey on /track (iter13 fallback no longer needed).",
+    "Backend correctly rejects vehicle_type='car' (422 from Pydantic enum validation in RideRequest) — keeps the only-economy/comfort/xl contract intact."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter14_regression.py"
+  ],
+  "success_rate": {"backend": "100% (21/21 — 12 new + 9 pre-existing kpis/nubo_ride)", "frontend": "100% (4/4 critical surfaces)"},
+  "test_credentials": "Admin: badarbox1756@gmail.com / Admin1234! | Customer: qa_customer@nubo.com / Test1234!",
+  "seed_data_creation": "One test ride created+cancelled in nubo_produccion atlas during TestNuboCar.test_request_active_and_cancel; cleaned up by the same test via /rides/{id}/cancel.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Test file /app/backend/tests/test_iter14_regression.py reads REACT_APP_BACKEND_URL with a safe default; pre-existing tests (test_kpis.py, test_nubo_ride.py, test_regression_modularization.py) REQUIRE the env var to be exported before pytest (they do .rstrip('/') on os.environ.get(...) directly and crash at collection otherwise). Use: `export REACT_APP_BACKEND_URL=https://nubo-abejas.preview.emergentagent.com && pytest backend/tests/`. Refactored KPI helpers in admin.py (_build_live_fleet, _build_available_fleet, _accumulate_kpis, _accumulate_delivered_kpi, _resolve_top_bees, _accumulate_region_kpis, _idle_from_timestamp) all covered by structure/contract tests; if future changes touch them, re-run test_iter14_regression.py + test_kpis.py. Google Maps region='MA' verified live — /track now renders real map (no InvalidKey).",
+  "rca of the issue": "No regressions found. KPI refactor and Google Maps centralization are both functionally and contractually correct."
+}
