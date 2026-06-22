@@ -25,6 +25,16 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Stripe**: override `STRIPE_LIVE_KEY` + badge LIVE/TEST en panel. **MongoDB Atlas** producción: override `MONGO_URL_OVERRIDE`/`DB_NAME_OVERRIDE` (core.py), seed `seed_atlas.py` (16 ciudades + Fundador).
 - ✅ Testeado: **140/140 pytest** + frontend e2e (iteration_10.json). Email Login normaliza a minúsculas.
 
+## Despliegue a PRODUCCIÓN — RESUELTO y EN VIVO (2026-06-22)
+- 🟢 **https://noboexpress.com LIVE y certificado.** Frontend 200 + API 200.
+- **Bloqueo resuelto**: el deploy fallaba siempre con `external MongoDB connection test failed: bad auth SCRAM-SHA-1`. Causa raíz: el panel de Secrets de Emergent doble-codificaba el `@` de la contraseña (`Ninite@2030` → `%40` → `%2540`) y además un campo Mongo URL bloqueado/cacheado en la pestaña Database. Soporte (support@emergent.sh) desbloqueó el campo cacheado.
+- **Fix definitivo**: nuevo usuario Atlas `nubo_prod` con contraseña ALFANUMÉRICA pura (`yMiURAXoF1zOxb6c`) → sin caracteres que codificar. Verificado con PING OK desde preview antes de desplegar.
+- **E2E de producción PASADO (curl en vivo)**: auth admin+cliente OK; Nubo Car ciclo completo (estimate→request 'buscando'→admin lo ve→cancelar) OK; AI Smart Search (LLM) OK; `/api/orders` 200; `/api/public/cities` 200. Frontend: landing con 4 tarjetas incl. **Nubo Car** (coche de lujo) + Maps renderizan.
+- **Plan B DigitalOcean** (carpeta `/deploy` + `.github/workflows/deploy.yml`): blueprint completo commiteado a GitHub (Docker + Nginx + SSL Let's Encrypt + CI/CD + backup_mongo.sh). Listo como respaldo.
+- NOTA tipos de vehículo Nubo Car: `economy`, `comfort`, `xl` (NO `car`).
+- Quedó 1 ride de prueba CANCELADO en `nubo_produccion` (se elimina con cleanup_production.py cuando el usuario diga "limpia la base").
+
+
 ## Pendiente / Backlog
 - DNS de subdominios (director./delegacion.) → usuario + Soporte Emergent.
 - Producción: añadir secrets `MONGO_URL_OVERRIDE`, `DB_NAME_OVERRIDE`, `STRIPE_LIVE_KEY`, `RESEND_API_KEY`, `ADMIN_RESET_SECRET`, `REACT_APP_GOOGLE_MAPS_API_KEY` (vía Soporte si la UI los bloquea).

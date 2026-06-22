@@ -28,6 +28,13 @@
 - Fallback rutas ocultas: `/nubo-control` (gestión), `/auth` (clientes). Detección en `frontend/src/lib/portal.js`.
 - DNS de subdominios lo configura el usuario con Soporte (support@emergent.sh).
 
+## PRODUCCIÓN — Base de datos (Atlas)
+- Usuario DB de producción (VERIFICADO, en vivo): `nubo_prod` / `yMiURAXoF1zOxb6c`
+- URI: `mongodb+srv://nubo_prod:yMiURAXoF1zOxb6c@cluster0.6isx6d9.mongodb.net/?appName=Cluster0`
+- DB: `nubo_produccion`. Network Access Atlas: 0.0.0.0/0.
+- NOTA: el usuario antiguo `badarbox1756_db_user` (pass `Ninite@2030`) sigue existiendo y funciona, pero el `@` rompía el panel de Secrets (doble-codificación) → se migró a `nubo_prod` (alfanumérico puro). Deploy en verde desde entonces.
+- App en vivo: https://noboexpress.com (frontend 200, API 200). Tipos de vehículo Nubo Car válidos: `economy`, `comfort`, `xl` (NO `car`).
+
 ## Notes
 - Other seeded accounts exist (cliente1@test.com, restaurante@test.com, repartidor@test.com, etc.) but their passwords are unknown.
 - Register endpoint: POST /api/auth/register
