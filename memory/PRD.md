@@ -25,6 +25,12 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Stripe**: override `STRIPE_LIVE_KEY` + badge LIVE/TEST en panel. **MongoDB Atlas** producción: override `MONGO_URL_OVERRIDE`/`DB_NAME_OVERRIDE` (core.py), seed `seed_atlas.py` (16 ciudades + Fundador).
 - ✅ Testeado: **140/140 pytest** + frontend e2e (iteration_10.json). Email Login normaliza a minúsculas.
 
+## Email logística + UI admin cotizaciones + Desacople DB (2026-06-22)
+- **Email automático** al crear cotización de Camión: `email_service.send_logistics_quote_received()` ("Hemos recibido tu solicitud..."), llamado best-effort en `create_logistics_quote`. Usa Resend si RESEND_API_KEY está, si no Gmail SMTP (configurado en preview). Para Resend en producción: añadir RESEND_API_KEY en Deploy Secrets.
+- **UI admin** `LogisticsQuotesManager.jsx` (integrado en AdminDashboard, visible Fundador + Gestor): lista cotizaciones `pending_quote` con datos del cliente y permite fijar precio. Backend: `GET /api/admin/logistics-quotes` (scope regional) + `PATCH /api/orders/{id}/set-quote-price`. Verificado E2E (curl + screenshot).
+- **Preview DESACOPLADO de producción**: removidos MONGO_URL_OVERRIDE/DB_NAME_OVERRIDE del .env de preview → usa Mongo local (glovo_algeciras). Producción intacta. Sembrado local: 16 ciudades + admin + qa_customer.
+
+
 ## Vehículos & Logística en Delivery (2026-06-22)
 - **Flujo "Calcula tu envío" (`/presupuesto`, DeliveryQuote.js)**: opciones de vehículo ahora son **Moto / Coche / Camión** (eliminada "Bici"). Icono de Moto = imagen de motocicleta generada (URL en MOTO_ICON).
 - **Camión / Logística Pesada**: NO calcula precio automático. Muestra mensaje "El precio final será determinado por la administración basado en el tipo de carga..." + badge, y botón **"Solicitar Cotización"** → `POST /api/orders/logistics-quote` (crea order order_type='logistics', status='pending_quote', total_amount=0, vehicle_type='truck' + alerta Telegram). Si no hay sesión → redirige a /auth.

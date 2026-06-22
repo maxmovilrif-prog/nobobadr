@@ -28,6 +28,11 @@
 - Fallback rutas ocultas: `/nubo-control` (gestión), `/auth` (clientes). Detección en `frontend/src/lib/portal.js`.
 - DNS de subdominios lo configura el usuario con Soporte (support@emergent.sh).
 
+## PREVIEW — Base de datos (DESACOPLADA de producción, 2026-06-22)
+- El preview ahora usa **MongoDB LOCAL** (`mongodb://localhost:27017`, DB `glovo_algeciras`). Se eliminaron `MONGO_URL_OVERRIDE`/`DB_NAME_OVERRIDE` del backend/.env de preview para NO contaminar producción al testear.
+- Cuentas sembradas en local: admin `badarbox1756@gmail.com` / `Admin1234!`, cliente QA `qa_customer@nubo.com` / `Test1234!`, 16 ciudades.
+- Producción (noboexpress.com) usa su propia config en el panel de Deploy (usuario `nubo_prod`), totalmente separada.
+
 ## PRODUCCIÓN — Base de datos (Atlas)
 - Usuario DB de producción (VERIFICADO, en vivo): `nubo_prod` / `yMiURAXoF1zOxb6c`
 - URI: `mongodb+srv://nubo_prod:yMiURAXoF1zOxb6c@cluster0.6isx6d9.mongodb.net/?appName=Cluster0`

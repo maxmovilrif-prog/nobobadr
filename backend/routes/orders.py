@@ -177,6 +177,9 @@ async def create_logistics_quote(order_data: ExpressOrderCreate, current_user: d
     doc['updated_at'] = doc['updated_at'].isoformat()
     await db.orders.insert_one(doc)
     await telegram_alerts.notify_new_order(doc)
+    # Email automático de confirmación de cotización al cliente (best-effort, no bloqueante)
+    if current_user.get('email'):
+        asyncio.create_task(email_service.send_logistics_quote_received(current_user['email'], doc))
     return order
 
 

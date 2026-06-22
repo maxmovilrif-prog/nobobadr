@@ -9,6 +9,7 @@ import MapComponent from '@/components/MapComponent';
 import CityManager from '@/components/CityManager';
 import RiderManager from '@/components/RiderManager';
 import OperationsManager from '@/components/OperationsManager';
+import LogisticsQuotesManager from '@/components/LogisticsQuotesManager';
 import AccountingManager from '@/components/AccountingManager';
 import KpiDashboard from '@/components/KpiDashboard';
 import ManagerManager from '@/components/ManagerManager';
@@ -439,6 +440,9 @@ export default function AdminDashboard() {
 
         {/* Operaciones y Logística (Bloque C): despacho por proximidad + historial */}
         <OperationsManager API={API} token={token} />
+
+        {/* Cotizaciones de Camión / Logística Pesada (Fundador + Gestor regional) */}
+        <LogisticsQuotesManager API={API} token={token} />
 
         {/* Secciones exclusivas del Fundador (CEO): finanzas, zonas, riders, gestores */}
         {isFounder && (

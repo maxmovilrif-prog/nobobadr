@@ -163,6 +163,26 @@ async def send_order_delivered(to: str, order: dict) -> dict:
     return await send_email(to, f"Pedido #{oid} entregado · Nubo Express", body)
 
 
+async def send_logistics_quote_received(to: str, order: dict) -> dict:
+    """Notificación automática: solicitud de cotización de Camión/Logística recibida."""
+    oid = str(order.get("id", ""))[:8]
+    body = f"""
+      <p>¡Hemos recibido tu solicitud de cotización! 🚛</p>
+      <p>Nuestro equipo de logística está revisando los detalles de tu carga y te enviaremos el <b>precio personalizado</b> en breve.</p>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+        <tr><td style="padding:6px 0;color:#6b7280;">Referencia</td><td style="padding:6px 0;text-align:right;font-weight:bold;">#{oid}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Recogida</td><td style="padding:6px 0;text-align:right;">{order.get('origin_name') or '—'}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Entrega</td><td style="padding:6px 0;text-align:right;">{order.get('destination_name') or '—'}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Servicio</td><td style="padding:6px 0;text-align:right;">Camión / Logística Pesada</td></tr>
+      </table>
+      <div style="margin-top:20px;background:#f9fafb;border-radius:12px;padding:16px;">
+        <p style="margin:0;font-size:13px;color:#374151;">El precio final dependerá del tipo de carga (carga completa o paquetes pequeños por kilo) y la ubicación logística. Te contactaremos con la tarifa cuanto antes.</p>
+      </div>
+      <p style="margin-top:18px;">Gracias por confiar en Nubo Express para tu logística pesada. 🐝</p>
+    """
+    return await send_email(to, f"Solicitud de cotización recibida #{oid} · Nubo Express", body)
+
+
 async def send_password_reset_email(to: str, reset_link: str, name: str = "") -> dict:
     """Recuperación de contraseña: enlace seguro de un solo uso (válido 1 hora)."""
     saludo = f"Hola {name}," if name else "Hola,"

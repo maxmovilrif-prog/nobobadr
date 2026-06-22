@@ -359,6 +359,24 @@ async def my_region_kpis(current_user: dict = Depends(get_current_manager_or_adm
 
 
 
+@router.get("/admin/logistics-quotes")
+async def admin_logistics_quotes(current_user: dict = Depends(get_current_manager_or_admin)):
+    """Lista las solicitudes de cotización de Camión/Logística (status pending_quote),
+    con aislamiento regional para Gestores. El Fundador ve todas."""
+    scope = await get_scope_city_ids(current_user)  # None = global
+    query = {'order_type': 'logistics', 'status': 'pending_quote'}
+    if scope is not None:
+        query['city_id'] = {'$in': scope}
+    rows = await db.orders.find(query, {'_id': 0}).sort('created_at', -1).to_list(200)
+    # Enriquecer con datos del cliente
+    for r in rows:
+        cust = await db.users.find_one({'id': r.get('customer_id')}, {'_id': 0, 'name': 1, 'email': 1, 'phone': 1})
+        r['customer_name'] = cust.get('name') if cust else None
+        r['customer_email'] = cust.get('email') if cust else None
+        r['customer_phone'] = cust.get('phone') if cust else None
+    return {'count': len(rows), 'quotes': rows}
+
+
 # =========================
 # TELEGRAM ALERTS CONFIG
 # =========================
