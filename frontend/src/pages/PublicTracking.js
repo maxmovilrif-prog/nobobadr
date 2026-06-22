@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from '@react-google-maps/api';
-import { MAPS_ENABLED, MAPS_API_KEY } from '@/lib/maps';
+import { MAPS_ENABLED, MAPS_LOADER_OPTIONS } from '@/lib/maps';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -76,10 +76,7 @@ class MapErrorBoundary extends React.Component {
 
 export default function PublicTracking() {
   const navigate = useNavigate();
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: MAPS_ENABLED ? MAPS_API_KEY : 'YOUR_API_KEY_HERE',
-  });
+  const { isLoaded, loadError } = useJsApiLoader(MAPS_LOADER_OPTIONS);
 
   const { i18n } = useTranslation();
   const rtl = i18n.language === 'ar';

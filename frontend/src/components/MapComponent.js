@@ -1,6 +1,6 @@
 import React from 'react';
 import { GoogleMap, Marker, useJsApiLoader, DirectionsRenderer } from '@react-google-maps/api';
-import { MAPS_ENABLED, MAPS_API_KEY } from '@/lib/maps';
+import { MAPS_ENABLED, MAPS_LOADER_OPTIONS } from '@/lib/maps';
 
 const containerStyle = {
   width: '100%',
@@ -36,10 +36,7 @@ function MapInner({
   center = defaultCenter,
   zoom = 13
 }) {
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: MAPS_API_KEY
-  });
+  const { isLoaded, loadError } = useJsApiLoader(MAPS_LOADER_OPTIONS);
 
   const [map, setMap] = React.useState(null);
   const [directions, setDirections] = React.useState(null);

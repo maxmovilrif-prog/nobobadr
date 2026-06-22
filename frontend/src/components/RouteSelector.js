@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleMap, DirectionsRenderer, Marker, useJsApiLoader } from '@react-google-maps/api';
-import { MAPS_ENABLED, MAPS_API_KEY } from '@/lib/maps';
+import { MAPS_ENABLED, MAPS_LOADER_OPTIONS } from '@/lib/maps';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,11 +24,7 @@ export default function RouteSelector({
   destination: initialDestination,
   servicePrice = 1.5 // Precio por km
 }) {
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: MAPS_ENABLED ? MAPS_API_KEY : 'YOUR_API_KEY_HERE',
-    libraries: ['places']
-  });
+  const { isLoaded } = useJsApiLoader(MAPS_LOADER_OPTIONS);
 
   const [origin, setOrigin] = useState(initialOrigin || '');
   const [destination, setDestination] = useState(initialDestination || '');
