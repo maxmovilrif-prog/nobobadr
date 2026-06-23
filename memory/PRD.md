@@ -34,6 +34,17 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - Panel admin logística: 2 secciones (pending_quote "sin precio" + quoted "por confirmar"), endpoint `GET /admin/logistics-quotes?status=`.
 
 
+## Opción B: Alerta WhatsApp admin + número oficial unificado (2026-06-22, sesión fork)
+- **Número admin oficial unificado a `+34612284215`** en TODO el sistema (reemplaza antiguos `+34654242092` y `+34654232573`, eliminados por completo):
+  - `seed_admin.py`: phone en creación Y actualización del admin.
+  - Frontend: `WhatsAppButton.js` (fallback) y `App.js` L178 (botón flotante WhatsApp).
+  - DB de preview actualizada vía seed; producción al redeploy.
+- **Opción B — alerta WhatsApp al admin** (`whatsapp_service.notify_admin_logistics_priced`): al fijar precio (`PATCH /orders/{id}/set-quote-price`) el sistema notifica al CLIENTE (email + WhatsApp) Y envía copia/alerta al WhatsApp del admin (`role:'admin'` leído dinámicamente de DB → `whatsapp:+34612284215`). Best-effort vía `asyncio.create_task`, no bloquea respuesta. Proyección del cliente incluye `name` para la alerta.
+- ✅ Testeado: testing_agent 5/5 backend GREEN (iteration_15.json). Flujo crear→fijar precio→notificar cliente+admin→confirmar sin errores.
+- **Producción noboexpress.com**: deploy estabilizado (MONGO_URL corregido a `cluster0.6isx6d9.mongodb.net`, había typo `1nubo` que tumbó un deploy). Secrets Twilio + APP_BASE_URL configurados por el usuario. Backend+DB verificados en vivo (cities 200, set-quote-price persiste 'quoted', admin/kpis 200).
+- ⚠️ **PENDIENTE entrega real WhatsApp**: el sandbox Twilio dio "Failed to join" en el móvil admin → entrega NO confirmada (limitación sandbox: solo entrega a números con `join` activo). Código y backend OK. Solución definitiva: activar WhatsApp Sender aprobado (WhatsApp Business) en Twilio para entregar sin `join`.
+
+
 ## Ciclo Cotización→Venta de Logística (2026-06-22)
 - **Flujo de estados**: pending_quote → (admin fija precio) → **quoted** (+email al cliente con tarifa y botón Confirmar) → (cliente confirma) → **pending** (entra a despacho + alerta Telegram).
 - Backend: `PATCH /api/orders/{id}/set-quote-price` ahora pone status='quoted' y envía `email_service.send_logistics_quote_priced` (precio + enlace `${APP_BASE_URL}/confirmar-cotizacion/{id}`). Nuevo `POST /api/orders/{id}/confirm-quote` (cliente dueño, idempotente: 400 si ya no está 'quoted').
