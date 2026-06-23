@@ -34,6 +34,12 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - Panel admin logística: 2 secciones (pending_quote "sin precio" + quoted "por confirmar"), endpoint `GET /admin/logistics-quotes?status=`.
 
 
+## Historial de notificaciones + reenvío (2026-06-22, sesión fork)
+- **Registro de envíos**: helper `_dispatch_quote_notifications(order_id, priced_order, customer)` en `orders.py` envía email + WhatsApp cliente + WhatsApp admin, captura el resultado de cada canal `{sent, reason/via}` y lo persiste en `db.orders` vía `$push` al array `notifications` (+ `last_notified_at`). `set-quote-price` lo lanza en background (respuesta rápida).
+- **Reenvío manual**: `POST /api/orders/{id}/resend-quote-notification` (admin/manager, solo estado 'quoted') reenvía y devuelve el registro (awaited). Añade nueva entrada al historial.
+- **UI admin** (`LogisticsQuotesManager.jsx`): cada cotización valorada muestra "Historial de notificaciones" con badges por canal (Email / WA cliente / WA admin, verde=enviado, rojo=fallo con tooltip de motivo), fecha de último envío, contador de envíos, y botón "Reenviar notificación".
+- ✅ Verificado E2E en preview: curl (crear→fijar precio→historial registrado→reenviar 2ª entrada) + screenshot del panel. Email=gmail OK, WhatsApp=not_configured en preview (esperado).
+
 ## Opción B: Alerta WhatsApp admin + número oficial unificado (2026-06-22, sesión fork)
 - **Número admin oficial unificado a `+34612284215`** en TODO el sistema (reemplaza antiguos `+34654242092` y `+34654232573`, eliminados por completo):
   - `seed_admin.py`: phone en creación Y actualización del admin.

@@ -184,6 +184,36 @@ async def create_logistics_quote(order_data: ExpressOrderCreate, current_user: d
     return order
 
 
+async def _dispatch_quote_notifications(order_id: str, priced_order: dict, customer: dict | None) -> dict:
+    """Envía email + WhatsApp (cliente y admin) y registra el resultado en el historial del pedido."""
+    channels = {}
+    if customer and customer.get('email'):
+        channels['email'] = await email_service.send_logistics_quote_priced(customer['email'], priced_order)
+    else:
+        channels['email'] = {'sent': False, 'reason': 'no_email'}
+    if customer and customer.get('phone'):
+        channels['customer_whatsapp'] = await whatsapp_service.notify_logistics_quote_priced(customer['phone'], priced_order)
+    else:
+        channels['customer_whatsapp'] = {'sent': False, 'reason': 'no_phone'}
+    admin = await db.users.find_one({'role': 'admin'}, {'_id': 0, 'phone': 1})
+    if admin and admin.get('phone'):
+        channels['admin_whatsapp'] = await whatsapp_service.notify_admin_logistics_priced(admin['phone'], priced_order, customer)
+    else:
+        channels['admin_whatsapp'] = {'sent': False, 'reason': 'no_admin_phone'}
+    record = {
+        'at': datetime.now(timezone.utc).isoformat(),
+        'type': 'quote_priced',
+        'price': priced_order.get('total_amount'),
+        'currency': priced_order.get('currency') or 'EUR',
+        'channels': channels,
+    }
+    await db.orders.update_one(
+        {'id': order_id},
+        {'$push': {'notifications': record}, '$set': {'last_notified_at': record['at']}},
+    )
+    return record
+
+
 @router.patch("/orders/{order_id}/set-quote-price")
 async def set_logistics_quote_price(order_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
     """La administración (Fundador/Gestor) fija manualmente el precio de una cotización de logística."""
@@ -208,16 +238,24 @@ async def set_logistics_quote_price(order_id: str, payload: dict, current_user: 
     # Email automático al cliente con la tarifa final + enlace para confirmar (best-effort)
     customer = await db.users.find_one({'id': order.get('customer_id')}, {'_id': 0, 'email': 1, 'phone': 1, 'name': 1})
     priced_order = {**order, 'total_amount': price, 'status': 'quoted'}
-    if customer and customer.get('email'):
-        asyncio.create_task(email_service.send_logistics_quote_priced(customer['email'], priced_order))
-    # WhatsApp automático (best-effort, no rompe si Twilio no está configurado)
-    if customer and customer.get('phone'):
-        asyncio.create_task(whatsapp_service.notify_logistics_quote_priced(customer['phone'], priced_order))
-    # Alerta/copia automática al WhatsApp del admin (Opción B · control de gestión)
-    admin = await db.users.find_one({'role': 'admin'}, {'_id': 0, 'phone': 1})
-    if admin and admin.get('phone'):
-        asyncio.create_task(whatsapp_service.notify_admin_logistics_priced(admin['phone'], priced_order, customer))
+    # Notificaciones (email + WhatsApp cliente + WhatsApp admin) en segundo plano, registrando estado en el historial
+    asyncio.create_task(_dispatch_quote_notifications(order_id, priced_order, customer))
     return {'message': 'Precio fijado · cliente notificado', 'id': order_id, 'total_amount': price, 'status': 'quoted'}
+
+
+@router.post("/orders/{order_id}/resend-quote-notification")
+async def resend_quote_notification(order_id: str, current_user: dict = Depends(get_current_user)):
+    """La administración reenvía las notificaciones (email + WhatsApp cliente + WhatsApp admin) de una cotización ya valorada."""
+    if current_user.get('role') not in ('admin', 'manager'):
+        raise HTTPException(status_code=403, detail="Solo la administración puede reenviar notificaciones")
+    order = await db.orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    if order.get('order_type') != 'logistics' or order.get('status') != 'quoted':
+        raise HTTPException(status_code=400, detail="Solo se pueden reenviar cotizaciones ya valoradas (estado 'quoted')")
+    customer = await db.users.find_one({'id': order.get('customer_id')}, {'_id': 0, 'email': 1, 'phone': 1, 'name': 1})
+    record = await _dispatch_quote_notifications(order_id, order, customer)
+    return {'message': 'Notificación reenviada', 'id': order_id, 'notification': record}
 
 
 @router.post("/orders/{order_id}/confirm-quote", response_model=Order)

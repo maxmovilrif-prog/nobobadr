@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Truck, MapPin, Flag, Loader2, CheckCircle2, User, Clock } from 'lucide-react';
+import { Truck, MapPin, Flag, Loader2, CheckCircle2, User, Clock, Send, Mail, MessageCircle, ShieldCheck, XCircle } from 'lucide-react';
 
 export const LogisticsQuotesManager = ({ API, token }) => {
   const auth = { headers: { Authorization: `Bearer ${token}` } };
@@ -14,6 +14,7 @@ export const LogisticsQuotesManager = ({ API, token }) => {
   const [loading, setLoading] = useState(true);
   const [prices, setPrices] = useState({});
   const [savingId, setSavingId] = useState(null);
+  const [resendingId, setResendingId] = useState(null);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -41,13 +42,68 @@ export const LogisticsQuotesManager = ({ API, token }) => {
       await axios.patch(`${API}/orders/${id}/set-quote-price`, { total_amount: value }, auth);
       toast.success('Precio fijado · cliente notificado por email y WhatsApp');
       setPrices((prev) => ({ ...prev, [id]: '' }));
-      fetchAll();
+      setTimeout(fetchAll, 1500);
     } catch (err) {
       const d = err?.response?.data?.detail;
       toast.error(typeof d === 'string' ? d : 'No se pudo fijar el precio');
     } finally {
       setSavingId(null);
     }
+  };
+
+  const resend = async (id) => {
+    setResendingId(id);
+    try {
+      await axios.post(`${API}/orders/${id}/resend-quote-notification`, {}, auth);
+      toast.success('Notificación reenviada al cliente y al admin');
+      fetchAll();
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      toast.error(typeof d === 'string' ? d : 'No se pudo reenviar la notificación');
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const ChannelBadge = ({ icon: Icon, label, result }) => {
+    const sent = result?.sent;
+    return (
+      <span
+        title={sent ? 'Enviado' : (result?.reason || 'No enviado')}
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${sent ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}
+      >
+        <Icon className="w-3 h-3" />
+        {label}
+        {sent ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+      </span>
+    );
+  };
+
+  const NotifHistory = ({ q }) => {
+    const list = Array.isArray(q.notifications) ? q.notifications : [];
+    const last = list.length ? list[list.length - 1] : null;
+    return (
+      <div className="rounded-lg bg-white/70 border border-blue-100 p-3 space-y-2" data-testid={`notif-history-${q.id}`}>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <span className="text-xs font-semibold text-gray-600">Historial de notificaciones</span>
+          {q.last_notified_at && (
+            <span className="text-xs text-gray-400" data-testid={`notif-last-at-${q.id}`}>
+              Último envío: {new Date(q.last_notified_at).toLocaleString('es-ES')}
+            </span>
+          )}
+        </div>
+        {last ? (
+          <div className="flex flex-wrap gap-2">
+            <ChannelBadge icon={Mail} label="Email" result={last.channels?.email} />
+            <ChannelBadge icon={MessageCircle} label="WA cliente" result={last.channels?.customer_whatsapp} />
+            <ChannelBadge icon={ShieldCheck} label="WA admin" result={last.channels?.admin_whatsapp} />
+            {list.length > 1 && <span className="text-xs text-gray-400 self-center">· {list.length} envíos</span>}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">Aún sin registro de envío (puede tardar unos segundos en aparecer).</p>
+        )}
+      </div>
+    );
   };
 
   const CustomerLine = ({ q }) => (
@@ -119,6 +175,16 @@ export const LogisticsQuotesManager = ({ API, token }) => {
                   </div>
                   <CustomerLine q={q} />
                   <p className="text-sm font-semibold text-emerald-700">Precio enviado: {q.total_amount} {q.currency || 'EUR'}</p>
+                  <NotifHistory q={q} />
+                  <div className="flex justify-end pt-1">
+                    <Button onClick={() => resend(q.id)} disabled={resendingId === q.id}
+                      variant="outline" size="sm"
+                      data-testid={`logistics-resend-${q.id}`}
+                      className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-100">
+                      {resendingId === q.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      Reenviar notificación
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
