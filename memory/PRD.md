@@ -184,3 +184,13 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - **Stripe**: badge 🟢 LIVE / 🟡 TEST + botón "Verificar estado" en el panel del Fundador (`GET /api/admin/payments/status`). En preview → TEST.
 - **Reseteo de emergencia**: `POST /api/admin/reset-password` (guardado por `ADMIN_RESET_SECRET`, hmac.compare_digest, 404 si la env no existe). Crea la cuenta de admin si no existe (`created:true`) → permite provisionar el Fundador real en producción.
 - ✅ 114/114 pytest + frontend e2e 18/18 (iteration_9.json).
+
+## P2 — Módulo Reservas (BACKLOG, decidido 2026-06-22)
+- **Decisión del usuario:** arrancar 100% por **FERRIES** como primer vertical (corredor España–Marruecos / Estrecho, base en Algeciras). Modelo inicial **AFILIACIÓN** (Fase 1: cero coste API, sin licencias) → transaccional según demanda (Fase 2).
+- **Proveedor ferries recomendado:** **Direct Ferries Connect** (4.400+ rutas, 300+ operadoras, cubre Algeciras–Tánger / Tarifa–Tánger, REST/JSON, hasta 50% comisión CPS). Alternativa MVP rápido: **Ferryhopper** (widgets + API, sin coste setup, foco Mediterráneo).
+- **Arquitectura:** módulo unificado `/api/bookings` con patrón **provider adapter** (`FerryAdapter`, luego `BookingAdapter` hoteles, `FlightAdapter` vuelos) → cambiar/añadir proveedores sin tocar la lógica. Reusar infra de afiliados existente (`AffiliateSettings` + `TravelBooking`).
+- **Fases:** F1 Ferries afiliación (búsqueda + redirección con tracking comisión) → F2 Hoteles (Booking.com Affiliate vía Awin/CJ) + Vuelos (Travelpayouts/Skyscanner afiliación → Duffel/Kiwi transaccional) → F3 reservas in-app + pago Stripe + panel admin de reservas/comisiones.
+- **Verticales 2026 (notas):** Hoteles → Booking.com **Affiliate** (Connectivity pausado). Vuelos → Amadeus Self-Service en cierre (ir a Enterprise) o Duffel/Kiwi transaccional. Ferries → Direct Ferries Connect / Ferryhopper.
+
+## Pendiente operativo (producción)
+- **Twilio WhatsApp entrega real:** sandbox dio "Failed to join" en móvil admin +34612284215. Acción: reenviar `join <palabra>` (o `leave` y luego `join`) desde el móvil, o activar **WhatsApp Sender aprobado** (WhatsApp Business) en Twilio para entrega sin restricción de sandbox. El código ya lee `TWILIO_WHATSAPP_FROM` y registra el estado en el historial de notificaciones.
