@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Package, Truck, Store, Clock, Shield, MapPin, User } from 'lucide-react';
+import { Package, Truck, Store, Clock, Shield, MapPin, User, Ship } from 'lucide-react';
 import Footer from '@/components/Footer';
 import LanguageSelector from '@/components/LanguageSelector';
 
@@ -79,6 +79,15 @@ export default function Landing() {
               >
                 <User className="w-4 h-4 mr-1.5" />
                 {t('landing.nav.customer_area')}
+              </Button>
+              <Button
+                data-testid="nav-ferries-btn"
+                variant="outline"
+                onClick={() => navigate('/ferries')}
+                className="border-sky-600 text-sky-700 hover:bg-sky-50 px-5"
+              >
+                <Ship className="w-4 h-4 mr-1.5" />
+                {t('landing.nav.ferries', 'Ferries')}
               </Button>
               <Button
                 data-testid="nav-track-btn"

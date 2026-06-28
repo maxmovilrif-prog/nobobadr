@@ -203,3 +203,10 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
   - `routes/bookings.py` (registrado en server.py): `GET /api/bookings/ferries/provider-status`, `GET /api/bookings/ferries/ports`, `POST /api/bookings/ferries/search`, `POST /api/bookings/ferries/redirect` (registra clic en `db.booking_clicks`), `GET /api/admin/bookings/ferry-clicks` (Fundador, seguimiento comisiones).
 - ✅ Verificado por curl: status configured=false, ports OK, search 3 ofertas mock con deeplink, redirect crea click_id, admin lista clics.
 - **Pendiente para activar real:** contratar Direct Ferries Connect → añadir secrets `DIRECT_FERRIES_API_KEY`/`AFFILIATE_ID` en prod + implementar `_search_live`. Frontend de búsqueda de ferries (no creado aún).
+
+## Frontend búsqueda de Ferries (2026-06-28, sesión fork)
+- **Página `pages/FerrySearch.js`** en ruta pública **`/ferries`** (registrada en App.js). Tema náutico sky/cyan.
+- Form: selectores Origen/Destino (puertos de `/bookings/ferries/ports` agrupados por país ES/MA), fecha de salida, adultos/niños, vehículo. Botón "Buscar travesías" → `POST /bookings/ferries/search`.
+- Resultados: tarjetas de oferta (operadora, horarios salida→llegada, duración, precio desde) + botón "Reservar" → `POST /bookings/ferries/redirect` (registra clic) → abre deeplink afiliado en nueva pestaña. Badge "Datos de ejemplo · proveedor en pruebas" cuando `configured=false`.
+- ✅ Verificado por screenshot: Algeciras→Tánger Med devuelve 3 ofertas mock renderizadas correctamente. data-testids: ferry-search-page, ferry-origin-select, ferry-dest-select, ferry-date-input, ferry-adults-input, ferry-children-input, ferry-vehicle-select, ferry-search-btn, ferry-results, ferry-offer-{idx}, ferry-reserve-{idx}, ferry-mock-badge.
+- Enlace `/ferries` en navbar de Landing (botón "Ferries" + icono Ship, i18n ES/AR) ✅. Pendiente: `_search_live` real al contratar Direct Ferries.

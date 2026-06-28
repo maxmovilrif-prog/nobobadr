@@ -42,6 +42,7 @@
     "nav": {
       "customer_area": "Área de clientes",
       "track_order": "Seguir pedido",
+      "ferries": "Ferries",
       "calculate_price": "Calcular precio"
     },
     "hero_cta_quote": "Calcular presupuesto",
