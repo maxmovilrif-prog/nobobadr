@@ -194,3 +194,12 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 
 ## Pendiente operativo (producción)
 - **Twilio WhatsApp entrega real:** sandbox dio "Failed to join" en móvil admin +34612284215. Acción: reenviar `join <palabra>` (o `leave` y luego `join`) desde el móvil, o activar **WhatsApp Sender aprobado** (WhatsApp Business) en Twilio para entrega sin restricción de sandbox. El código ya lee `TWILIO_WHATSAPP_FROM` y registra el estado en el historial de notificaciones.
+
+## Scaffold Módulo Reservas — Ferries (2026-06-28, sesión fork)
+- **Estructura backend lista (patrón adapter)** para conectar Direct Ferries:
+  - `booking_providers/base.py`: `FerryProviderAdapter` (ABC) + modelos `FerryPort`, `FerryPassengers`, `FerrySearchQuery`, `FerryOffer`.
+  - `booking_providers/direct_ferries.py`: `DirectFerriesAdapter` (afiliación). Lee env `DIRECT_FERRIES_API_KEY/AFFILIATE_ID/DEEPLINK_BASE/BASE_URL`. `is_configured()` por API key. `list_ports()` (seed Estrecho/Med: ALG, TARM, ALM, MOT, MLN, BCN, TNG, TNGV, NDR, CEU). `search()` devuelve ofertas EJEMPLO (is_mock) hasta tener credenciales; `build_affiliate_link()` ya construye deeplink con `affid`. TODO: `_search_live` API real (Fase 2).
+  - `booking_providers/registry.py`: `get_ferry_adapter()` selecciona por env `BOOKINGS_FERRY_PROVIDER` (def direct_ferries).
+  - `routes/bookings.py` (registrado en server.py): `GET /api/bookings/ferries/provider-status`, `GET /api/bookings/ferries/ports`, `POST /api/bookings/ferries/search`, `POST /api/bookings/ferries/redirect` (registra clic en `db.booking_clicks`), `GET /api/admin/bookings/ferry-clicks` (Fundador, seguimiento comisiones).
+- ✅ Verificado por curl: status configured=false, ports OK, search 3 ofertas mock con deeplink, redirect crea click_id, admin lista clics.
+- **Pendiente para activar real:** contratar Direct Ferries Connect → añadir secrets `DIRECT_FERRIES_API_KEY`/`AFFILIATE_ID` en prod + implementar `_search_live`. Frontend de búsqueda de ferries (no creado aún).
