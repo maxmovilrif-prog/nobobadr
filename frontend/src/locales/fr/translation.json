@@ -37,7 +37,7 @@
       "supermarkets": "Supermarchés",
       "courier": "Coursier"
     },
-    "coverage": "Espagne"
+    "coverage": "Maroc et Espagne"
   },
   "auth": {
     "welcome": "Bienvenue à",
@@ -143,7 +143,7 @@
   },
   "footer": {
     "about": "Nubo",
-    "about_text": "Votre marketplace en Espagne. Nourriture, courses, coursier, voitures et électronique.",
+    "about_text": "Votre marketplace au Maroc et en Espagne. Nourriture, courses, coursier, voitures et électronique.",
     "contact": "Contact",
     "links": "Liens",
     "home": "Accueil",

@@ -5,7 +5,7 @@ import LanguageSelector from './LanguageSelector';
 
 export default function Footer() {
   const { t } = useTranslation();
-  const phoneNumber = '+34 654 23 25 73';
+  const phoneNumber = '+34 612 28 42 15';
   const email = 'exprenobo@hotmail.com';
   const address = t('landing.coverage');
 
@@ -117,7 +117,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-700 mt-8 pt-6 text-center text-sm text-gray-400">
-          <p>© 2025 {t('footer.about')} - {t('landing.coverage')}. {t('footer.rights')}.</p>
+          <p>© 2026 {t('footer.about')} - {t('landing.coverage')}. {t('footer.rights')}.</p>
           <p className="mt-2">
             <span className="text-emerald-400">📱 {t('footer.whatsapp')}:</span> {phoneNumber}
           </p>

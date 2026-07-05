@@ -38,7 +38,7 @@
       "courier": "Paquetería",
       "nubo_car": "Nubo Car"
     },
-    "coverage": "España",
+    "coverage": "Marruecos y España",
     "nav": {
       "customer_area": "Área de clientes",
       "track_order": "Seguir pedido",
@@ -182,7 +182,7 @@
   },
   "footer": {
     "about": "Nubo",
-    "about_text": "Tu marketplace en España. Comida, compras, paquetería, coches y electrónica.",
+    "about_text": "Tu marketplace en Marruecos y España. Comida, compras, paquetería, coches y electrónica.",
     "contact": "Contacto",
     "links": "Enlaces",
     "home": "Inicio",

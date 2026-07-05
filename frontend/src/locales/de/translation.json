@@ -37,7 +37,7 @@
       "supermarkets": "Supermärkte",
       "courier": "Kurier"
     },
-    "coverage": "Spanien"
+    "coverage": "Marokko und Spanien"
   },
   "auth": {
     "welcome": "Willkommen bei",
@@ -143,7 +143,7 @@
   },
   "footer": {
     "about": "Nubo",
-    "about_text": "Dein Marktplatz in Spanien. Essen, Einkaufen, Kurier, Autos und Elektronik.",
+    "about_text": "Dein Marktplatz in Marokko und Spanien. Essen, Einkaufen, Kurier, Autos und Elektronik.",
     "contact": "Kontakt",
     "links": "Links",
     "home": "Startseite",

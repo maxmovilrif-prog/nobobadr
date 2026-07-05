@@ -216,3 +216,7 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - Env vars nuevas (pegar HX cuando Meta apruebe, sin tocar código): `TWILIO_CONTENT_SID_QUOTE_PRICED` (cliente), `TWILIO_CONTENT_SID_ADMIN_ALERT` (admin), `TWILIO_MESSAGING_SERVICE_SID` (opcional).
 - Variables plantilla — Cliente: {{1}}nº pedido {{2}}ruta {{3}}precio+moneda {{4}}enlace confirmación. Admin: {{1}}nº pedido {{2}}cliente(nombre+tel) {{3}}ruta {{4}}precio+moneda.
 - Verificado: import OK, fallback `not_configured` en preview. Requiere Re-deploy para producción.
+
+## Footer identidad Marruecos y España (2026, sesión fork)
+- Footer: descripción, cobertura (contacto) y copyright ahora "Marruecos y España" (antes solo "España"). Copyright © 2025 → © 2026. Aplicado en los 7 locales (es/ar/en/fr/de/nl/pt): claves `landing.coverage` y `footer.about_text`.
+- Corregido teléfono antiguo residual en Footer.js `+34 654 23 25 73` (con espacios, no detectado antes) → oficial `+34 612 28 42 15` (telefono + botón WhatsApp). Ya no quedan rastros del número viejo.
