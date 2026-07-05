@@ -23,6 +23,7 @@ import OrderSuccess from '@/pages/OrderSuccess';
 import DropshippingPanel from '@/pages/DropshippingPanel';
 import TravelBooking from '@/pages/TravelBooking';
 import FerrySearch from '@/pages/FerrySearch';
+import HotelSearch from '@/pages/HotelSearch';
 import AffiliateSettings from '@/pages/AffiliateSettings';
 import Privacy from '@/pages/Privacy';
 import Terms from '@/pages/Terms';
@@ -169,6 +170,7 @@ function App() {
           <Route path="/dropshipping-panel" element={user && user.role === 'business' ? <DropshippingPanel /> : <Navigate to="/auth" />} />
           <Route path="/travel" element={<TravelBooking />} />
           <Route path="/ferries" element={<FerrySearch />} />
+          <Route path="/hoteles" element={<HotelSearch />} />
           <Route path="/affiliate-settings" element={user && user.role === 'business' ? <AffiliateSettings /> : <Navigate to="/auth" />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />

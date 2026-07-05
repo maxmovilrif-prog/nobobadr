@@ -220,3 +220,9 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 ## Footer identidad Marruecos y España (2026, sesión fork)
 - Footer: descripción, cobertura (contacto) y copyright ahora "Marruecos y España" (antes solo "España"). Copyright © 2025 → © 2026. Aplicado en los 7 locales (es/ar/en/fr/de/nl/pt): claves `landing.coverage` y `footer.about_text`.
 - Corregido teléfono antiguo residual en Footer.js `+34 654 23 25 73` (con espacios, no detectado antes) → oficial `+34 612 28 42 15` (telefono + botón WhatsApp). Ya no quedan rastros del número viejo.
+
+## Módulo Hoteles (esqueleto Fase 2) + fix icono Nubo Car (2026, sesión fork)
+- **Hoteles (afiliación Booking.com)**: `booking_providers/hotels.py` (`HotelProviderAdapter` + `BookingComAdapter`, modelos HotelDestination/HotelSearchQuery/HotelOffer, seed destinos ES/MA, mock offers, deeplink `booking.com/searchresults?aid=`). `registry.get_hotel_adapter()`. Endpoints en `routes/bookings.py`: `/bookings/hotels/provider-status|destinations|search|redirect`, admin `/admin/bookings/hotel-clicks`. Secrets: `BOOKING_AFFILIATE_ID`, `BOOKING_DEEPLINK_BASE`, `BOOKINGS_HOTEL_PROVIDER`.
+- **Frontend**: `pages/HotelSearch.js` ruta `/hoteles` (tema ámbar/naranja), botón nav "Hoteles" (icono cama) junto a Ferries, i18n ES/AR (`landing.nav.hotels`). data-testids: hotel-search-page, hotel-dest-select, hotel-checkin-input, hotel-checkout-input, hotel-adults-input, hotel-rooms-input, hotel-search-btn, hotel-results, hotel-offer-{idx}, hotel-reserve-{idx}, hotel-mock-badge, nav-hotels-btn.
+- **Icono Nubo Car**: eliminado recuadro negro (from-slate-800/900 + ring); ahora coche blanco estilizado (generado, transparente) sobre gradiente índigo-azul (from-indigo-400 to-blue-500), consistente con los demás iconos. Nueva URL en Landing.js categories.
+- ✅ Verificado por curl (3 hoteles mock Tánger) + screenshots (navbar Hoteles, /hoteles con 3 ofertas, icono Nubo Car limpio).

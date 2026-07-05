@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Package, Truck, Store, Clock, Shield, MapPin, User, Ship } from 'lucide-react';
+import { Package, Truck, Store, Clock, Shield, MapPin, User, Ship, BedDouble } from 'lucide-react';
 import Footer from '@/components/Footer';
 import LanguageSelector from '@/components/LanguageSelector';
 
@@ -48,7 +48,7 @@ export default function Landing() {
     { name: t('landing.services.restaurants'), emoji: '🍔', color: 'from-orange-400 to-red-500', path: '/auth' },
     { name: t('landing.services.supermarkets'), emoji: '🛒', color: 'from-blue-400 to-cyan-500', path: '/auth' },
     { name: t('landing.services.courier'), emoji: '📦', color: 'from-purple-400 to-pink-500', path: '/presupuesto' },
-    { name: 'Nubo Car', emoji: '🚗', color: 'from-slate-800 to-slate-900', path: '/ride', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/6171a4cb06401b700892f39b880ec54b1e5d9ec3ebbe57e460b62c7400cad0c4.png' }  ];
+    { name: 'Nubo Car', emoji: '🚗', color: 'from-indigo-400 to-blue-500', path: '/ride', img: 'https://static.prod-images.emergentagent.com/jobs/b2114274-550f-4f93-8612-a95098ea48da/images/e13e2b56a433a4eb08c3d4efd69df5ea54309eac9ad688025cfbec6c08aeb3bc.png' }  ];
 
   return (
     <div className="min-h-screen">
@@ -88,6 +88,15 @@ export default function Landing() {
               >
                 <Ship className="w-4 h-4 mr-1.5" />
                 {t('landing.nav.ferries', 'Ferries')}
+              </Button>
+              <Button
+                data-testid="nav-hotels-btn"
+                variant="outline"
+                onClick={() => navigate('/hoteles')}
+                className="border-amber-600 text-amber-700 hover:bg-amber-50 px-5"
+              >
+                <BedDouble className="w-4 h-4 mr-1.5" />
+                {t('landing.nav.hotels', 'Hoteles')}
               </Button>
               <Button
                 data-testid="nav-track-btn"
@@ -152,8 +161,8 @@ export default function Landing() {
                         className="text-center hover-lift cursor-pointer"
                       >
                         {cat.img ? (
-                          <div className="w-20 h-20 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center overflow-hidden shadow-lg ring-1 ring-black/5">
-                            <img src={cat.img} alt={cat.name} className="w-full h-full object-contain p-1.5" />
+                          <div className={`w-20 h-20 mx-auto mb-3 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center overflow-hidden shadow-lg`}>
+                            <img src={cat.img} alt={cat.name} className="w-12 h-12 object-contain" />
                           </div>
                         ) : (
                           <div className={`w-20 h-20 mx-auto mb-3 bg-gradient-to-br ${cat.color} rounded-2xl flex items-center justify-center text-3xl shadow-lg`}>
