@@ -210,3 +210,9 @@ Nubo (antes "Glovo Algeciras") es un marketplace multiservicio (FastAPI + React 
 - Resultados: tarjetas de oferta (operadora, horarios salida→llegada, duración, precio desde) + botón "Reservar" → `POST /bookings/ferries/redirect` (registra clic) → abre deeplink afiliado en nueva pestaña. Badge "Datos de ejemplo · proveedor en pruebas" cuando `configured=false`.
 - ✅ Verificado por screenshot: Algeciras→Tánger Med devuelve 3 ofertas mock renderizadas correctamente. data-testids: ferry-search-page, ferry-origin-select, ferry-dest-select, ferry-date-input, ferry-adults-input, ferry-children-input, ferry-vehicle-select, ferry-search-btn, ferry-results, ferry-offer-{idx}, ferry-reserve-{idx}, ferry-mock-badge.
 - Enlace `/ferries` en navbar de Landing (botón "Ferries" + icono Ship, i18n ES/AR) ✅. Pendiente: `_search_live` real al contratar Direct Ferries.
+
+## Soporte plantillas WhatsApp (Content Template SID) (2026, sesión fork)
+- `whatsapp_service.py` refactor: `_send_sync` acepta `content_sid`+`content_variables` (JSON) o `body`. Emisor por `TWILIO_MESSAGING_SERVICE_SID` (MG...) si existe, si no `TWILIO_WHATSAPP_FROM`. Nueva `send_whatsapp_template(phone, content_sid, variables, fallback_body)` → usa plantilla si hay SID, si no texto libre (sandbox). Best-effort, nunca rompe.
+- Env vars nuevas (pegar HX cuando Meta apruebe, sin tocar código): `TWILIO_CONTENT_SID_QUOTE_PRICED` (cliente), `TWILIO_CONTENT_SID_ADMIN_ALERT` (admin), `TWILIO_MESSAGING_SERVICE_SID` (opcional).
+- Variables plantilla — Cliente: {{1}}nº pedido {{2}}ruta {{3}}precio+moneda {{4}}enlace confirmación. Admin: {{1}}nº pedido {{2}}cliente(nombre+tel) {{3}}ruta {{4}}precio+moneda.
+- Verificado: import OK, fallback `not_configured` en preview. Requiere Re-deploy para producción.
